@@ -102,6 +102,18 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
         content = message.content.strip()
         lower = content.lower()
 
+        # 0. Dedicated Song Requests Channel Direct Queue (Zero-prefix)
+        if "song-request" in message.channel.name.lower() or "requests" in message.channel.name.lower():
+            if content and not content.startswith("/"):
+                ctx = await b.get_context(message)
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+                music_cog = b.get_cog("Music")
+                if music_cog:
+                    return await music_cog.play(ctx, query=content)
+
         # 1. Direct Play triggers: /play, !play, play, /p, !p, p
         play_prefixes = ["/play ", "!play ", "play ", "/p ", "!p ", "p "]
         matched_prefix = next((p for p in play_prefixes if lower.startswith(p)), None)
