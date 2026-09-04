@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: rai-vibes-bot
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DISCORD_BOT_TOKEN
+        sync: false

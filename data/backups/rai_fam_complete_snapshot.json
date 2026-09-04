@@ -1,0 +1,1313 @@
+{
+    "server_name": "RAI FAM\ud83d\udc97",
+    "server_id": "1457382179981099090",
+    "total_roles": 31,
+    "total_channels": 39,
+    "roles": [
+        {
+            "id": "1457382179981099090",
+            "name": "@everyone",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 0,
+            "color": 0,
+            "colors": {
+                "primary_color": 0,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1534903565535940648",
+            "name": "Rythm",
+            "description": null,
+            "permissions": "8",
+            "position": 31,
+            "color": 0,
+            "colors": {
+                "primary_color": 0,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": true,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "tags": {
+                "bot_id": "235088799074484224"
+            },
+            "flags": 0
+        },
+        {
+            "id": "1545494288643657912",
+            "name": "RAI VIBES",
+            "description": null,
+            "permissions": "3214344",
+            "position": 30,
+            "color": 0,
+            "colors": {
+                "primary_color": 0,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": true,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "tags": {
+                "bot_id": "1545479610550980709"
+            },
+            "flags": 0
+        },
+        {
+            "id": "1545494578512134176",
+            "name": "\ud83e\udd16 \u250a \ud835\udc00\ud835\udc14\ud835\udc03\ud835\udc08\ud835\udc0e \ud835\udc01\ud835\udc0e\ud835\udc13\ud835\udc12",
+            "description": null,
+            "permissions": "51200",
+            "position": 29,
+            "color": 9807270,
+            "colors": {
+                "primary_color": 9807270,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": true,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 1
+        },
+        {
+            "id": "1545494584203673740",
+            "name": "\ud83c\udf38 \u250a \ud835\udc11\ud835\udc00\ud835\udc08 \ud835\udc05\ud835\udc00\ud835\udc0c\ud835\udc08\ud835\udc0b\ud835\udc18",
+            "description": null,
+            "permissions": "3147776",
+            "position": 28,
+            "color": 16295362,
+            "colors": {
+                "primary_color": 16295362,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 1
+        },
+        {
+            "id": "1545494591883579434",
+            "name": "\ud83d\udc8e \u250a \ud835\udc11\ud835\udc00\ud835\udc08 \ud835\udc04\ud835\udc0b\ud835\udc08\ud835\udc13\ud835\udc04",
+            "description": null,
+            "permissions": "67141632",
+            "position": 26,
+            "color": 16738740,
+            "colors": {
+                "primary_color": 16738740,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": true,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545494600347680918",
+            "name": "\ud83d\udee1\ufe0f \u250a \ud835\udc06\ud835\udc14\ud835\udc00\ud835\udc11\ud835\udc03\ud835\udc08\ud835\udc00\ud835\udc0d",
+            "description": null,
+            "permissions": "163586054",
+            "position": 24,
+            "color": 3447003,
+            "colors": {
+                "primary_color": 3447003,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": true,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545494610489643038",
+            "name": "\ud83d\udc51 \u250a \ud835\udc04\ud835\udc0c\ud835\udc0f\ud835\udc04\ud835\udc11\ud835\udc0e\ud835\udc11",
+            "description": null,
+            "permissions": "8",
+            "position": 22,
+            "color": 15844367,
+            "colors": {
+                "primary_color": 15844367,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": true,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545506927788687470",
+            "name": "\u26a1 \u250a \ud835\udc07\ud835\udc04\ud835\udc00\ud835\udc03 \ud835\udc00\ud835\udc03\ud835\udc0c\ud835\udc08\ud835\udc0d",
+            "description": null,
+            "permissions": "0",
+            "position": 1,
+            "color": 15158332,
+            "colors": {
+                "primary_color": 15158332,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": true,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516328016805979",
+            "name": "\ud83c\udf38 \u250a Sakura Pink",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 16758725,
+            "colors": {
+                "primary_color": 16758725,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516370785996882",
+            "name": "\ud83d\udc9c \u250a Neon Violet",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 10182117,
+            "colors": {
+                "primary_color": 10182117,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516378046337074",
+            "name": "\ud83e\ude75 \u250a Cyber Cyan",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 62932,
+            "colors": {
+                "primary_color": 62932,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516381426950214",
+            "name": "\ud83d\udc9b \u250a Royal Gold",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 16704576,
+            "colors": {
+                "primary_color": 16704576,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516383742201919",
+            "name": "\ud83d\udc8e \u250a Rai Legend",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 14604534,
+            "colors": {
+                "primary_color": 14604534,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516386887929916",
+            "name": "\ud83d\udd25 \u250a Rai Champion",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 16755365,
+            "colors": {
+                "primary_color": 16755365,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516390520193165",
+            "name": "\u2728 \u250a Rai Active",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 16765878,
+            "colors": {
+                "primary_color": 16765878,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516392969670787",
+            "name": "\ud83c\udf31 \u250a Rai Novice",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 11069135,
+            "colors": {
+                "primary_color": 11069135,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516397034078269",
+            "name": "\ud83d\udd25 \u250a Free Fire",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 16742144,
+            "colors": {
+                "primary_color": 16742144,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516399663779871",
+            "name": "\u26a1 \u250a BGMI",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 15844367,
+            "colors": {
+                "primary_color": 15844367,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516402188881991",
+            "name": "\ud83e\uddf8 \u250a Roblox",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 15158332,
+            "colors": {
+                "primary_color": 15158332,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516404302811256",
+            "name": "\ud83d\udcf1 \u250a Mobile Gamer",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 3447003,
+            "colors": {
+                "primary_color": 3447003,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516406454493257",
+            "name": "\ud83d\udcbb \u250a PC Gamer",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 2719929,
+            "colors": {
+                "primary_color": 2719929,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516408375353376",
+            "name": "\ud83c\udfac \u250a Movie Alerts",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 15277667,
+            "colors": {
+                "primary_color": 15277667,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516411659620383",
+            "name": "\ud83c\udf89 \u250a Giveaway Alerts",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 3066993,
+            "colors": {
+                "primary_color": 3066993,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516414016815169",
+            "name": "\ud83d\udce2 \u250a Server News",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 10181046,
+            "colors": {
+                "primary_color": 10181046,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516416969609296",
+            "name": "\ud83c\udfa7 \u250a Music Jam",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 1752220,
+            "colors": {
+                "primary_color": 1752220,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": true,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516419121422377",
+            "name": "\u2642\ufe0f \u250a He/Him",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 9807270,
+            "colors": {
+                "primary_color": 9807270,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516421583208551",
+            "name": "\u2640\ufe0f \u250a She/Her",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 15221651,
+            "colors": {
+                "primary_color": 15221651,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516423789543651",
+            "name": "\ud83c\udf08 \u250a They/Them",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 52937,
+            "colors": {
+                "primary_color": 52937,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545516426893197392",
+            "name": "\ud83d\udd1e \u250a 18+ Verified",
+            "description": null,
+            "permissions": "2222085186637377",
+            "position": 1,
+            "color": 14037041,
+            "colors": {
+                "primary_color": 14037041,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": false,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "flags": 0
+        },
+        {
+            "id": "1545519948007473222",
+            "name": "Wick",
+            "description": null,
+            "permissions": "8",
+            "position": 1,
+            "color": 0,
+            "colors": {
+                "primary_color": 0,
+                "secondary_color": null,
+                "tertiary_color": null
+            },
+            "hoist": false,
+            "managed": true,
+            "mentionable": false,
+            "icon": null,
+            "unicode_emoji": null,
+            "tags": {
+                "bot_id": "536991182035746816"
+            },
+            "flags": 0
+        }
+    ],
+    "channels": [
+        {
+            "id": "1545502694930649109",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udf38 | \ud835\ude52\ud835\ude40\ud835\ude47\ud835\ude3e\ud835\ude4a\ud835\ude48\ud835\ude40 & \ud835\ude44\ud835\ude49\ud835\ude41\ud835\ude4a",
+            "parent_id": null,
+            "position": 0,
+            "permission_overwrites": []
+        },
+        {
+            "id": "1545502700840427702",
+            "type": 0,
+            "last_message_id": "1545502870231715931",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u2705\u30fbverify-here",
+            "parent_id": "1545502694930649109",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 0,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502705643167876",
+            "type": 0,
+            "last_message_id": "1545519948581965896",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udc4b\u30fbwelcome",
+            "parent_id": "1545502694930649109",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 1,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502710101704714",
+            "type": 0,
+            "last_message_id": "1545520497825947760",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udcdc\u30fbrules",
+            "parent_id": "1545502694930649109",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 2,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502718792175646",
+            "type": 0,
+            "last_message_id": "1545520502175432870",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udce2\u30fbannouncements",
+            "parent_id": "1545502694930649109",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 3,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502722739150898",
+            "type": 0,
+            "last_message_id": "1545516674713657375",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u2b50\u30fbself-roles",
+            "parent_id": "1545502694930649109",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 4,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502726232744108",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udcac | \ud835\ude3e\ud835\ude43\ud835\ude3c\ud835\ude4f & \ud835\ude47\ud835\ude4a\ud835\ude50\ud835\ude49\ud835\ude42\ud835\ude40",
+            "parent_id": null,
+            "position": 1,
+            "permission_overwrites": []
+        },
+        {
+            "id": "1545502730699808768",
+            "type": 0,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udcac\u30fbgeneral-chat",
+            "parent_id": "1545502726232744108",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 5,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502734663286856",
+            "type": 0,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udcf8\u30fbmedia",
+            "parent_id": "1545502726232744108",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 6,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502738362671255",
+            "type": 0,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83e\udd16\u30fbbot-commands",
+            "parent_id": "1545502726232744108",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 7,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502762467328185",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udfa5 | CINEMA THEATER",
+            "parent_id": "1545502766120566784",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 0,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502766120566784",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udfb5 | \ud835\ude48\ud835\ude50\ud835\ude4e\ud835\ude44\ud835\ude3e & \ud835\ude3e\ud835\ude44\ud835\ude49\ud835\ude40\ud835\ude48\ud835\ude3c",
+            "parent_id": null,
+            "position": 3,
+            "permission_overwrites": []
+        },
+        {
+            "id": "1545502782268772453",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udfa7 | MUSIC LOUNGE",
+            "parent_id": "1545502766120566784",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 2,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502786161090652",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\ude39 | \ud835\ude41\ud835\ude50\ud835\ude49 \ud835\ude51\ud835\ude4a\ud835\ude44\ud835\ude3e\ud835\ude40 \ud835\ude3e\ud835\ude43\ud835\ude3c\ud835\ude49\ud835\ude49\ud835\ude40\ud835\ude47\ud835\ude4e",
+            "parent_id": null,
+            "position": 4,
+            "permission_overwrites": []
+        },
+        {
+            "id": "1545502790888198215",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u2795 | JOIN TO CREATE",
+            "parent_id": "1545502786161090652",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 3,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502794868457574",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udc23 | FUN TIME",
+            "parent_id": "1545502786161090652",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 4,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502799402369034",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udf47 | OPEN VOICE",
+            "parent_id": "1545502786161090652",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 5,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502804280352871",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83e\udd42 | \u30fb DUO",
+            "parent_id": "1545502786161090652",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 2,
+            "rtc_region": null,
+            "position": 6,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502809896517703",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83e\udd42 | \u30fb TRIO",
+            "parent_id": "1545502786161090652",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 3,
+            "rtc_region": null,
+            "position": 7,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502813889499136",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udca4 | AFK",
+            "parent_id": "1545502786161090652",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 8,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502817471569990",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udfae | \ud835\ude42\ud835\ude3c\ud835\ude48\ud835\ude44\ud835\ude49\ud835\ude42 \ud835\ude55\ud835\ude4a\ud835\ude49\ud835\ude40",
+            "parent_id": null,
+            "position": 5,
+            "permission_overwrites": []
+        },
+        {
+            "id": "1545502823699980408",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u26a1 | FREE FIRE",
+            "parent_id": "1545502817471569990",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 9,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502829089787924",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u26a1 | BGMI",
+            "parent_id": "1545502817471569990",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 10,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502832822591539",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u26a1 | ROBLOX",
+            "parent_id": "1545502817471569990",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 11,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502836392198164",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u26a1 | OTHER GAMES",
+            "parent_id": "1545502817471569990",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 12,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502840452157463",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udee1\ufe0f | \ud835\ude4e\ud835\ude4f\ud835\ude3c\ud835\ude41\ud835\ude41 \ud835\ude55\ud835\ude4a\ud835\ude49\ud835\ude40",
+            "parent_id": null,
+            "position": 6,
+            "permission_overwrites": []
+        },
+        {
+            "id": "1545502845208629328",
+            "type": 0,
+            "last_message_id": "1545520508043530354",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udee1\ufe0f\u30fbstaff-chat",
+            "parent_id": "1545502840452157463",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 13,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545502850057244762",
+            "type": 0,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udccb\u30fbmod-logs",
+            "parent_id": "1545502840452157463",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 14,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545514505520545886",
+            "type": 0,
+            "last_message_id": "1545514507428962336",
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udce9\u30fbticket-support",
+            "parent_id": "1545502840452157463",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 15,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545518525634838658",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udc51 | \ud835\ude4d\ud835\ude4a\ud835\ude54\ud835\ude3c\ud835\ude47 \ud835\ude4e\ud835\ude3c\ud835\ude49\ud835\ude3e\ud835\ude4f\ud835\ude50\ud835\ude3c\ud835\ude4d\ud835\ude54",
+            "parent_id": null,
+            "position": 7,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "0",
+                    "deny": "1051648"
+                },
+                {
+                    "id": "1545494610489643038",
+                    "type": 0,
+                    "allow": "3214864",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545494288643657912",
+                    "type": 0,
+                    "allow": "3148800",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545506927788687470",
+                    "type": 0,
+                    "allow": "3214848",
+                    "deny": "0"
+                }
+            ]
+        },
+        {
+            "id": "1545518528126394400",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udc51 | EMPEROR'S THRONE",
+            "parent_id": "1545518525634838658",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 13,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "0",
+                    "deny": "1051648"
+                },
+                {
+                    "id": "1545494610489643038",
+                    "type": 0,
+                    "allow": "3214864",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545494288643657912",
+                    "type": 0,
+                    "allow": "3148800",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545506927788687470",
+                    "type": 0,
+                    "allow": "3214848",
+                    "deny": "0"
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1545518531192553603",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\u26a1 | HIGH COMMAND VC",
+            "parent_id": "1545518525634838658",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 14,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "0",
+                    "deny": "1051648"
+                },
+                {
+                    "id": "1545494610489643038",
+                    "type": 0,
+                    "allow": "3214864",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545494288643657912",
+                    "type": 0,
+                    "allow": "3148800",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545506927788687470",
+                    "type": 0,
+                    "allow": "3214848",
+                    "deny": "0"
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1545518533566271539",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udf78 | PRIVATE LOUNGE",
+            "parent_id": "1545518525634838658",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 2,
+            "rtc_region": null,
+            "position": 15,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "0",
+                    "deny": "1051648"
+                },
+                {
+                    "id": "1545494288643657912",
+                    "type": 0,
+                    "allow": "3148800",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545494610489643038",
+                    "type": 0,
+                    "allow": "3214864",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545506927788687470",
+                    "type": 0,
+                    "allow": "3214848",
+                    "deny": "0"
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1545518535827263519",
+            "type": 0,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udd12\u30fbexecutive-chat",
+            "parent_id": "1545518525634838658",
+            "rate_limit_per_user": 0,
+            "topic": null,
+            "position": 16,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "0",
+                    "deny": "1051648"
+                },
+                {
+                    "id": "1545494288643657912",
+                    "type": 0,
+                    "allow": "3148800",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545494610489643038",
+                    "type": 0,
+                    "allow": "3214864",
+                    "deny": "0"
+                },
+                {
+                    "id": "1545506927788687470",
+                    "type": 0,
+                    "allow": "3214848",
+                    "deny": "0"
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1545518701414195281",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udcfb | 24-7 RADIO",
+            "parent_id": "1545502766120566784",
+            "rate_limit_per_user": 0,
+            "bitrate": 96000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 16,
+            "permission_overwrites": [],
+            "nsfw": false
+        },
+        {
+            "id": "1545519330903724053",
+            "type": 4,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udcca | \ud835\ude4e\ud835\ude40\ud835\ude4d\ud835\ude51\ud835\ude40\ud835\ude4d \ud835\ude4e\ud835\ude4f\ud835\ude3c\ud835\ude4f\ud835\ude4e",
+            "parent_id": null,
+            "position": 0,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "1024",
+                    "deny": "1048576"
+                }
+            ]
+        },
+        {
+            "id": "1545519333126574080",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udc65\u30fbMembers: 6",
+            "parent_id": "1545519330903724053",
+            "rate_limit_per_user": 0,
+            "bitrate": 64000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 17,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "1024",
+                    "deny": "1048576"
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1545519336104661002",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83c\udf99\ufe0f\u30fbIn Voice: 0 Active",
+            "parent_id": "1545519330903724053",
+            "rate_limit_per_user": 0,
+            "bitrate": 64000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 18,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "1024",
+                    "deny": "1048576"
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1545519338868572221",
+            "type": 2,
+            "last_message_id": null,
+            "flags": 0,
+            "guild_id": "1457382179981099090",
+            "name": "\ud83d\udc8e\u30fbBoosts: 0 (Lvl 0)",
+            "parent_id": "1545519330903724053",
+            "rate_limit_per_user": 0,
+            "bitrate": 64000,
+            "user_limit": 0,
+            "rtc_region": null,
+            "position": 19,
+            "permission_overwrites": [
+                {
+                    "id": "1457382179981099090",
+                    "type": 0,
+                    "allow": "1024",
+                    "deny": "1048576"
+                }
+            ],
+            "nsfw": false
+        }
+    ]
+}

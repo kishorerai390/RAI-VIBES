@@ -1,0 +1,26 @@
+# Sensitive credentials & tokens
+.env
+.env.*
+*.token
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Binary files & executables
+bin/ffmpeg.exe
+bin/ffprobe.exe
+*.exe
+*.dll
+
+# Logs & scratch data
+*.log
+scratch/
+.system_generated/
+.idea/
+.vscode/
