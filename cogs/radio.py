@@ -2,7 +2,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from discord import app_commands
-from typing import Optional
+from typing import Optional, Literal
 
 import config
 
@@ -207,18 +207,16 @@ class Radio(commands.Cog):
 
     @commands.hybrid_command(name="stay247", aliases=["247", "alwayson"], description="Toggle or set 24/7 mode (prevents bot from leaving voice channel).")
     @app_commands.describe(mode="Choose to explicitly Enable or Disable 24/7 mode")
-    @app_commands.choices(mode=[
-        app_commands.Choice(name="✅ Enable 24/7 Mode (Never leave VC)", value="enable"),
-        app_commands.Choice(name="❌ Disable 24/7 Mode (Leave when inactive)", value="disable")
-    ])
-    async def stay_247(self, ctx: commands.Context, mode: Optional[app_commands.Choice[str]] = None):
+    async def stay_247(self, ctx: commands.Context, mode: Optional[Literal["enable", "disable"]] = None):
         music_cog = self.bot.get_cog("Music")
         if not music_cog:
             return await ctx.send("❌ Music engine not available.", ephemeral=True)
 
         player = music_cog.get_or_create_player(ctx.guild)
-        if mode:
-            player.mode_247 = (mode.value == "enable")
+        if mode == "enable":
+            player.mode_247 = True
+        elif mode == "disable":
+            player.mode_247 = False
         else:
             player.mode_247 = not player.mode_247
 
