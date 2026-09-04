@@ -1,6 +1,26 @@
 import discord
 from discord.ui import View, Button, button
 
+ROLE_ID_MAP = {
+    "🌸 ┊ Sakura Pink": 1545516328016805979,
+    "💜 ┊ Neon Violet": 1545516370785996882,
+    "🩵 ┊ Cyber Cyan": 1545516378046337074,
+    "💛 ┊ Royal Gold": 1545516381426950214,
+    "🔥 ┊ Free Fire": 1545516397034078269,
+    "⚡ ┊ BGMI": 1545516399663779871,
+    "🧸 ┊ Roblox": 1545516402188881991,
+    "📱 ┊ Mobile Gamer": 1545516404302811256,
+    "💻 ┊ PC Gamer": 1545516406454493257,
+    "🎬 ┊ Movie Alerts": 1545516408375353376,
+    "🎉 ┊ Giveaway Alerts": 1545516411659620383,
+    "📢 ┊ Server News": 1545516414016815169,
+    "🎧 ┊ Music Jam": 1545516416969609296,
+    "♂️ ┊ He/Him": 1545516419121422377,
+    "♀️ ┊ She/Her": 1545516421583208551,
+    "🌈 ┊ They/Them": 1545516423789543651,
+    "🔞 ┊ 18+ Verified": 1545516426893197392,
+}
+
 ALL_COLOR_ROLES = [
     "🌸 ┊ Sakura Pink",
     "💜 ┊ Neon Violet",
@@ -8,25 +28,34 @@ ALL_COLOR_ROLES = [
     "💛 ┊ Royal Gold"
 ]
 
+def find_role(guild: discord.Guild, role_name: str) -> discord.Role | None:
+    role_id = ROLE_ID_MAP.get(role_name)
+    if role_id:
+        r = guild.get_role(role_id)
+        if r:
+            return r
+    for r in guild.roles:
+        if r.name.lower() == role_name.lower() or role_name.lower() in r.name.lower():
+            return r
+    return None
+
 class ColorRoleButton(Button):
     def __init__(self, role_name: str, label: str, emoji: str, style: discord.ButtonStyle, row: int = 0):
         super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"colorrole_{role_name}")
         self.role_name = role_name
 
     async def callback(self, interaction: discord.Interaction):
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
 
         guild = interaction.guild
         member = interaction.user
-        role = discord.utils.get(guild.roles, name=self.role_name)
+        role = find_role(guild, self.role_name)
         if not role:
             return await interaction.followup.send(f"❌ Role `{self.role_name}` not found.", ephemeral=True)
 
-        # Check if user already has this color
         if role in member.roles:
             await member.remove_roles(role)
             return await interaction.followup.send(f"⚪ Removed color: **{role.name}**", ephemeral=True)
@@ -46,14 +75,13 @@ class SelfRoleButton(Button):
         self.role_name = role_name
 
     async def callback(self, interaction: discord.Interaction):
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
 
         guild = interaction.guild
-        role = discord.utils.get(guild.roles, name=self.role_name)
+        role = find_role(guild, self.role_name)
         if not role:
             return await interaction.followup.send(f"❌ Role `{self.role_name}` not found.", ephemeral=True)
 
