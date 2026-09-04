@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from typing import Optional
+from typing import Optional, Literal
 
 import config
 from utils.filters import FILTER_PRESETS
@@ -44,17 +44,17 @@ class Filters(commands.Cog):
 
     @commands.hybrid_command(name="bassboost", aliases=["bb", "bass"], description="Boost the sub-bass frequencies.")
     @app_commands.describe(level="Bass boost intensity level")
-    @app_commands.choices(level=[
-        app_commands.Choice(name="Off (Disable)", value="off"),
-        app_commands.Choice(name="Low (Subtle Punch)", value="bassboost_low"),
-        app_commands.Choice(name="Medium (Rich Thunder)", value="bassboost_medium"),
-        app_commands.Choice(name="High (Heavy Rumble)", value="bassboost_high"),
-        app_commands.Choice(name="Extreme (Asgard Quake)", value="bassboost_extreme"),
-    ])
-    async def bassboost(self, ctx: commands.Context, level: Optional[app_commands.Choice[str]] = None):
-        target = level.value if level else "bassboost_medium"
-        name = level.name if level else "Medium (Rich Thunder)"
-        await self.apply_player_filter(ctx, target, f"Bass Boost [{name}]")
+    async def bassboost(self, ctx: commands.Context, level: Optional[Literal["low", "medium", "high", "extreme", "off"]] = "medium"):
+        target_map = {
+            "off": "off",
+            "low": "bassboost_low",
+            "medium": "bassboost_medium",
+            "high": "bassboost_high",
+            "extreme": "bassboost_extreme"
+        }
+        target = target_map.get(level or "medium", "bassboost_medium")
+        display = level.capitalize() if level else "Medium"
+        await self.apply_player_filter(ctx, target, f"Bass Boost [{display}]")
 
     @commands.hybrid_command(name="nightcore", aliases=["nc"], description="Toggle high-energy Nightcore pitch & speed filter.")
     async def nightcore(self, ctx: commands.Context):
