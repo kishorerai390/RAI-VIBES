@@ -54,12 +54,11 @@ class Song:
 
     @classmethod
     async def create_source(cls, search: str, requester: discord.Member, loop: asyncio.AbstractEventLoop = None):
-        """Extracts streamable info using yt-dlp asynchronously."""
+        """Extracts streamable info using yt-dlp asynchronously with smart single-track preference."""
         loop = loop or asyncio.get_event_loop()
         
-        to_search = search
-        if not search.startswith("http://") and not search.startswith("https://"):
-            to_search = f"ytsearch:{search}"
+        is_url = search.startswith("http://") or search.startswith("https://")
+        to_search = search if is_url else f"ytsearch5:{search}"
 
         partial_extract = functools.partial(
             ytdl.extract_info,
@@ -76,7 +75,22 @@ class Song:
             entries = [e for e in data["entries"] if e is not None]
             if not entries:
                 return None
-            data = entries[0]
+            
+            # Smart Single-Track Filter: prefer individual tracks over long compilation mixes
+            selected_entry = entries[0]
+            query_lower = search.lower()
+            wants_compilation = any(k in query_lower for k in ["mix", "compilation", "playlist", "jukebox", "album", "top "])
+            
+            if not wants_compilation and len(entries) > 1:
+                # Look for the first single track (under 10 minutes and not titled as a mix)
+                for entry in entries:
+                    t_lower = entry.get("title", "").lower()
+                    dur = entry.get("duration") or 0
+                    is_mix = any(k in t_lower for k in ["top 5", "top 10", "top 20", "jukebox", "compilation", "full album", "all songs", "nonstop", "non-stop"])
+                    if not is_mix and 30 <= dur <= 600:
+                        selected_entry = entry
+                        break
+            data = selected_entry
 
         return cls(data, requester=requester, source_type="youtube")
 
@@ -402,13 +416,23 @@ class GuildMusicPlayer:
                                 pass
 
             try:
+                # Ensure fresh streaming URL
+                stream_url = song.url
+                if not stream_url or "googlevideo.com" in stream_url:
+                    try:
+                        fresh_info = await self.bot.loop.run_in_executor(None, functools.partial(ytdl.extract_info, song.webpage_url, download=False, process=True))
+                        if fresh_info:
+                            stream_url = fresh_info.get("url") or stream_url
+                    except Exception:
+                        pass
+
                 filter_args = get_filter_string(self.active_filters, self.custom_speed)
                 ffmpeg_opt = f"-vn {filter_args}".strip()
 
                 raw_source = discord.FFmpegPCMAudio(
-                    song.url,
+                    stream_url,
                     executable=ffmpeg_bin,
-                    before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
+                    before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin -probesize 10M -analyzeduration 0",
                     options=ffmpeg_opt
                 )
                 self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.volume / 100.0)
