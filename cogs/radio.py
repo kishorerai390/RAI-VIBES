@@ -1,3 +1,4 @@
+import asyncio
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -49,6 +50,86 @@ class Radio(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    async def start_radio_in_channel(self, channel: discord.VoiceChannel, station_key: str = "lofi", requester: Optional[discord.Member] = None):
+        """Connects to a voice channel and starts streaming 24/7 radio."""
+        music_cog = self.bot.get_cog("Music")
+        if not music_cog:
+            return
+
+        guild = channel.guild
+        voice_client = guild.voice_client
+
+        if not voice_client or voice_client.channel != channel:
+            try:
+                if voice_client:
+                    await voice_client.disconnect(force=True)
+                voice_client = await channel.connect(timeout=20.0, reconnect=True, self_deaf=True)
+            except Exception as e:
+                print(f"[Radio Connect Error] {e}")
+                return
+
+        player = music_cog.get_or_create_player(guild)
+        player.voice_client = voice_client
+        player.mode_247 = True
+
+        from cogs.music import Song
+        st_data = RADIO_STATIONS.get(station_key, RADIO_STATIONS["lofi"])
+        radio_song = Song(
+            data={
+                "title": f"📻 24/7 Live Radio: {st_data['name']}",
+                "url": st_data["url"],
+                "webpage_url": st_data["url"],
+                "duration": 0,
+                "thumbnail": st_data["thumb"],
+                "uploader": "RAI VIBES 💗 Live Radio"
+            },
+            requester=requester or guild.me,
+            source_type="radio"
+        )
+
+        player.queue.clear()
+        player.queue.appendleft(radio_song)
+        if player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()):
+            player.skip()
+
+        text_channel = discord.utils.get(guild.text_channels, name="🎵・song-requests") or discord.utils.get(guild.text_channels, name="💬・general-chat")
+        if text_channel:
+            player.text_channel = text_channel
+            embed = discord.Embed(
+                title="📻 24/7 Live Radio Station Streaming!",
+                description=f"Now broadcasting non-stop in **{channel.name}**:\n**{st_data['name']}** — *{st_data['desc']}*",
+                color=config.COLOR_GOLD
+            )
+            embed.set_thumbnail(url=st_data["thumb"])
+            embed.set_footer(text="RAI VIBES 💗 • 24/7 Live Radio Engine", icon_url=config.RAI_ICON_URL)
+            try:
+                await text_channel.send(embed=embed)
+            except Exception:
+                pass
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Auto-connect to 24-7 Radio channel on bot startup!"""
+        await asyncio.sleep(5) # wait for guilds to load
+        for guild in self.bot.guilds:
+            radio_vc = discord.utils.get(guild.voice_channels, name="📻 | 24-7 RADIO") or next((vc for vc in guild.voice_channels if "24-7" in vc.name.lower() or "radio" in vc.name.lower()), None)
+            if radio_vc:
+                print(f"[Radio] Auto-joining 24/7 radio in {radio_vc.name} ({guild.name})...")
+                await self.start_radio_in_channel(radio_vc, "lofi")
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Auto-starts 24/7 Radio when someone enters the 24-7 Radio channel!"""
+        if member.bot:
+            return
+
+        if after.channel and ("24-7" in after.channel.name.lower() or "radio" in after.channel.name.lower()):
+            guild = after.channel.guild
+            voice_client = guild.voice_client
+            if not voice_client or voice_client.channel != after.channel or not voice_client.is_playing():
+                print(f"[Radio] Member {member.name} joined {after.channel.name}, starting radio...")
+                await self.start_radio_in_channel(after.channel, "lofi", requester=member)
+
     @commands.hybrid_command(name="radio", description="Stream continuous 24/7 live themed radio stations.")
     @app_commands.describe(station="Select a 24/7 radio station")
     @app_commands.choices(station=[
@@ -61,111 +142,21 @@ class Radio(commands.Cog):
     ])
     async def radio(self, ctx: commands.Context, station: Optional[app_commands.Choice[str]] = None):
         key = station.value if station else "lofi"
+        author = ctx.author
+        if not author.voice or not author.voice.channel:
+            return await ctx.send("⚡ **You must join a voice channel first to tune into radio!**", ephemeral=True)
+
+        await ctx.defer()
+        await self.start_radio_in_channel(author.voice.channel, station_key=key, requester=author)
         st_data = RADIO_STATIONS.get(key, RADIO_STATIONS["lofi"])
-
-        music_cog = self.bot.get_cog("Music")
-        if not music_cog:
-            return await ctx.send("❌ Music cog not available.", ephemeral=True)
-
-        voice_client = await music_cog.ensure_voice(ctx)
-        if not voice_client:
-            return
-
-        player = music_cog.get_or_create_player(ctx.guild)
-        player.voice_client = voice_client
-        player.text_channel = ctx.channel
-
-        from cogs.music import Song
-        radio_song = Song(
-            data={
-                "title": f"📻 24/7 Live Radio: {st_data['name']}",
-                "url": st_data["url"],
-                "webpage_url": st_data["url"],
-                "duration": 0,
-                "thumbnail": st_data["thumb"],
-                "uploader": "RAI VIBES 💗 Live Radio"
-            },
-            requester=ctx.author,
-            source_type="radio"
-        )
-
-        player.queue.appendleft(radio_song)
-        if player.voice_client.is_playing() or player.voice_client.is_paused():
-            player.skip()
-
         embed = discord.Embed(
-            title=f"⚡ Tuning into 24/7 Radio Station",
+            title="📻 Tuned into 24/7 Radio Station",
             description=f"**{st_data['name']}**\n{st_data['desc']}",
             color=config.COLOR_GOLD
         )
         embed.set_thumbnail(url=st_data["thumb"])
-        embed.add_field(name="Requested By", value=ctx.author.mention, inline=True)
         embed.set_footer(text="RAI VIBES 💗 Live Broadcast", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-        """Auto-starts 24/7 Radio when someone joins the 24-7 Radio channel!"""
-        if member.bot:
-            return
-
-        if after.channel and ("24-7" in after.channel.name.lower() or "radio" in after.channel.name.lower()):
-            music_cog = self.bot.get_cog("Music")
-            if not music_cog:
-                return
-
-            guild = after.channel.guild
-            voice_client = guild.voice_client
-
-            # If not connected or in a different channel, join and play 24/7 Lofi Radio
-            if not voice_client or voice_client.channel != after.channel:
-                try:
-                    if voice_client:
-                        await voice_client.disconnect(force=True)
-                    voice_client = await after.channel.connect(timeout=20.0, reconnect=True, self_deaf=True)
-                except Exception as e:
-                    print(f"[Radio Auto-Join Error] {e}")
-                    return
-
-                player = music_cog.get_or_create_player(guild)
-                player.voice_client = voice_client
-                player.mode_247 = True
-
-                from cogs.music import Song
-                st_data = RADIO_STATIONS["lofi"]
-                radio_song = Song(
-                    data={
-                        "title": f"📻 24/7 Live Radio: {st_data['name']}",
-                        "url": st_data["url"],
-                        "webpage_url": st_data["url"],
-                        "duration": 0,
-                        "thumbnail": st_data["thumb"],
-                        "uploader": "RAI VIBES 💗 Live Radio"
-                    },
-                    requester=member,
-                    source_type="radio"
-                )
-
-                player.queue.clear()
-                player.queue.appendleft(radio_song)
-                if player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()):
-                    player.skip()
-
-                # Find a text channel to notify
-                text_channel = discord.utils.get(guild.text_channels, name="🎵・song-requests") or discord.utils.get(guild.text_channels, name="💬・general-chat")
-                if text_channel:
-                    player.text_channel = text_channel
-                    embed = discord.Embed(
-                        title="📻 24/7 Live Radio Station Auto-Activated!",
-                        description=f"Now streaming non-stop in **{after.channel.name}**:\n**{st_data['name']}** — *{st_data['desc']}*",
-                        color=config.COLOR_GOLD
-                    )
-                    embed.set_thumbnail(url=st_data["thumb"])
-                    embed.set_footer(text="RAI VIBES 💗 • 24/7 Live Radio Engine", icon_url=config.RAI_ICON_URL)
-                    try:
-                        await text_channel.send(embed=embed)
-                    except Exception:
-                        pass
 
 
 async def setup(bot: commands.Bot):
