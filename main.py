@@ -185,33 +185,19 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
     return b
 
 async def load_cogs(bot_instance: commands.Bot):
+    # Pure Music, Radio & Audio FX Engine for RAI VIBES 💗
     initial_extensions = [
         "cogs.music",
-        "cogs.general",
-        "cogs.filters",
         "cogs.radio",
-        "cogs.favorites",
+        "cogs.filters",
         "cogs.lyrics",
-        "cogs.voicehub",
-        "cogs.moderation",
-        "cogs.economy",
-        "cogs.giveaways",
-        "cogs.polls",
-        "cogs.birthdays",
-        "cogs.starboard",
-        "cogs.counting",
-        "cogs.movies",
-        "cogs.cinema_hub",
-        "cogs.levels",
-        "cogs.minigames",
-        "cogs.ai_assistant",
-        "cogs.welcome",
-        "cogs.verify"
+        "cogs.favorites",
+        "cogs.general",
     ]
     for extension in initial_extensions:
         try:
             await bot_instance.load_extension(extension)
-            logger.info(f"Loaded extension: {extension}")
+            logger.info(f"Loaded audio extension: {extension}")
         except Exception as e:
             logger.error(f"Failed to load extension {extension}: {e}")
 
