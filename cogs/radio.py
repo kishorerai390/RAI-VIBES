@@ -7,6 +7,24 @@ from typing import Optional
 import config
 
 RADIO_STATIONS = {
+    "tamil": {
+        "name": "🌺 Tamil Non-Stop Hits & Melodies 24/7",
+        "url": "https://stream.zeno.fm/f3wvbbqmdg8uv",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
+        "desc": "Non-stop Tamil cinema chartbusters, Anirudh, Sai Abhyankar & melody hits 24/7."
+    },
+    "tamil_lofi": {
+        "name": "☕ Tamil Slowed & Lofi Beats 24/7",
+        "url": "https://stream.zeno.fm/e2981u30c18uv",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/3075/3075908.png",
+        "desc": "Relaxing aesthetic Tamil lofi and midnight chill vibes."
+    },
+    "tamil_ar": {
+        "name": "👑 AR Rahman Classics 24/7",
+        "url": "https://stream.zeno.fm/65x759p158quv",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/461/461238.png",
+        "desc": "24/7 legendary AR Rahman musical masterworks and OSTs."
+    },
     "lofi": {
         "name": "☕ Lofi Hip Hop / Chill Beats",
         "url": "https://play.streamafrica.net/lofiradio",
@@ -46,12 +64,12 @@ RADIO_STATIONS = {
 }
 
 class Radio(commands.Cog):
-    """24/7 Live Radio Stations and 24/7 Voice Channel Stay Mode."""
+    """24/7 Live Radio Stations, Tamil Non-Stop Music & Voice Channel Stay Mode."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def start_radio_in_channel(self, channel: discord.VoiceChannel, station_key: str = "lofi", requester: Optional[discord.Member] = None):
-        """Connects to a voice channel and starts streaming 24/7 radio."""
+    async def start_radio_in_channel(self, channel: discord.VoiceChannel, station_key: str = "tamil", requester: Optional[discord.Member] = None):
+        """Connects to a voice channel and starts streaming 24/7 radio non-stop without buffering."""
         music_cog = self.bot.get_cog("Music")
         if not music_cog:
             return
@@ -63,7 +81,7 @@ class Radio(commands.Cog):
             try:
                 if voice_client:
                     await voice_client.disconnect(force=True)
-                voice_client = await channel.connect(timeout=20.0, reconnect=True, self_deaf=True)
+                voice_client = await channel.connect(timeout=25.0, reconnect=True, self_deaf=True)
             except Exception as e:
                 print(f"[Radio Connect Error] {e}")
                 return
@@ -73,7 +91,7 @@ class Radio(commands.Cog):
         player.mode_247 = True
 
         from cogs.music import Song
-        st_data = RADIO_STATIONS.get(station_key, RADIO_STATIONS["lofi"])
+        st_data = RADIO_STATIONS.get(station_key, RADIO_STATIONS["tamil"])
         radio_song = Song(
             data={
                 "title": f"📻 24/7 Live Radio: {st_data['name']}",
@@ -81,7 +99,7 @@ class Radio(commands.Cog):
                 "webpage_url": st_data["url"],
                 "duration": 0,
                 "thumbnail": st_data["thumb"],
-                "uploader": "RAI VIBES 💗 Live Radio"
+                "uploader": "RAI VIBES 💗 Non-Stop Radio"
             },
             requester=requester or guild.me,
             source_type="radio"
@@ -96,12 +114,12 @@ class Radio(commands.Cog):
         if text_channel:
             player.text_channel = text_channel
             embed = discord.Embed(
-                title="📻 24/7 Live Radio Station Streaming!",
-                description=f"Now broadcasting non-stop in **{channel.name}**:\n**{st_data['name']}** — *{st_data['desc']}*",
-                color=config.COLOR_GOLD
+                title="🌺 24/7 Non-Stop Radio Station Live!",
+                description=f"Now broadcasting continuously in **{channel.name}**:\n### **{st_data['name']}**\n*{st_data['desc']}*",
+                color=config.COLOR_PRIMARY
             )
             embed.set_thumbnail(url=st_data["thumb"])
-            embed.set_footer(text="RAI VIBES 💗 • 24/7 Live Radio Engine", icon_url=config.RAI_ICON_URL)
+            embed.set_footer(text="RAI VIBES 💗 • Non-Stop Smooth Audio", icon_url=config.RAI_ICON_URL)
             try:
                 await text_channel.send(embed=embed)
             except Exception:
@@ -110,16 +128,16 @@ class Radio(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Auto-connect to 24-7 Radio channel on bot startup!"""
-        await asyncio.sleep(5) # wait for guilds to load
+        await asyncio.sleep(5)
         for guild in self.bot.guilds:
             radio_vc = discord.utils.get(guild.voice_channels, name="📻 | 24-7 RADIO") or next((vc for vc in guild.voice_channels if "24-7" in vc.name.lower() or "radio" in vc.name.lower()), None)
             if radio_vc:
-                print(f"[Radio] Auto-joining 24/7 radio in {radio_vc.name} ({guild.name})...")
-                await self.start_radio_in_channel(radio_vc, "lofi")
+                print(f"[Radio] Auto-joining 24/7 Tamil radio in {radio_vc.name} ({guild.name})...")
+                await self.start_radio_in_channel(radio_vc, "tamil")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-        """Auto-starts 24/7 Radio when someone enters the 24-7 Radio channel!"""
+        """Auto-starts 24/7 Tamil Radio when someone enters the 24-7 Radio channel!"""
         if member.bot:
             return
 
@@ -127,12 +145,34 @@ class Radio(commands.Cog):
             guild = after.channel.guild
             voice_client = guild.voice_client
             if not voice_client or voice_client.channel != after.channel or not voice_client.is_playing():
-                print(f"[Radio] Member {member.name} joined {after.channel.name}, starting radio...")
-                await self.start_radio_in_channel(after.channel, "lofi", requester=member)
+                print(f"[Radio] Member {member.name} joined {after.channel.name}, starting Tamil radio...")
+                await self.start_radio_in_channel(after.channel, "tamil", requester=member)
+
+    @commands.hybrid_command(name="tamil", aliases=["tamilmusic", "tamilsongs"], description="Stream 24/7 Non-Stop Tamil Hit Songs without stopping!")
+    async def tamil(self, ctx: commands.Context):
+        """Instant shortcut to stream 24/7 Non-Stop Tamil Hits."""
+        author = ctx.author
+        if not author.voice or not author.voice.channel:
+            return await ctx.send("⚡ **Please join a voice channel first to play Tamil Songs!**", ephemeral=True)
+
+        await ctx.defer()
+        await self.start_radio_in_channel(author.voice.channel, station_key="tamil", requester=author)
+        st_data = RADIO_STATIONS["tamil"]
+        embed = discord.Embed(
+            title="🌺 24/7 Non-Stop Tamil Songs Streaming!",
+            description=f"**{st_data['name']}**\n{st_data['desc']}",
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_thumbnail(url=st_data["thumb"])
+        embed.set_footer(text="RAI VIBES 💗 Live Tamil Stream", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="radio", description="Stream continuous 24/7 live themed radio stations.")
     @app_commands.describe(station="Select a 24/7 radio station")
     @app_commands.choices(station=[
+        app_commands.Choice(name="🌺 Tamil Non-Stop Hits & Melodies 24/7", value="tamil"),
+        app_commands.Choice(name="☕ Tamil Slowed & Lofi Beats 24/7", value="tamil_lofi"),
+        app_commands.Choice(name="👑 AR Rahman Classics 24/7", value="tamil_ar"),
         app_commands.Choice(name="☕ Lofi Hip Hop / Study Beats", value="lofi"),
         app_commands.Choice(name="🌆 Synthwave / 80s Retrowave", value="synthwave"),
         app_commands.Choice(name="🎮 Gaming EDM / Simulator", value="gaming"),
@@ -141,14 +181,14 @@ class Radio(commands.Cog):
         app_commands.Choice(name="🎸 Indie & Alternative Rock", value="rock"),
     ])
     async def radio(self, ctx: commands.Context, station: Optional[app_commands.Choice[str]] = None):
-        key = station.value if station else "lofi"
+        key = station.value if station else "tamil"
         author = ctx.author
         if not author.voice or not author.voice.channel:
             return await ctx.send("⚡ **You must join a voice channel first to tune into radio!**", ephemeral=True)
 
         await ctx.defer()
         await self.start_radio_in_channel(author.voice.channel, station_key=key, requester=author)
-        st_data = RADIO_STATIONS.get(key, RADIO_STATIONS["lofi"])
+        st_data = RADIO_STATIONS.get(key, RADIO_STATIONS["tamil"])
         embed = discord.Embed(
             title="📻 Tuned into 24/7 Radio Station",
             description=f"**{st_data['name']}**\n{st_data['desc']}",

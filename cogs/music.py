@@ -448,7 +448,7 @@ class GuildMusicPlayer:
                         pass
 
                 filter_args = get_filter_string(self.active_filters, self.custom_speed)
-                ffmpeg_opt = f"-vn {filter_args}".strip()
+                ffmpeg_opt = f"-vn -bufsize 4096k -threads 2 {filter_args}".strip()
 
                 raw_source = discord.FFmpegPCMAudio(
                     stream_url,
