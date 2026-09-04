@@ -148,7 +148,7 @@ class Radio(commands.Cog):
                 print(f"[Radio] Member {member.name} joined {after.channel.name}, starting Tamil Nadu FM...")
                 await self.start_radio_in_channel(after.channel, "tamilnadu_fm", requester=member)
 
-    @commands.hybrid_command(name="tamilnadufm", aliases=["tnfm", "tamilfm", "tamil"], description="Stream 24/7 Live Tamil Nadu FM Radio non-stop!")
+    @commands.hybrid_command(name="tamilnadufm", description="Stream 24/7 Live Tamil Nadu FM Radio non-stop!")
     async def tamilnadufm(self, ctx: commands.Context):
         """Instant shortcut to stream 24/7 Tamil Nadu FM."""
         author = ctx.author
@@ -166,6 +166,14 @@ class Radio(commands.Cog):
         embed.set_thumbnail(url=st_data["thumb"])
         embed.set_footer(text="RAI VIBES 💗 Tamil Nadu FM Live", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="tnfm", description="Quick shortcut: Stream 24/7 Tamil Nadu FM Live!")
+    async def tnfm(self, ctx: commands.Context):
+        await self.tamilnadufm(ctx)
+
+    @commands.hybrid_command(name="tamil", description="Quick shortcut: Stream 24/7 Non-Stop Tamil Hit Songs!")
+    async def tamil(self, ctx: commands.Context):
+        await self.tamilnadufm(ctx)
 
     @commands.hybrid_command(name="radio", description="Stream continuous 24/7 live themed radio stations.")
     @app_commands.describe(station="Select a 24/7 radio station")
