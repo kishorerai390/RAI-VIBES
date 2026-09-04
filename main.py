@@ -76,7 +76,10 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
             except Exception as e:
                 logger.debug(f"Could not change nickname in {guild.name}: {e}")
 
-        # Register Persistent Views for instant interaction without timeout
+        logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
+
+    async def setup_hook():
+        # Register Persistent Views before gateway connection so buttons work 100% of the time
         b.add_view(VerifyButtonView())
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
@@ -84,15 +87,9 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
         b.add_view(IdentityRolesView())
         b.add_view(TicketCreateView())
         b.add_view(TicketCloseView())
+        logger.info("Registered all persistent interaction views in setup_hook.")
 
-        try:
-            logger.info("Synchronizing application slash commands with Discord...")
-            synced = await b.tree.sync()
-            logger.info(f"Successfully synchronized {len(synced)} slash commands!")
-        except Exception as e:
-            logger.error(f"Failed to sync slash commands: {e}")
-
-        logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
+    b.setup_hook = setup_hook
 
     @b.event
     async def on_message(message: discord.Message):
