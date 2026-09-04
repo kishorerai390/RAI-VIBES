@@ -204,6 +204,22 @@ class Radio(commands.Cog):
         )
         embed.set_thumbnail(url=st_data["thumb"])
         embed.set_footer(text="RAI VIBES 💗 Live Broadcast", icon_url=config.RAI_ICON_URL)
+    @commands.hybrid_command(name="stay247", aliases=["247", "alwayson"], description="Toggle 24/7 mode (prevents bot from leaving voice channel).")
+    async def stay_247(self, ctx: commands.Context):
+        music_cog = self.bot.get_cog("Music")
+        if not music_cog:
+            return await ctx.send("❌ Music engine not available.", ephemeral=True)
+
+        player = music_cog.get_or_create_player(ctx.guild)
+        player.mode_247 = not player.mode_247
+
+        status = "ENABLED (Bot stays in voice channel 24/7)" if player.mode_247 else "DISABLED (Bot leaves when empty)"
+        embed = discord.Embed(
+            title="⚡ RAI VIBES 💗 24/7 Voice Mode",
+            description=f"**24/7 Voice Channel Presence:** `{status}`",
+            color=config.COLOR_PRIMARY if player.mode_247 else config.COLOR_DARK
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Non-Stop Music Engine", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
 
