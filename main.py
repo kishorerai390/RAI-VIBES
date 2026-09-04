@@ -174,7 +174,13 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
             await ctx.send("You don't have permission to execute this command.")
         else:
             logger.error(f"Error executing command '{ctx.command}': {error}")
-            await ctx.send(f"An error occurred: `{error}`")
+            try:
+                if ctx.interaction and ctx.interaction.response.is_done():
+                    await ctx.interaction.followup.send(f"An error occurred: `{error}`", ephemeral=True)
+                else:
+                    await ctx.send(f"An error occurred: `{error}`")
+            except Exception:
+                pass
 
     return b
 

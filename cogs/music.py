@@ -512,7 +512,10 @@ class Music(commands.Cog):
         if not author.voice or not author.voice.channel:
             msg = "⚡ **You must join a voice channel first before playing music!**"
             if isinstance(ctx_or_interaction, discord.Interaction):
-                await ctx_or_interaction.response.send_message(msg, ephemeral=True)
+                if ctx_or_interaction.response.is_done():
+                    await ctx_or_interaction.followup.send(msg, ephemeral=True)
+                else:
+                    await ctx_or_interaction.response.send_message(msg, ephemeral=True)
             else:
                 await ctx_or_interaction.send(msg)
             return None
