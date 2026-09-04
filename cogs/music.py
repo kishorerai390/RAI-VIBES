@@ -34,6 +34,11 @@ YTDL_OPTIONS = {
     "no_warnings": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "ios", "web_embedded", "mweb"]
+        }
+    }
 }
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
@@ -54,19 +59,35 @@ class Song:
 
     @classmethod
     async def create_source(cls, search: str, requester: discord.Member, loop: asyncio.AbstractEventLoop = None):
-        """Extracts streamable info using yt-dlp asynchronously with smart single-track preference."""
+        """Extracts streamable info using yt-dlp asynchronously with smart single-track preference and fallback."""
         loop = loop or asyncio.get_event_loop()
         
         is_url = search.startswith("http://") or search.startswith("https://")
         to_search = search if is_url else f"ytsearch5:{search}"
 
-        partial_extract = functools.partial(
-            ytdl.extract_info,
-            to_search,
-            download=False,
-            process=True
-        )
-        data = await loop.run_in_executor(None, partial_extract)
+        try:
+            partial_extract = functools.partial(
+                ytdl.extract_info,
+                to_search,
+                download=False,
+                process=True
+            )
+            data = await loop.run_in_executor(None, partial_extract)
+        except Exception as e:
+            # Fallback to SoundCloud if YouTube blocks search
+            if not is_url:
+                try:
+                    sc_extract = functools.partial(
+                        ytdl.extract_info,
+                        f"scsearch5:{search}",
+                        download=False,
+                        process=True
+                    )
+                    data = await loop.run_in_executor(None, sc_extract)
+                except Exception:
+                    data = None
+            else:
+                data = None
 
         if data is None:
             return None
