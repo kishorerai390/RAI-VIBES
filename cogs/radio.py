@@ -203,23 +203,40 @@ class Radio(commands.Cog):
             color=config.COLOR_GOLD
         )
         embed.set_thumbnail(url=st_data["thumb"])
-        embed.set_footer(text="RAI VIBES 💗 Live Broadcast", icon_url=config.RAI_ICON_URL)
-    @commands.hybrid_command(name="stay247", aliases=["247", "alwayson"], description="Toggle 24/7 mode (prevents bot from leaving voice channel).")
-    async def stay_247(self, ctx: commands.Context):
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="stay247", aliases=["247", "alwayson"], description="Toggle or set 24/7 mode (prevents bot from leaving voice channel).")
+    @app_commands.describe(mode="Choose to explicitly Enable or Disable 24/7 mode")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="✅ Enable 24/7 Mode (Never leave VC)", value="enable"),
+        app_commands.Choice(name="❌ Disable 24/7 Mode (Leave when inactive)", value="disable")
+    ])
+    async def stay_247(self, ctx: commands.Context, mode: Optional[app_commands.Choice[str]] = None):
         music_cog = self.bot.get_cog("Music")
         if not music_cog:
             return await ctx.send("❌ Music engine not available.", ephemeral=True)
 
         player = music_cog.get_or_create_player(ctx.guild)
-        player.mode_247 = not player.mode_247
+        if mode:
+            player.mode_247 = (mode.value == "enable")
+        else:
+            player.mode_247 = not player.mode_247
 
-        status = "ENABLED (Bot stays in voice channel 24/7)" if player.mode_247 else "DISABLED (Bot leaves when empty)"
+        if player.mode_247:
+            status_title = "✅ 24/7 Mode ACTIVATED"
+            status_desc = "⚡ **Bot is locked into 24/7 Mode!**\nRAI VIBES 💗 will stay connected in voice channels 24/7 non-stop without leaving."
+            color = config.COLOR_SUCCESS
+        else:
+            status_title = "❌ 24/7 Mode DEACTIVATED"
+            status_desc = "⏳ **Bot will leave voice channels when inactive/empty.**"
+            color = config.COLOR_DARK
+
         embed = discord.Embed(
-            title="⚡ RAI VIBES 💗 24/7 Voice Mode",
-            description=f"**24/7 Voice Channel Presence:** `{status}`",
-            color=config.COLOR_PRIMARY if player.mode_247 else config.COLOR_DARK
+            title=status_title,
+            description=status_desc,
+            color=color
         )
-        embed.set_footer(text="RAI VIBES 💗 • Non-Stop Music Engine", icon_url=config.RAI_ICON_URL)
+        embed.set_footer(text="RAI VIBES 💗 • 24/7 Music Engine", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
 
