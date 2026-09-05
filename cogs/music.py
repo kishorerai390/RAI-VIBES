@@ -1183,60 +1183,7 @@ class Music(commands.Cog):
         seek_str = time.strftime('%M:%S', time.gmtime(seconds))
         await ctx.send(f"⏩ **Seeked to:** `{seek_str}`")
 
-    # =========================================================================
-    # EVENT LISTENER: SMART RESUME ON VOICE JOIN
-    # =========================================================================
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-        if member.bot:
-            return
-
-        # Trigger when a user joins or switches into a voice channel
-        if after.channel is not None and before.channel != after.channel:
-            player = self.get_player(member.guild.id)
-            if not player or not player.paused_snapshot:
-                return
-
-            snapshot = player.paused_snapshot
-            target_user_id = snapshot.get("user_id")
-            # If the member is the one who paused it (or any member if no specific author)
-            if target_user_id is None or member.id == target_user_id:
-                song = snapshot.get("song")
-                if not song:
-                    return
-
-                pos_sec = snapshot.get("position", 0)
-                pos_str = time.strftime("%M:%S", time.gmtime(pos_sec))
-                tot_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
-
-                target_channel = (
-                    discord.utils.get(member.guild.text_channels, name="│🎵・song-requests")
-                    or discord.utils.get(member.guild.text_channels, name="song-requests")
-                    or player.text_channel
-                    or member.guild.system_channel
-                )
-
-                if target_channel:
-                    embed = discord.Embed(
-                        title="🌸 Welcome Back • Continue Where You Left Off?",
-                        description=(
-                            f"Hey {member.mention}! You left off listening to:\n"
-                            f"### 🎵 [{song.title}]({song.webpage_url})\n\n"
-                            f"⏱️ **Paused at:** `{pos_str}` / `{tot_str}`\n"
-                            f"🔊 **Target VC:** {after.channel.mention}\n\n"
-                            f"Click **Continue** below to instantly resume from `{pos_str}`!"
-                        ),
-                        color=config.COLOR_PRIMARY
-                    )
-                    embed.set_thumbnail(url=song.thumbnail or config.RAI_ICON_URL)
-                    embed.set_footer(text="RAI VIBES 💗 Smart Resume Engine", icon_url=config.RAI_ICON_URL)
-
-                    view = ResumePlaybackView(player, snapshot)
-                    try:
-                        await target_channel.send(content=member.mention, embed=embed, view=view)
-                    except Exception as e:
-                        print(f"[Smart Resume Prompt Error] {e}")
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Music(bot))
+
