@@ -89,6 +89,15 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
 
         logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
 
+    @b.before_invoke
+    async def auto_defer_commands(ctx: commands.Context):
+        """Immediately defers slash command interactions to prevent 'didn't respond in time' timeouts."""
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            try:
+                await ctx.defer()
+            except Exception:
+                pass
+
     @b.command(name="sync")
     @commands.is_owner()
     async def sync_cmd(ctx: commands.Context):
