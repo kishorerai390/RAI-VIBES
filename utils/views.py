@@ -199,9 +199,13 @@ class MusicPlayerView(View):
     async def lyrics_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player or not player.current:
-            return await interaction.response.send_message("❌ No song currently playing to fetch lyrics for.", ephemeral=True)
+            if not interaction.response.is_done():
+                return await interaction.response.send_message("❌ No song currently playing to fetch lyrics for.", ephemeral=True)
+            return
 
-        await interaction.response.defer(ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
         lyrics_cog = interaction.client.get_cog("Lyrics")
         lyrics_data = await lyrics_cog.fetch_lyrics(player.current.title) if lyrics_cog else None
 

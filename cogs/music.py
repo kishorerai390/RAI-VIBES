@@ -709,30 +709,34 @@ class Music(commands.Cog):
         return self.players[guild.id]
 
     async def ensure_voice(self, ctx_or_interaction) -> Optional[discord.VoiceClient]:
-        """Ensures the bot is connected to voice without bouncing or reconnecting unnecessarily."""
+        """Ensures the bot connects to or moves to the user's active voice channel."""
         guild = ctx_or_interaction.guild
         voice_client = guild.voice_client
 
-        # If already connected, return existing voice client immediately
-        if voice_client is not None and voice_client.is_connected():
-            return voice_client
-
-        # Determine target voice channel (User's active VC > Lo-Fi Chillroom > First VC)
         author = getattr(ctx_or_interaction, "author", None) or getattr(ctx_or_interaction, "user", None)
         user_vc = getattr(getattr(author, "voice", None), "channel", None)
         lofi_vc = discord.utils.get(guild.voice_channels, name="✨ Lo-Fi Chillroom") or guild.get_channel(1545781986193309789)
-        target_vc = user_vc or lofi_vc or (guild.voice_channels[0] if guild.voice_channels else None)
+        target_vc = user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None) or lofi_vc or (guild.voice_channels[0] if guild.voice_channels else None)
 
         if not target_vc:
             if hasattr(ctx_or_interaction, "send"):
                 await ctx_or_interaction.send("❌ Please join a voice channel first!", ephemeral=True)
             return None
 
-        try:
-            voice_client = await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
-        except Exception as e:
-            print(f"[Voice Connect Error] {e}")
-            voice_client = guild.voice_client
+        # If bot is not connected, connect to target_vc
+        if not voice_client or not voice_client.is_connected():
+            try:
+                voice_client = await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
+            except Exception as e:
+                print(f"[Voice Connect Error] {e}")
+                voice_client = guild.voice_client
+        # If bot is connected elsewhere, move directly to the user's active voice channel!
+        elif user_vc and voice_client.channel != user_vc:
+            try:
+                await voice_client.move_to(user_vc)
+                print(f"[Voice Move] Moved RAI VIBES to {user_vc.name}")
+            except Exception as e:
+                print(f"[Voice Move Error] {e}")
 
         return voice_client or guild.voice_client
 
