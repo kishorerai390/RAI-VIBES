@@ -19,25 +19,42 @@ class MusicPlayerView(View):
 
     async def get_player(self, interaction: discord.Interaction):
         cog = self.music_cog or interaction.client.get_cog("Music")
-        guild_id = self.guild_id or (interaction.guild.id if interaction.guild else None)
-        if not cog or not guild_id:
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return None
-        
-        player = cog.get_player(guild_id)
-        if not player or not player.is_connected or not interaction.guild.voice_client:
+
+        if not cog:
+            await interaction.response.send_message("❌ Music module is currently unavailable.", ephemeral=True)
+            return None
+
+        player = cog.get_or_create_player(interaction.guild)
+        vc = interaction.guild.voice_client
+
+        if not vc or not vc.is_connected():
             await interaction.response.send_message(
                 "⚡ **RAI VIBES 💗 is currently inactive.** Start playback anytime using `/play <song>` or `!play <song>`!",
                 ephemeral=True
             )
             return None
-        if not interaction.guild.voice_client.channel:
+
+        player.voice_client = vc
+        if interaction.channel:
+            player.text_channel = interaction.channel
+
+        # Allow admins, server managers, or members in the active voice channel
+        is_admin = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild
+        is_in_vc = vc.channel and interaction.user in vc.channel.members
+
+        if not is_admin and not is_in_vc:
+            if vc.channel:
+                await interaction.response.send_message(
+                    f"⚡ **You must join {vc.channel.mention} to control RAI VIBES 💗.**",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message("⚡ Please join the voice channel to control RAI VIBES 💗.", ephemeral=True)
             return None
-        if interaction.user not in interaction.guild.voice_client.channel.members:
-            await interaction.response.send_message(
-                f"⚡ **You must join {interaction.guild.voice_client.channel.mention} to control RAI VIBES 💗.**",
-                ephemeral=True
-            )
-            return None
+
         return player
 
     @button(label="Pause", style=discord.ButtonStyle.success, emoji="⏯️", row=0, custom_id="music_btn_pause")

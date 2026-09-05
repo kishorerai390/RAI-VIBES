@@ -699,7 +699,12 @@ class Music(commands.Cog):
         self.players: Dict[int, GuildMusicPlayer] = {}
 
     def get_player(self, guild_id: int) -> Optional[GuildMusicPlayer]:
-        return self.players.get(guild_id)
+        if guild_id in self.players:
+            return self.players[guild_id]
+        guild = self.bot.get_guild(guild_id)
+        if guild:
+            return self.get_or_create_player(guild)
+        return None
 
     def get_or_create_player(self, guild: discord.Guild) -> GuildMusicPlayer:
         if guild.id not in self.players:
