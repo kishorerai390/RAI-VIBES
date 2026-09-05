@@ -134,9 +134,11 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
                 if music_cog:
                     return await music_cog.play(ctx, query=content)
 
-        # 2. Check if bot is mentioned (e.g. @RAI VIBES /play song, @RAI VIBES play song, @RAI VIBES song)
+        # 2. Check if bot is mentioned (e.g. @RAI VIBES /play song, @RAI VIBES 💗/play song, @RAI VIBES song)
         if b.user in message.mentions and not message.mention_everyone:
             raw_text = re.sub(rf"<@!?{b.user.id}>", "", content).strip()
+            # Strip bot nickname trailing emojis/text like 💗, 💖, 🌸
+            raw_text = re.sub(r'^[💗💖🌸✨\s]+', '', raw_text).strip()
             ctx = await b.get_context(message)
             music_cog = b.get_cog("Music")
 
@@ -174,7 +176,11 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
                 query = url_match.group(0).strip()
             else:
                 query = raw_text
-                for prefix in ["/play ", "!play ", "play ", "/p ", "!p ", "p ", "/search ", "!search ", "search "]:
+                prefixes_to_strip = [
+                    "/play ", "!play ", "play ", "/p ", "!p ", "p ", "/search ", "!search ", "search ",
+                    "/play", "!play", "play", "/p", "!p"
+                ]
+                for prefix in prefixes_to_strip:
                     if query.lower().startswith(prefix):
                         query = query[len(prefix):].strip()
                         break

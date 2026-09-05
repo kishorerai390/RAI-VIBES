@@ -65,9 +65,13 @@ class Song:
         """Extracts streamable info using yt-dlp asynchronously with smart single-track preference and fallback."""
         loop = loop or asyncio.get_event_loop()
         
-        # Sanitize query by removing any command prefixes
-        cleaned_search = search.strip()
-        for prefix in ["/play ", "!play ", "play ", "/p ", "!p ", "p ", "/search ", "!search ", "search "]:
+        # Sanitize query by removing any command prefixes and leftover emojis
+        cleaned_search = re.sub(r'^[💗💖🌸✨\s]+', '', search.strip()).strip()
+        prefixes_to_strip = [
+            "/play ", "!play ", "play ", "/p ", "!p ", "p ", "/search ", "!search ", "search ",
+            "/play", "!play", "play", "/p", "!p"
+        ]
+        for prefix in prefixes_to_strip:
             if cleaned_search.lower().startswith(prefix):
                 cleaned_search = cleaned_search[len(prefix):].strip()
                 break
