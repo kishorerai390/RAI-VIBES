@@ -84,10 +84,14 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
         b.add_view(VoiceControlView())
         b.add_view(MusicPlayerView())
 
-        # Automatically synchronize slash commands tree to purge moderation commands
+        # Synchronize slash commands directly to each guild for instant updates
         try:
+            for guild in b.guilds:
+                b.tree.copy_global_to(guild=guild)
+                synced_guild = await b.tree.sync(guild=guild)
+                logger.info(f"✨ Successfully synchronized {len(synced_guild)} dedicated Music & Vibe slash commands to '{guild.name}'!")
             synced = await b.tree.sync()
-            logger.info(f"✨ Successfully synchronized {len(synced)} dedicated Music & Vibe slash commands!")
+            logger.info(f"✨ Global slash commands tree synchronized ({len(synced)} commands).")
         except Exception as e:
             logger.error(f"Failed to synchronize slash commands: {e}")
 
