@@ -2,30 +2,37 @@ import discord
 from discord.ui import View, Button, button
 
 ROLE_ID_MAP = {
-    "🌸 ┊ Sakura Pink": 1545516328016805979,
-    "💜 ┊ Neon Violet": 1545516370785996882,
-    "🩵 ┊ Cyber Cyan": 1545516378046337074,
-    "💛 ┊ Royal Gold": 1545516381426950214,
-    "🔥 ┊ Free Fire": 1545516397034078269,
-    "⚡ ┊ BGMI": 1545516399663779871,
-    "🧸 ┊ Roblox": 1545516402188881991,
-    "📱 ┊ Mobile Gamer": 1545516404302811256,
-    "💻 ┊ PC Gamer": 1545516406454493257,
-    "🎬 ┊ Movie Alerts": 1545516408375353376,
-    "🎉 ┊ Giveaway Alerts": 1545516411659620383,
-    "📢 ┊ Server News": 1545516414016815169,
-    "🎧 ┊ Music Jam": 1545516416969609296,
-    "♂️ ┊ He/Him": 1545516419121422377,
-    "♀️ ┊ She/Her": 1545516421583208551,
-    "🌈 ┊ They/Them": 1545516423789543651,
-    "🔞 ┊ 18+ Verified": 1545516426893197392,
+    # Colors
+    "Sakura Pink 🌸": 1545516328016805979,
+    "Neon Violet 💜": 1545516370785996882,
+    "Cyber Cyan 🩵": 1545516378046337074,
+    "Royal Gold 💛": 1545516381426950214,
+
+    # Gaming & Device
+    "Free Fire 💥": 1545516397034078269,
+    "BGMI ⚡": 1545516399663779871,
+    "Roblox 🧸": 1545516402188881991,
+    "Mobile Player 📱": 1545516404302811256,
+    "PC Player 💻": 1545516406454493257,
+
+    # Notification Pings
+    "Movie Alerts 🍿": 1545516408375353376,
+    "Giveaways 🎉": 1545516411659620383,
+    "Server News 📢": 1545516414016815169,
+    "Music Jam 🎵": 1545516416969609296,
+
+    # Identity & Pronouns (inspired by photo 2)
+    "Male 🤴": 1545516419121422377,
+    "Female 👸": 1545516421583208551,
+    "They / Them 🌈": 1545516423789543651,
+    "18+ Verified 🔞": 1545516426893197392,
 }
 
 ALL_COLOR_ROLES = [
-    "🌸 ┊ Sakura Pink",
-    "💜 ┊ Neon Violet",
-    "🩵 ┊ Cyber Cyan",
-    "💛 ┊ Royal Gold"
+    "Sakura Pink 🌸",
+    "Neon Violet 💜",
+    "Cyber Cyan 🩵",
+    "Royal Gold 💛"
 ]
 
 def find_role(guild: discord.Guild, role_name: str) -> discord.Role | None:
@@ -97,38 +104,38 @@ class SelfRoleButton(Button):
 class ColorRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(ColorRoleButton("🌸 ┊ Sakura Pink", "Sakura Pink", "🌸", discord.ButtonStyle.secondary, row=0))
-        self.add_item(ColorRoleButton("💜 ┊ Neon Violet", "Neon Violet", "💜", discord.ButtonStyle.primary, row=0))
-        self.add_item(ColorRoleButton("🩵 ┊ Cyber Cyan", "Cyber Cyan", "🩵", discord.ButtonStyle.secondary, row=0))
-        self.add_item(ColorRoleButton("💛 ┊ Royal Gold", "Royal Gold", "💛", discord.ButtonStyle.success, row=0))
+        self.add_item(ColorRoleButton("Sakura Pink 🌸", "Sakura Pink", "🌸", discord.ButtonStyle.secondary, row=0))
+        self.add_item(ColorRoleButton("Neon Violet 💜", "Neon Violet", "💜", discord.ButtonStyle.primary, row=0))
+        self.add_item(ColorRoleButton("Cyber Cyan 🩵", "Cyber Cyan", "🩵", discord.ButtonStyle.secondary, row=0))
+        self.add_item(ColorRoleButton("Royal Gold 💛", "Royal Gold", "💛", discord.ButtonStyle.success, row=0))
 
 
 class GamingRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("🔥 ┊ Free Fire", "Free Fire", "🔥", discord.ButtonStyle.danger, row=0))
-        self.add_item(SelfRoleButton("⚡ ┊ BGMI", "BGMI", "⚡", discord.ButtonStyle.primary, row=0))
-        self.add_item(SelfRoleButton("🧸 ┊ Roblox", "Roblox", "🧸", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("📱 ┊ Mobile Gamer", "Mobile", "📱", discord.ButtonStyle.secondary, row=1))
-        self.add_item(SelfRoleButton("💻 ┊ PC Gamer", "PC", "💻", discord.ButtonStyle.secondary, row=1))
+        self.add_item(SelfRoleButton("Free Fire 💥", "Free Fire", "💥", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("BGMI ⚡", "BGMI", "⚡", discord.ButtonStyle.primary, row=0))
+        self.add_item(SelfRoleButton("Roblox 🧸", "Roblox", "🧸", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Mobile Player 📱", "Mobile Player", "📱", discord.ButtonStyle.secondary, row=1))
+        self.add_item(SelfRoleButton("PC Player 💻", "PC Player", "💻", discord.ButtonStyle.secondary, row=1))
 
 
 class NotificationRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("🎬 ┊ Movie Alerts", "Movie Alerts", "🎬", discord.ButtonStyle.danger, row=0))
-        self.add_item(SelfRoleButton("🎉 ┊ Giveaway Alerts", "Giveaways", "🎉", discord.ButtonStyle.success, row=0))
-        self.add_item(SelfRoleButton("📢 ┊ Server News", "Server News", "📢", discord.ButtonStyle.primary, row=0))
-        self.add_item(SelfRoleButton("🎧 ┊ Music Jam", "Music Jam", "🎧", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Movie Alerts 🍿", "Movie Alerts", "🍿", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("Giveaways 🎉", "Giveaways", "🎉", discord.ButtonStyle.success, row=0))
+        self.add_item(SelfRoleButton("Server News 📢", "Server News", "📢", discord.ButtonStyle.primary, row=0))
+        self.add_item(SelfRoleButton("Music Jam 🎵", "Music Jam", "🎵", discord.ButtonStyle.secondary, row=0))
 
 
 class IdentityRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("♂️ ┊ He/Him", "He/Him", "♂️", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("♀️ ┊ She/Her", "She/Her", "♀️", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("🌈 ┊ They/Them", "They/Them", "🌈", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("🔞 ┊ 18+ Verified", "18+ Verified", "🔞", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("Male 🤴", "Male", "🤴", discord.ButtonStyle.primary, row=0))
+        self.add_item(SelfRoleButton("Female 👸", "Female", "👸", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("They / Them 🌈", "They / Them", "🌈", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("18+ Verified 🔞", "18+ Verified", "🔞", discord.ButtonStyle.danger, row=0))
 
 
 class VerifyButtonView(View):
@@ -140,6 +147,7 @@ class VerifyButtonView(View):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         verified_role = (
+            discord.utils.get(guild.roles, name="RAI FAMILY 🌸") or
             discord.utils.get(guild.roles, name="🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘") or
             discord.utils.get(guild.roles, name="👥 Verified Member")
         )
@@ -178,7 +186,7 @@ class TicketCreateView(View):
     async def open_ticket_button(self, interaction: discord.Interaction, btn: Button):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-        staff_role = discord.utils.get(guild.roles, name="🛡️ ┊ 𝐆𝐔𝐀𝐑𝐃𝐈𝐀𝐍")
+        staff_role = discord.utils.get(guild.roles, name="M O D E R A T O R 🛡️") or discord.utils.get(guild.roles, name="🛡️ ┊ 𝐆𝐔𝐀𝐑𝐃𝐈𝐀𝐍")
         cat = discord.utils.get(guild.categories, name="🛡️ | 𝙎𝙏𝘼𝙁𝙁 𝙕𝙊𝙉𝙀")
 
         ticket_channel_name = f"ticket-{interaction.user.name.lower()}"
