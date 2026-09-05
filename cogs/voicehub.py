@@ -55,6 +55,28 @@ class LimitVoiceModal(discord.ui.Modal, title="Set Room Member Limit"):
             await interaction.response.send_message(f"❌ Error updating limit: {e}", ephemeral=True)
 
 
+class SetStatusVoiceModal(discord.ui.Modal, title="Set Voice Channel Status"):
+    status_text = discord.ui.TextInput(
+        label="Voice Room Status / Activity",
+        placeholder="e.g., Grinding Valorant 🎮, Midnight Lofi 🌙, Chill Hangout",
+        max_length=80,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        vc = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if not vc:
+            return await interaction.response.send_message("❌ You are not connected to a voice room.", ephemeral=True)
+        try:
+            try:
+                await vc.edit(status=self.status_text.value)
+            except Exception:
+                pass
+            await interaction.response.send_message(f"💬 Voice status set to: **{self.status_text.value}**", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Could not update status: {e}", ephemeral=True)
+
+
 class InviteUserSelectView(discord.ui.View):
     """User dropdown menu to grant access to a Ghost / Hidden voice channel."""
     def __init__(self, vc: discord.VoiceChannel, owner: discord.Member):
@@ -211,6 +233,13 @@ class VoiceControlView(discord.ui.View):
         
         view = RevokeUserSelectView(vc, interaction.user)
         await interaction.response.send_message("🚫 **Select members below to revoke access & hide this channel from:**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, emoji="💬", row=1, custom_id="vc_status")
+    async def status(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to set status.", ephemeral=True)
+        await interaction.response.send_modal(SetStatusVoiceModal())
 
 
 class VoiceHub(commands.Cog):
@@ -418,6 +447,24 @@ class VoiceHub(commands.Cog):
             await ctx.send(f"👥 Room limit updated to `{limit}`.", ephemeral=True)
         else:
             await ctx.send("❌ Limit must be between 0 and 99.", ephemeral=True)
+
+    @commands.hybrid_command(name="vstatus", description="Set a custom status / topic for your active voice room.")
+    @app_commands.describe(status="Status or activity description for your room")
+    async def vstatus(self, ctx: commands.Context, *, status: str):
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            return await ctx.send("❌ You must be in your voice channel to use this command.", ephemeral=True)
+        vc = ctx.author.voice.channel
+        if vc.id not in self.temp_channels or self.temp_channels[vc.id] != ctx.author.id:
+            return await ctx.send("❌ You can only set status for voice channels you own.", ephemeral=True)
+        
+        try:
+            try:
+                await vc.edit(status=status)
+            except Exception:
+                pass
+            await ctx.send(f"💬 Voice channel status updated to: **{status}**", ephemeral=True)
+        except Exception as e:
+            await ctx.send(f"❌ Could not update status: {e}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

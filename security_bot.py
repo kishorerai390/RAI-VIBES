@@ -79,6 +79,7 @@ async def start_sentinel(token: str, use_members: bool = False, use_message_cont
     security_extensions = [
         "cogs.moderation",
         "cogs.verify",
+        "cogs.tickets",
     ]
     for ext in security_extensions:
         try:

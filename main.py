@@ -283,6 +283,10 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.qotd",
         "cogs.counting",
         "cogs.starboard",
+        "cogs.music_quiz",
+        "cogs.soundboard",
+        "cogs.dj",
+        "cogs.voice_stats",
     ]
     for extension in initial_extensions:
         try:
