@@ -19,7 +19,7 @@ FILTER_PRESETS = {
     "8d": "apulsator=hz=0.125",
     "vaporwave": "aresample=48000,asetrate=48000*0.8",
     "treble": "treble=g=6",
-    "karaoke": "stereotools=mlev=0.01,equalizer=f=1000:width_type=h:width=200:g=-10",
+    "karaoke": "stereotools=mlev=0.015625:slev=1.35,equalizer=f=1200:width_type=h:width=600:g=-16,bass=g=5:f=100",
     "pop": "equalizer=f=1000:width_type=h:width=100:g=3",
     "rock": "equalizer=f=100:width_type=h:width=100:g=4,equalizer=f=8000:width_type=h:width=100:g=4",
     "soft": "lowpass=f=1000",

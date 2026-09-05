@@ -72,9 +72,40 @@ class Filters(commands.Cog):
     async def vaporwave(self, ctx: commands.Context):
         await self.apply_player_filter(ctx, "vaporwave", "Vaporwave")
 
-    @commands.hybrid_command(name="karaoke", description="Attenuate vocals for karaoke singing.")
+    @commands.hybrid_command(name="karaoke", description="Toggle vocal attenuation filter & display song lyrics for sing-along!")
     async def karaoke(self, ctx: commands.Context):
-        await self.apply_player_filter(ctx, "karaoke", "Karaoke (Vocal Attenuation)")
+        player = self.get_player(ctx)
+        if not player or not player.is_connected or not player.current:
+            return await ctx.send("❌ RAI VIBES 💗 must be playing a song to activate Karaoke mode.", ephemeral=True)
+
+        if "karaoke" in player.active_filters:
+            player.active_filters.remove("karaoke")
+            await player.restart_current_with_filters()
+            return await ctx.send("➡️ **Karaoke mode deactivated:** Restored full vocal audio track.")
+        else:
+            player.active_filters.append("karaoke")
+            await player.restart_current_with_filters()
+
+            # Automatically fetch and display lyrics for the song
+            lyrics_cog = self.bot.get_cog("Lyrics")
+            if lyrics_cog and player.current:
+                data = await lyrics_cog.fetch_lyrics(player.current.title)
+                if data and data.get("lyrics"):
+                    lyrics_text = data["lyrics"]
+                    if len(lyrics_text) > 3900:
+                        lyrics_text = lyrics_text[:3885] + "...\n*(Lyrics truncated)*"
+
+                    embed = discord.Embed(
+                        title=f"🎤 Karaoke Sing-Along: {data.get('title', player.current.title)}",
+                        description=f"```fix\n{lyrics_text}\n```" if len(lyrics_text) < 1800 else lyrics_text,
+                        color=0xFF1493
+                    )
+                    embed.set_author(name=f"{data.get('author', 'Artist')} • Sing Along", icon_url=config.RAI_ICON_URL)
+                    embed.set_thumbnail(url=player.current.thumbnail or config.RAI_ICON_URL)
+                    embed.set_footer(text="RAI VIBES 💗 • Center Vocals Attenuated • Sing Loud & Proud!", icon_url=config.RAI_ICON_URL)
+                    return await ctx.send(content="⚡ **Audio Filter Activated: Karaoke (Vocal Attenuation)**", embed=embed)
+
+            await ctx.send("⚡ **Audio Filter Activated: Karaoke (Vocal Attenuation)**\n*Center vocal frequencies suppressed. Sing along with the music!*")
 
     @commands.hybrid_command(name="speed", description="Adjust playback speed (0.5x to 2.0x).")
     @app_commands.describe(value="Playback speed factor (e.g. 1.25 for 1.25x)")

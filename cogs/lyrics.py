@@ -9,59 +9,59 @@ from typing import Optional, List, Dict
 import config
 
 class Lyrics(commands.Cog):
-    """Universal Song Lyrics Engine for RAI VIBES 💗 (Powered by LRCLIB & Genius)."""
+    """Universal Song Lyrics Engine for RAI VIBES 💗 (Powered by LRCLIB, Genius & LRCLIB Synced Engine)."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     def clean_title_candidates(self, raw_title: str) -> List[str]:
         """Generates cleaned search queries for accurate lyrics matching."""
+        # Strip @ symbols but preserve creator handles
+        t = raw_title.replace("@", "")
+
         junk_patterns = [
-            r"\(official\s+music\s+video\)", r"\[official\s+music\s+video\]",
-            r"\(official\s+video\)", r"\[official\s+video\]",
-            r"\(official\s+audio\)", r"\[official\s+audio\]",
-            r"\(lyric\s+video\)", r"\[lyric\s+video\]",
-            r"\(lyrical\s+video\)", r"\[lyrical\s+video\]",
-            r"\(lyrics\)", r"\[lyrics\]", r"\(lyrical\)", r"\[lyrical\]",
-            r"\(audio\)", r"\[audio\]", r"\(hd\)", r"\[hd\]", r"\(4k\)", r"\[4k\]",
-            r"\(full\s+song\)", r"\[full\s+song\]", r"\(full\s+video\)",
-            r"official\s+music\s+video", r"official\s+video", r"official\s+audio",
-            r"lyric\s+video", r"lyrical\s+video", r"full\s+song", r"full\s+video"
+            r"\([^)]*(?:music|official|video|audio|lyric|lyrics|lyrical|song|hd|4k|remastered|visualizer|prod|prod\.|feat|feat\.|ft|ft\.|full)[^)]*\)",
+            r"\[[^\]]*(?:music|official|video|audio|lyric|lyrics|lyrical|song|hd|4k|remastered|visualizer|prod|prod\.|feat|feat\.|ft|ft\.|full)[^\]]*\]",
+            r"(?:official\s+music\s+video|official\s+video|music\s+video|official\s+audio|lyric\s+video|lyrical\s+video|full\s+song|full\s+video)"
         ]
-        
-        t = raw_title
-        for pattern in junk_patterns:
-            t = re.sub(pattern, "", t, flags=re.IGNORECASE)
+        cleaned = t
+        for p in junk_patterns:
+            cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
 
-        candidates = [t.strip()]
-        
-        if "|" in raw_title:
-            candidates.append(raw_title.split("|")[0].strip())
-        if "-" in raw_title:
-            candidates.append(raw_title.split("-")[0].strip())
-            candidates.append(raw_title.replace("-", " ").strip())
+        candidates = []
 
-        # Parentheses & feat stripping
-        broad = re.sub(r"\(.*?\)|\[.*?\]|ft\..*|feat\..*|prod\..*", "", raw_title, flags=re.IGNORECASE).strip()
-        if broad and broad not in candidates:
-            candidates.append(broad)
+        # Split by common metadata separators
+        parts = [p.strip() for p in re.split(r"[\-\|\/:]", cleaned) if p.strip()]
 
-        # Remove duplicate or empty candidates while preserving order
-        seen = set()
-        unique_candidates = []
-        for c in candidates:
-            c_clean = " ".join(c.split())
-            if c_clean and c_clean.lower() not in seen:
-                seen.add(c_clean.lower())
-                unique_candidates.append(c_clean)
+        # 1. Individual segments (e.g., 'Radhimaa', 'SaiAbhyankkar')
+        for p in parts:
+            p_clean = re.sub(r"[^\w\s\']", " ", p).strip()
+            p_clean = re.sub(r"\s+", " ", p_clean)
+            if len(p_clean) >= 2 and p_clean not in candidates:
+                candidates.append(p_clean)
 
-        return unique_candidates
+        # 2. Combined artist + track segments
+        if len(parts) >= 2:
+            c1 = f"{parts[0]} {parts[1]}".strip()
+            c2 = f"{parts[1]} {parts[0]}".strip()
+            if c1 not in candidates:
+                candidates.append(c1)
+            if c2 not in candidates:
+                candidates.append(c2)
+
+        # 3. Overall cleaned string
+        overall = re.sub(r"[^\w\s\']", " ", cleaned).strip()
+        overall = re.sub(r"\s+", " ", overall)
+        if overall and overall not in candidates:
+            candidates.append(overall)
+
+        return [c for c in candidates if len(c) > 1]
 
     async def fetch_lyrics(self, song_title: str) -> Optional[Dict[str, str]]:
         """Fetches lyrics using LRCLIB API with automatic SomeRandomAPI fallback."""
         candidates = self.clean_title_candidates(song_title)
 
         async with aiohttp.ClientSession(headers={"User-Agent": "RaiVibes/2.0"}) as session:
-            # 1. Search LRCLIB (Millions of songs, Indian & Global, Synced & Plain)
+            # 1. Search LRCLIB (Millions of songs, Indian, Cinema & Global, Synced & Plain)
             for query in candidates:
                 encoded = urllib.parse.quote(query)
                 lrclib_url = f"https://lrclib.net/api/search?q={encoded}"
@@ -73,7 +73,6 @@ class Lyrics(commands.Cog):
                                 for item in data:
                                     lyrics = item.get("plainLyrics") or item.get("syncedLyrics")
                                     if lyrics:
-                                        # Clean synced timestamps if plain is not available
                                         if not item.get("plainLyrics") and item.get("syncedLyrics"):
                                             lyrics = re.sub(r"\[\d{2}:\d{2}\.\d{2}\]", "", lyrics).strip()
                                         return {

@@ -214,7 +214,7 @@ class MusicPlayerView(View):
 
         embed = discord.Embed(
             title=f"🎤 Lyrics: {lyrics_data.get('title', player.current.title)}",
-            description=lyrics_text,
+            description=f"```fix\n{lyrics_text}\n```" if len(lyrics_text) < 1800 else lyrics_text,
             color=config.COLOR_PRIMARY
         )
         embed.set_author(name=lyrics_data.get("author", "RAI VIBES 💗 Lyrics Engine"), icon_url=config.RAI_ICON_URL)
