@@ -1,15 +1,21 @@
 {
     "1457382179981099090": {
         "1457380609641938981": {
-            "xp": 4661,
-            "level": 13,
+            "xp": 4711,
+            "level": 14,
             "messages": 35,
-            "voice_minutes": 154
+            "voice_minutes": 156
         },
         "1365981348589862923": {
             "xp": 50,
             "level": 1,
             "messages": 2,
+            "voice_minutes": 0
+        },
+        "694962550739042335": {
+            "xp": 18,
+            "level": 1,
+            "messages": 1,
             "voice_minutes": 0
         }
     }
