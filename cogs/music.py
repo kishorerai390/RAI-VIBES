@@ -999,6 +999,24 @@ class Music(commands.Cog):
         await ctx.send(f"⏭️ **Skipped directly to track #{index}:** `{target_song}`")
 
     # =========================================================================
+    # COMMAND: JOIN / SUMMON
+    # =========================================================================
+    @commands.hybrid_command(name="join", aliases=["summon", "connect"], description="Summon RAI VIBES 💗 to your active voice channel.")
+    async def join(self, ctx: commands.Context):
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            return await ctx.send("❌ Please connect to a voice channel first!", ephemeral=True)
+        
+        target_vc = ctx.author.voice.channel
+        vc = await self.ensure_voice(ctx)
+        if vc and vc.is_connected():
+            player = self.get_or_create_player(ctx.guild)
+            player.voice_client = vc
+            player.text_channel = ctx.channel
+            await ctx.send(f"🎧 **Joined:** {target_vc.mention}! Ready to play music.")
+        else:
+            await ctx.send("❌ Could not connect to your voice channel.", ephemeral=True)
+
+    # =========================================================================
     # COMMAND: STOP / DISCONNECT
     # =========================================================================
     @commands.hybrid_command(name="stop", aliases=["leave", "disconnect", "dc"], description="Stop music, clear queue, and leave voice.")
