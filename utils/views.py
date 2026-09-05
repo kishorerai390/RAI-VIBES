@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import Optional
 import discord
 from discord.ui import View, button, Button
 
@@ -10,17 +11,22 @@ if str(PROJECT_ROOT) not in sys.path:
 import config
 
 class MusicPlayerView(View):
-    """Interactive Discord UI button controls for RAI VIBES 💗 Music Player."""
-    def __init__(self, music_cog, guild_id: int):
+    """Interactive Persistent Discord UI button controls for RAI VIBES 💗 Music Player."""
+    def __init__(self, music_cog=None, guild_id: Optional[int] = None):
         super().__init__(timeout=None)
         self.music_cog = music_cog
         self.guild_id = guild_id
 
     async def get_player(self, interaction: discord.Interaction):
-        player = self.music_cog.get_player(self.guild_id)
+        cog = self.music_cog or interaction.client.get_cog("Music")
+        guild_id = self.guild_id or (interaction.guild.id if interaction.guild else None)
+        if not cog or not guild_id:
+            return None
+        
+        player = cog.get_player(guild_id)
         if not player or not player.is_connected or not interaction.guild.voice_client:
             await interaction.response.send_message(
-                "⚡ **RAI VIBES 💗 is currently inactive.** Start playback anytime using `!play <song>` or `@RAI VIBES <song>`!",
+                "⚡ **RAI VIBES 💗 is currently inactive.** Start playback anytime using `/play <song>` or `!play <song>`!",
                 ephemeral=True
             )
             return None
@@ -34,7 +40,7 @@ class MusicPlayerView(View):
             return None
         return player
 
-    @button(label="Pause", style=discord.ButtonStyle.success, emoji="⏯️", row=0)
+    @button(label="Pause", style=discord.ButtonStyle.success, emoji="⏯️", row=0, custom_id="music_btn_pause")
     async def pause_resume_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -63,7 +69,7 @@ class MusicPlayerView(View):
             except Exception:
                 pass
 
-    @button(label="Skip", style=discord.ButtonStyle.secondary, emoji="⏭️", row=0)
+    @button(label="Skip", style=discord.ButtonStyle.secondary, emoji="⏭️", row=0, custom_id="music_btn_skip")
     async def skip_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -77,7 +83,7 @@ class MusicPlayerView(View):
         else:
             await interaction.response.send_message("ℹ️ Nothing is playing to skip.", ephemeral=True)
 
-    @button(label="Loop", style=discord.ButtonStyle.secondary, emoji="🔁", row=0)
+    @button(label="Loop", style=discord.ButtonStyle.secondary, emoji="🔁", row=0, custom_id="music_btn_loop")
     async def loop_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -97,14 +103,13 @@ class MusicPlayerView(View):
             mode_text = "➡️ **Loop Mode: Disabled (Off)**"
 
         await interaction.response.send_message(mode_text, ephemeral=True)
-
         if player.now_playing_message:
             try:
                 await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
             except Exception:
                 pass
 
-    @button(label="Shuffle", style=discord.ButtonStyle.secondary, emoji="🔀", row=0)
+    @button(label="Shuffle", style=discord.ButtonStyle.secondary, emoji="🔀", row=0, custom_id="music_btn_shuffle")
     async def shuffle_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -117,7 +122,7 @@ class MusicPlayerView(View):
         player.shuffle()
         await interaction.response.send_message("🔀 **Queue shuffled successfully!**", ephemeral=True)
 
-    @button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️", row=0)
+    @button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️", row=0, custom_id="music_btn_stop")
     async def stop_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -126,7 +131,7 @@ class MusicPlayerView(View):
         await player.stop()
         await interaction.response.send_message("⏹️ **Playback stopped & queue cleared.**", ephemeral=True)
 
-    @button(label="Vol -", style=discord.ButtonStyle.secondary, emoji="🔉", row=1)
+    @button(label="Vol -", style=discord.ButtonStyle.secondary, emoji="🔉", row=1, custom_id="music_btn_voldown")
     async def vol_down_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -141,7 +146,7 @@ class MusicPlayerView(View):
             except Exception:
                 pass
 
-    @button(label="Vol +", style=discord.ButtonStyle.secondary, emoji="🔊", row=1)
+    @button(label="Vol +", style=discord.ButtonStyle.secondary, emoji="🔊", row=1, custom_id="music_btn_volup")
     async def vol_up_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -157,7 +162,7 @@ class MusicPlayerView(View):
             except Exception:
                 pass
 
-    @button(label="Queue", style=discord.ButtonStyle.primary, emoji="📜", row=1)
+    @button(label="Queue", style=discord.ButtonStyle.primary, emoji="📜", row=1, custom_id="music_btn_queue")
     async def queue_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -167,7 +172,7 @@ class MusicPlayerView(View):
         view = QueuePaginationView(player)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @button(label="Bass", style=discord.ButtonStyle.secondary, emoji="🎛️", row=1)
+    @button(label="Bass", style=discord.ButtonStyle.secondary, emoji="🎛️", row=1, custom_id="music_btn_bass")
     async def bass_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player:
@@ -190,14 +195,14 @@ class MusicPlayerView(View):
             except Exception:
                 pass
 
-    @button(label="Lyrics", style=discord.ButtonStyle.secondary, emoji="🎤", row=1)
+    @button(label="Lyrics", style=discord.ButtonStyle.secondary, emoji="🎤", row=1, custom_id="music_btn_lyrics")
     async def lyrics_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
         if not player or not player.current:
             return await interaction.response.send_message("❌ No song currently playing to fetch lyrics for.", ephemeral=True)
 
         await interaction.response.defer(ephemeral=True)
-        lyrics_cog = self.music_cog.bot.get_cog("Lyrics")
+        lyrics_cog = interaction.client.get_cog("Lyrics")
         lyrics_data = await lyrics_cog.fetch_lyrics(player.current.title) if lyrics_cog else None
 
         if not lyrics_data or "lyrics" not in lyrics_data:

@@ -76,11 +76,13 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
 
         # Register Persistent Views for instant interaction without timeout
         from cogs.voicehub import VoiceControlView
+        from utils.views import MusicPlayerView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
         b.add_view(IdentityRolesView())
         b.add_view(VoiceControlView())
+        b.add_view(MusicPlayerView())
 
         # Automatically synchronize slash commands tree to purge moderation commands
         try:
