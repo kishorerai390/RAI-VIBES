@@ -93,11 +93,13 @@ class Lyrics(commands.Cog):
                         if resp.status == 200:
                             data = await resp.json()
                             if data and "lyrics" in data and data["lyrics"]:
+                                thumb_data = data.get("thumbnail")
+                                thumb_url = thumb_data.get("genius") if isinstance(thumb_data, dict) else (thumb_data if isinstance(thumb_data, str) else None)
                                 return {
                                     "title": data.get("title", query),
                                     "author": data.get("author", "Genius"),
                                     "lyrics": data["lyrics"],
-                                    "thumbnail": data.get("thumbnail", {}).get("genius"),
+                                    "thumbnail": thumb_url,
                                     "source": "Genius"
                                 }
                 except Exception:

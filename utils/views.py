@@ -17,23 +17,32 @@ class MusicPlayerView(View):
         self.music_cog = music_cog
         self.guild_id = guild_id
 
+    async def send_interaction_msg(self, interaction: discord.Interaction, text: str):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(text, ephemeral=True)
+            else:
+                await interaction.followup.send(text, ephemeral=True)
+        except Exception:
+            pass
+
     async def get_player(self, interaction: discord.Interaction):
         cog = self.music_cog or interaction.client.get_cog("Music")
         if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            await self.send_interaction_msg(interaction, "❌ This command can only be used in a server.")
             return None
 
         if not cog:
-            await interaction.response.send_message("❌ Music module is currently unavailable.", ephemeral=True)
+            await self.send_interaction_msg(interaction, "❌ Music module is currently unavailable.")
             return None
 
         player = cog.get_or_create_player(interaction.guild)
         vc = interaction.guild.voice_client
 
         if not vc or not vc.is_connected():
-            await interaction.response.send_message(
-                "⚡ **RAI VIBES 💗 is currently inactive.** Start playback anytime using `/play <song>` or `!play <song>`!",
-                ephemeral=True
+            await self.send_interaction_msg(
+                interaction,
+                "⚡ **RAI VIBES 💗 is currently inactive.** Start playback anytime using `/play <song>` or `!play <song>`!"
             )
             return None
 
@@ -47,12 +56,12 @@ class MusicPlayerView(View):
 
         if not is_admin and not is_in_vc:
             if vc.channel:
-                await interaction.response.send_message(
-                    f"⚡ **You must join {vc.channel.mention} to control RAI VIBES 💗.**",
-                    ephemeral=True
+                await self.send_interaction_msg(
+                    interaction,
+                    f"⚡ **You must join {vc.channel.mention} to control RAI VIBES 💗.**"
                 )
             else:
-                await interaction.response.send_message("⚡ Please join the voice channel to control RAI VIBES 💗.", ephemeral=True)
+                await self.send_interaction_msg(interaction, "⚡ Please join the voice channel to control RAI VIBES 💗.")
             return None
 
         return player
@@ -229,20 +238,31 @@ class MusicPlayerView(View):
         if not lyrics_data or "lyrics" not in lyrics_data:
             return await interaction.followup.send(f"⚠️ Could not find synchronized lyrics for `{player.current.title[:50]}`.", ephemeral=True)
 
-        lyrics_text = lyrics_data.get("lyrics", "")
-        if len(lyrics_text) > 4000:
-            lyrics_text = lyrics_text[:3990] + "...\n*(Lyrics truncated)*"
+        try:
+            lyrics_text = lyrics_data.get("lyrics", "")
+            if len(lyrics_text) > 4000:
+                lyrics_text = lyrics_text[:3990] + "...\n*(Lyrics truncated)*"
 
-        embed = discord.Embed(
-            title=f"🎤 Lyrics: {lyrics_data.get('title', player.current.title)}",
-            description=f"```fix\n{lyrics_text}\n```" if len(lyrics_text) < 1800 else lyrics_text,
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_author(name=lyrics_data.get("author", "RAI VIBES 💗 Lyrics Engine"), icon_url=config.RAI_ICON_URL)
-        if lyrics_data.get("thumbnail", {}).get("genius"):
-            embed.set_thumbnail(url=lyrics_data["thumbnail"]["genius"])
-        embed.set_footer(text="RAI VIBES 💗 • Lyrics Dashboard", icon_url=config.RAI_ICON_URL)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+            embed = discord.Embed(
+                title=f"🎤 Lyrics: {lyrics_data.get('title', player.current.title)}",
+                description=f"```fix\n{lyrics_text}\n```" if len(lyrics_text) < 1800 else lyrics_text,
+                color=config.COLOR_PRIMARY
+            )
+            embed.set_author(name=lyrics_data.get("author", "RAI VIBES 💗 Lyrics Engine"), icon_url=config.RAI_ICON_URL)
+            
+            # Safe thumbnail resolution
+            thumb = lyrics_data.get("thumbnail")
+            if isinstance(thumb, str) and thumb.startswith("http"):
+                embed.set_thumbnail(url=thumb)
+            elif isinstance(thumb, dict) and thumb.get("genius"):
+                embed.set_thumbnail(url=thumb["genius"])
+            elif player.current and player.current.thumbnail:
+                embed.set_thumbnail(url=player.current.thumbnail)
+
+            embed.set_footer(text=f"RAI VIBES 💗 • Source: {lyrics_data.get('source', 'Synced Lyrics')}", icon_url=config.RAI_ICON_URL)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error displaying lyrics: {e}", ephemeral=True)
 
 
 class QueuePaginationView(View):
