@@ -51,4 +51,3 @@ Here are the **top 3 easiest and 100% free ways** to keep it online forever:
    ```
 
 4. Now it runs forever 24/7 in the cloud!
-
