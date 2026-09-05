@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import json
 import aiohttp
 import urllib.parse
 from pathlib import Path
@@ -47,7 +48,8 @@ def parse_spotify_url(query: str) -> Optional[tuple[str, str]]:
 async def resolve_spotify(query: str) -> List[Dict[str, str]]:
     """
     Extracts track queries from Spotify URLs.
-    Returns a list of dicts with {'title': str, 'artist': str, 'search_query': str, 'source': 'spotify', 'thumbnail': str}
+    Supports playlists, albums, and tracks without requiring API credentials.
+    Returns a list of dicts with {'title': str, 'artist': str, 'search_query': str, 'source': 'spotify', 'thumbnail': str, 'duration': int}
     """
     parsed = parse_spotify_url(query)
     if not parsed:
@@ -64,11 +66,13 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                 artist_name = ", ".join([a["name"] for a in track_data["artists"]])
                 title = track_data["name"]
                 thumbnail = track_data["album"]["images"][0]["url"] if track_data["album"]["images"] else ""
+                dur = int((track_data.get("duration_ms") or 0) / 1000)
                 tracks.append({
                     "title": title,
                     "artist": artist_name,
                     "search_query": f"{title} {artist_name} audio",
                     "thumbnail": thumbnail,
+                    "duration": dur,
                     "source": "spotify"
                 })
             elif item_type == "album":
@@ -77,15 +81,16 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                 for t in album_data["tracks"]["items"]:
                     artist_name = ", ".join([a["name"] for a in t["artists"]])
                     title = t["name"]
+                    dur = int((t.get("duration_ms") or 0) / 1000)
                     tracks.append({
                         "title": title,
                         "artist": artist_name,
                         "search_query": f"{title} {artist_name} audio",
                         "thumbnail": album_thumb,
+                        "duration": dur,
                         "source": "spotify"
                     })
             elif item_type == "playlist":
-                # Fetch up to 200 items from Spotify playlist
                 results = sp_client.playlist_items(item_id, limit=100)
                 items = results.get("items", [])
                 if results.get("next"):
@@ -103,11 +108,13 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                     artist_name = ", ".join([a["name"] for a in t.get("artists", [])])
                     title = t.get("name", "")
                     thumbnail = t.get("album", {}).get("images", [{}])[0].get("url", "")
+                    dur = int((t.get("duration_ms") or 0) / 1000)
                     tracks.append({
                         "title": title,
                         "artist": artist_name,
                         "search_query": f"{title} {artist_name} audio",
                         "thumbnail": thumbnail,
+                        "duration": dur,
                         "source": "spotify"
                     })
             if tracks:
@@ -115,12 +122,68 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
         except Exception as e:
             print(f"[Spotify API Warning] Spotipy query failed: {e}. Falling back to public resolver.")
 
-    # Method 2: Public oEmbed / Scrape Fallback (No API Keys needed!)
+    # Method 2: Public Spotify Embed Web Scraper (Extracts ALL playlist/album tracks!)
+    try:
+        embed_url = f"https://open.spotify.com/embed/{item_type}/{item_id}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(embed_url, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+                if resp.status == 200:
+                    text = await resp.text()
+                    
+                    # 1. Try __NEXT_DATA__ JSON
+                    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', text)
+                    if m:
+                        try:
+                            json_data = json.loads(m.group(1))
+                            entity = json_data.get("props", {}).get("pageProps", {}).get("state", {}).get("data", {}).get("entity", {})
+                            cover_url = entity.get("coverArt", {}).get("sources", [{}])[-1].get("url", "")
+                            
+                            if item_type == "track":
+                                title = entity.get("title", "")
+                                artist = entity.get("subtitle", "Spotify")
+                                dur = int(entity.get("duration", 0) / 1000) if entity.get("duration") else 0
+                                if title:
+                                    tracks.append({
+                                        "title": title,
+                                        "artist": artist,
+                                        "search_query": f"{title} {artist} audio",
+                                        "thumbnail": cover_url,
+                                        "duration": dur,
+                                        "source": "spotify"
+                                    })
+                            else:
+                                track_list = entity.get("trackList", [])
+                                for t in track_list[:200]:
+                                    t_title = t.get("title", "")
+                                    t_artist = re.sub(r'[\u00a0\xa0\u200b]+', ' ', t.get("subtitle", "Spotify")).strip()
+                                    t_dur = int(t.get("duration", 0) / 1000) if t.get("duration") else 0
+                                    if t_title:
+                                        tracks.append({
+                                            "title": t_title,
+                                            "artist": t_artist,
+                                            "search_query": f"{t_title} {t_artist} audio",
+                                            "thumbnail": cover_url,
+                                            "duration": t_dur,
+                                            "source": "spotify"
+                                        })
+                            if tracks:
+                                return tracks[:200]
+                        except Exception as e:
+                            print(f"[Spotify NEXT_DATA parse error] {e}")
+
+    except Exception as e:
+        print(f"[Spotify Embed Scraper Warning] {e}")
+
+    # Method 3: Public oEmbed Fallback
     try:
         clean_url = f"https://open.spotify.com/{item_type}/{item_id}"
         oembed_url = f"https://open.spotify.com/oembed?url={urllib.parse.quote(clean_url)}"
         async with aiohttp.ClientSession() as session:
-            async with session.get(oembed_url, timeout=10) as resp:
+            async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     title = data.get("title", "")
@@ -131,6 +194,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                             "artist": "Spotify",
                             "search_query": f"{title} audio",
                             "thumbnail": thumbnail,
+                            "duration": 0,
                             "source": "spotify"
                         })
                         return tracks
@@ -143,6 +207,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
         "artist": "Spotify",
         "search_query": query,
         "thumbnail": "",
+        "duration": 0,
         "source": "spotify"
     })
     return tracks

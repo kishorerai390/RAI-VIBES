@@ -1,3 +1,6 @@
+import os
+import sys
+import re
 import asyncio
 import functools
 import random
@@ -62,8 +65,22 @@ class Song:
         """Extracts streamable info using yt-dlp asynchronously with smart single-track preference and fallback."""
         loop = loop or asyncio.get_event_loop()
         
-        is_url = search.startswith("http://") or search.startswith("https://")
-        to_search = search if is_url else f"ytsearch5:{search}"
+        # Sanitize query by removing any command prefixes
+        cleaned_search = search.strip()
+        for prefix in ["/play ", "!play ", "play ", "/p ", "!p ", "p ", "/search ", "!search ", "search "]:
+            if cleaned_search.lower().startswith(prefix):
+                cleaned_search = cleaned_search[len(prefix):].strip()
+                break
+
+        is_url = cleaned_search.startswith("http://") or cleaned_search.startswith("https://")
+        if is_url:
+            to_search = cleaned_search
+        else:
+            # Clean symbols, emojis, and noise characters that cause search engine failures
+            sanitized = re.sub(r'[^\w\s\-\.\'\,\(\)]', ' ', cleaned_search)
+            sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+            query_str = sanitized if sanitized else cleaned_search
+            to_search = f"ytsearch5:{query_str}"
 
         try:
             partial_extract = functools.partial(
@@ -79,7 +96,7 @@ class Song:
                 try:
                     sc_extract = functools.partial(
                         ytdl.extract_info,
-                        f"scsearch5:{search}",
+                        f"scsearch5:{query_str}",
                         download=False,
                         process=True
                     )
@@ -192,7 +209,7 @@ class GuildMusicPlayer:
         self.bot = cog.bot
         self.queue = deque()
         self.history = deque(maxlen=20)
-        self.voice_client: Optional[discord.VoiceClient] = None
+        self._voice_client: Optional[discord.VoiceClient] = None
         self.current: Optional[Song] = None
         self.current_source: Optional[discord.AudioSource] = None
         self.loop_mode: str = "off"  # "off", "track", "queue"
@@ -211,17 +228,37 @@ class GuildMusicPlayer:
         self.is_restarting_for_filters: bool = False
 
     @property
+    def voice_client(self) -> Optional[discord.VoiceClient]:
+        return self.guild.voice_client
+
+    @voice_client.setter
+    def voice_client(self, vc: Optional[discord.VoiceClient]):
+        self._voice_client = vc
+
+    @property
     def is_connected(self) -> bool:
-        return self.voice_client is not None and self.voice_client.is_connected()
+        vc = self.guild.voice_client
+        return vc is not None and vc.is_connected()
 
     def set_volume(self, val: int):
         self.volume = max(0, min(200, val))
         if self.current_source and isinstance(self.current_source, discord.PCMVolumeTransformer):
             self.current_source.volume = self.volume / 100.0
 
+    def pause(self):
+        vc = self.guild.voice_client
+        if vc and vc.is_playing():
+            vc.pause()
+
+    def resume(self):
+        vc = self.guild.voice_client
+        if vc and vc.is_paused():
+            vc.resume()
+
     def skip(self):
-        if self.voice_client and (self.voice_client.is_playing() or self.voice_client.is_paused()):
-            self.voice_client.stop()
+        vc = self.guild.voice_client
+        if vc and (vc.is_playing() or vc.is_paused()):
+            vc.stop()
 
     def shuffle(self):
         temp = list(self.queue)
@@ -239,12 +276,12 @@ class GuildMusicPlayer:
             await self.voice_client.disconnect(force=True)
             self.voice_client = None
 
-    def create_progress_bar(self, current_sec: int, total_sec: int, length: int = 12) -> str:
+    def create_progress_bar(self, current_sec: int, total_sec: int, length: int = 14) -> str:
         if total_sec <= 0:
-            return "🔴 Live Stream / Radio"
+            return "🔴 **LIVE STREAM / RADIO**"
         progress = min(1.0, max(0.0, current_sec / total_sec))
         filled = int(progress * length)
-        bar = "▬" * filled + "🔘" + "▬" * (length - filled)
+        bar = "━" * filled + "●" + "─" * (length - filled)
         cur_str = time.strftime("%M:%S", time.gmtime(current_sec)) if current_sec < 3600 else time.strftime("%H:%M:%S", time.gmtime(current_sec))
         tot_str = time.strftime("%M:%S", time.gmtime(total_sec)) if total_sec < 3600 else time.strftime("%H:%M:%S", time.gmtime(total_sec))
         return f"`{cur_str}` {bar} `{tot_str}`"
@@ -259,35 +296,33 @@ class GuildMusicPlayer:
             return embed
 
         elapsed = int(time.time() - self.start_time) if self.start_time else 0
-        if self.voice_client and self.voice_client.is_paused():
-            status_symbol = "⏸️ Paused"
-        else:
-            status_symbol = "🎶 Now Playing"
+        is_paused = bool(self.voice_client and self.voice_client.is_paused())
+        status_text = "⏸️ Paused" if is_paused else "🎶 Now Playing"
 
-        embed = discord.Embed(
-            title=f"{status_symbol} • {self.current.title[:65]}",
-            url=self.current.webpage_url,
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_author(name="RAI VIBES 💗 • Music Engine", icon_url=config.RAI_ICON_URL)
-        embed.set_thumbnail(url=self.current.thumbnail)
-
-        pbar = self.create_progress_bar(elapsed, self.current.duration)
-        embed.add_field(name="Progress", value=pbar, inline=False)
-
-        loop_badge = "🔂 Track" if self.loop_mode == "track" else ("🔁 Queue" if self.loop_mode == "queue" else "Disabled")
+        loop_badge = "🔂 Track" if self.loop_mode == "track" else ("🔁 Queue" if self.loop_mode == "queue" else "Off")
         filters_badge = ", ".join(self.active_filters) if self.active_filters else "Normal"
         if self.custom_speed != 1.0:
             filters_badge += f" ({self.custom_speed}x)"
 
-        embed.add_field(name="👤 Channel / Artist", value=f"`{self.current.uploader[:25]}`", inline=True)
-        embed.add_field(name="🔊 Volume", value=f"`{self.volume}%`", inline=True)
-        embed.add_field(name="🔁 Loop Mode", value=f"`{loop_badge}`", inline=True)
-        embed.add_field(name="📥 Requested By", value=self.current.requester.mention, inline=True)
-        embed.add_field(name="📜 Queue Length", value=f"`{len(self.queue)}/{config.MAX_QUEUE_SIZE} songs`", inline=True)
-        embed.add_field(name="🎛️ Active Filters", value=f"`{filters_badge}`", inline=True)
+        pbar = self.create_progress_bar(elapsed, self.current.duration)
 
-        embed.set_footer(text=f"RAI VIBES 💗 • Queue Capacity: {len(self.queue)}/{config.MAX_QUEUE_SIZE}", icon_url=config.RAI_ICON_URL)
+        embed = discord.Embed(
+            color=0xFF1493 if not is_paused else 0x5865F2
+        )
+        embed.set_author(name=f"RAI VIBES 💗 • {status_text}", icon_url=config.RAI_ICON_URL)
+        embed.set_thumbnail(url=self.current.thumbnail or config.RAI_ICON_URL)
+
+        desc = (
+            f"### 🎵 [{self.current.title[:65]}]({self.current.webpage_url})\n\n"
+            f"{pbar}\n\n"
+            f"╭── 🎧 **Playback Info**\n"
+            f"│ 👤 **Artist:** `{self.current.uploader[:30]}`\n"
+            f"│ 🔊 **Volume:** `{self.volume}%`  •  🔁 **Loop:** `{loop_badge}`\n"
+            f"│ 🎛️ **Audio FX:** `{filters_badge}`  •  📜 **Queue:** `{len(self.queue)} songs`\n"
+            f"╰── 📥 **Requested by:** {self.current.requester.mention}"
+        )
+        embed.description = desc
+        embed.set_footer(text="RAI VIBES 💗 • High Fidelity Sound Engine", icon_url=config.RAI_ICON_URL)
         return embed
 
     def build_queue_embed(self, page: int = 0, per_page: int = 10) -> discord.Embed:
@@ -423,18 +458,23 @@ class GuildMusicPlayer:
                 if not self.is_restarting_for_filters:
                     self.bot.loop.call_soon_threadsafe(self.play_next_song.set)
 
-            # Ensure voice client is connected before playing
+            # Ensure voice client is connected before playing (Anchored to ✨ Lo-Fi Chillroom)
             if not self.voice_client or not self.voice_client.is_connected():
-                self.voice_client = self.guild.voice_client
+                lofi_vc = discord.utils.get(self.guild.voice_channels, name="✨ Lo-Fi Chillroom") or self.guild.get_channel(1545781986193309789)
+                target_vc = lofi_vc or (self.guild.voice_channels[0] if self.guild.voice_channels else None)
+
+                if target_vc:
+                    try:
+                        await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
+                    except Exception:
+                        pass
+
+                # If still not connected, wait for connection
                 if not self.voice_client or not self.voice_client.is_connected():
-                    # Attempt re-connection
-                    for vc in self.guild.voice_channels:
-                        if len(vc.members) > 0:
-                            try:
-                                self.voice_client = await vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
-                                break
-                            except Exception:
-                                pass
+                    self.queue.appendleft(song)
+                    self.current = None
+                    await self.wait_for_voice()
+                    continue
 
             try:
                 # Ensure fresh streaming URL
@@ -459,9 +499,14 @@ class GuildMusicPlayer:
                 self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.volume / 100.0)
                 self.start_time = time.time()
                 if self.voice_client and self.voice_client.is_connected():
+                    if self.voice_client.is_playing() or self.voice_client.is_paused():
+                        self.voice_client.stop()
+                        await asyncio.sleep(0.15)
                     self.voice_client.play(self.current_source, after=after_playing)
                 else:
-                    raise RuntimeError("Bot is not connected to a voice channel.")
+                    self.queue.appendleft(song)
+                    self.current = None
+                    continue
             except Exception as e:
                 print(f"[Player Error] Failed to stream: {e}")
                 if self.text_channel:
@@ -487,6 +532,18 @@ class GuildMusicPlayer:
         while not self.queue:
             await asyncio.sleep(1)
 
+    async def wait_for_voice(self):
+        while not self.voice_client or not self.voice_client.is_connected():
+            lofi_vc = discord.utils.get(self.guild.voice_channels, name="✨ Lo-Fi Chillroom") or self.guild.get_channel(1545781986193309789)
+            target_vc = lofi_vc or (self.guild.voice_channels[0] if self.guild.voice_channels else None)
+            if target_vc:
+                try:
+                    await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
+                    return
+                except Exception:
+                    pass
+            await asyncio.sleep(1.5)
+
 
 class Music(commands.Cog):
     """RAI VIBES 💗 Music System - The Ultimate High-Performance Sound Engine."""
@@ -505,40 +562,32 @@ class Music(commands.Cog):
         return self.players[guild.id]
 
     async def ensure_voice(self, ctx_or_interaction) -> Optional[discord.VoiceClient]:
-        """Ensures user and bot are connected to voice with auto-reconnect."""
-        author = ctx_or_interaction.user if isinstance(ctx_or_interaction, discord.Interaction) else ctx_or_interaction.author
+        """Ensures the bot is connected to voice without bouncing or reconnecting unnecessarily."""
         guild = ctx_or_interaction.guild
-
-        if not author.voice or not author.voice.channel:
-            msg = "⚡ **You must join a voice channel first before playing music!**"
-            if isinstance(ctx_or_interaction, discord.Interaction):
-                if ctx_or_interaction.response.is_done():
-                    await ctx_or_interaction.followup.send(msg, ephemeral=True)
-                else:
-                    await ctx_or_interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await ctx_or_interaction.send(msg)
-            return None
-
-        voice_channel = author.voice.channel
         voice_client = guild.voice_client
 
-        if voice_client is None or not voice_client.is_connected():
-            if voice_client:
-                try:
-                    await voice_client.disconnect(force=True)
-                except Exception:
-                    pass
-            try:
-                voice_client = await voice_channel.connect(timeout=25.0, reconnect=True, self_deaf=True)
-            except Exception as e:
-                print(f"[Voice Connect Error] {e}")
-                # Fallback retry
-                voice_client = await voice_channel.connect(timeout=25.0, reconnect=True, self_deaf=True)
-        elif voice_client.channel != voice_channel:
-            await voice_client.move_to(voice_channel)
+        # If already connected, return existing voice client immediately
+        if voice_client is not None and voice_client.is_connected():
+            return voice_client
 
-        return voice_client
+        # Determine target voice channel (User's active VC > Lo-Fi Chillroom > First VC)
+        author = getattr(ctx_or_interaction, "author", None) or getattr(ctx_or_interaction, "user", None)
+        user_vc = getattr(getattr(author, "voice", None), "channel", None)
+        lofi_vc = discord.utils.get(guild.voice_channels, name="✨ Lo-Fi Chillroom") or guild.get_channel(1545781986193309789)
+        target_vc = user_vc or lofi_vc or (guild.voice_channels[0] if guild.voice_channels else None)
+
+        if not target_vc:
+            if hasattr(ctx_or_interaction, "send"):
+                await ctx_or_interaction.send("❌ Please join a voice channel first!", ephemeral=True)
+            return None
+
+        try:
+            voice_client = await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
+        except Exception as e:
+            print(f"[Voice Connect Error] {e}")
+            voice_client = guild.voice_client
+
+        return voice_client or guild.voice_client
 
     # =========================================================================
     # COMMAND: PLAY / P
@@ -562,36 +611,64 @@ class Music(commands.Cog):
 
         # Check queue limit
         if len(player.queue) >= config.MAX_QUEUE_SIZE:
-            return await ctx.send(f"⚠️ **Queue is full ({config.MAX_QUEUE_SIZE}/{config.MAX_QUEUE_SIZE} songs).** Please wait for songs to finish or remove tracks.")
+            msg = f"⚠️ **Queue is full ({config.MAX_QUEUE_SIZE}/{config.MAX_QUEUE_SIZE} songs).** Please wait for songs to finish or remove tracks."
+            if ctx.interaction:
+                return await ctx.interaction.followup.send(msg, ephemeral=True)
+            return await ctx.send(msg)
 
         # Check if Spotify URL
         if is_spotify_url(query):
             spotify_tracks = await resolve_spotify(query)
             if not spotify_tracks:
-                await ctx.send("❌ Could not parse Spotify link. Please ensure it is a valid track, album, or playlist.")
-                return
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send("❌ Could not parse Spotify link. Please ensure it is a valid track, album, or playlist.", ephemeral=True)
+                return await ctx.send("❌ Could not parse Spotify link. Please ensure it is a valid track, album, or playlist.")
 
             if len(spotify_tracks) == 1:
                 t = spotify_tracks[0]
                 song = await Song.create_source(t["search_query"], ctx.author, self.bot.loop)
                 if not song:
-                    await ctx.send(f"❌ Could not find audio for Spotify track: `{t['title']}`")
-                    return
+                    if ctx.interaction:
+                        return await ctx.interaction.followup.send(f"❌ Could not find audio for Spotify track: `{t['title']}`", ephemeral=True)
+                    return await ctx.send(f"❌ Could not find audio for Spotify track: `{t['title']}`")
                 if t.get("thumbnail"):
                     song.thumbnail = t["thumbnail"]
+                
+                is_currently_playing = bool(player.current and player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()))
                 player.queue.append(song)
 
-                embed = discord.Embed(
-                    title="⚡ Track Added to RAI VIBES 💗 Queue",
-                    description=f"[{song.title}]({song.webpage_url})",
-                    color=config.COLOR_PRIMARY
-                )
-                embed.set_thumbnail(url=song.thumbnail)
-                embed.add_field(name="Position in Queue", value=f"`#{len(player.queue)}/{config.MAX_QUEUE_SIZE}`" if player.current else "`Now Playing`", inline=True)
-                embed.add_field(name="Artist", value=f"`{t.get('artist', 'Spotify')}`", inline=True)
-                embed.add_field(name="Source", value="🟢 Spotify", inline=True)
-                embed.set_footer(text=f"RAI VIBES 💗 • Queue: {len(player.queue)}/{config.MAX_QUEUE_SIZE}", icon_url=config.RAI_ICON_URL)
-                await ctx.send(embed=embed)
+                if is_currently_playing:
+                    # Calculate estimated time until playing
+                    est_sec = 0
+                    if player.current:
+                        cur_elapsed = int(time.time() - player.start_time) if player.start_time else 0
+                        est_sec += max(0, player.current.duration - cur_elapsed)
+                    for q_song in list(player.queue)[:-1]:
+                        est_sec += max(0, q_song.duration)
+                    est_str = time.strftime("%M:%S", time.gmtime(est_sec)) if est_sec > 0 else "Playing Next"
+                    dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
+
+                    embed = discord.Embed(
+                        title="🎵 Added to queue",
+                        description=f"**[{song.title}]({song.webpage_url})**",
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_thumbnail(url=song.thumbnail or config.RAI_ICON_URL)
+                    embed.add_field(name="⏱️ Track Duration", value=f"`{dur_str}`", inline=True)
+                    embed.add_field(name="📍 Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
+                    embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)
+                    embed.set_footer(text=f"Requested by {ctx.author.display_name} • RAI VIBES 💗", icon_url=ctx.author.display_avatar.url)
+                    
+                    if ctx.interaction:
+                        await ctx.interaction.followup.send(embed=embed)
+                    else:
+                        await ctx.send(embed=embed)
+                else:
+                    if ctx.interaction:
+                        try:
+                            await ctx.interaction.delete_original_response()
+                        except Exception:
+                            pass
             else:
                 remaining_space = max(0, config.MAX_QUEUE_SIZE - len(player.queue))
                 added_tracks = spotify_tracks[:remaining_space]
@@ -617,30 +694,51 @@ class Music(commands.Cog):
                 )
                 embed.set_thumbnail(url=spotify_tracks[0].get("thumbnail", config.RAI_ICON_URL))
                 embed.set_footer(text="RAI VIBES 💗 Music Engine", icon_url=config.RAI_ICON_URL)
-                await ctx.send(embed=embed)
+                
+                if ctx.interaction:
+                    await ctx.interaction.followup.send(embed=embed)
+                else:
+                    await ctx.send(embed=embed)
             return
 
         # Direct YouTube / Keyword Search
         try:
             song = await Song.create_source(query, ctx.author, self.bot.loop)
             if not song:
-                await ctx.send(f"❌ No results found for query: `{query}`")
-                return
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send(f"❌ No results found for query: `{query}`", ephemeral=True)
+                return await ctx.send(f"❌ No results found for query: `{query}`")
 
+            is_currently_playing = bool(player.current and player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()))
             player.queue.append(song)
-            if player.current:
+
+            if is_currently_playing:
+                # Calculate estimated time until playing (Rythm Style)
+                est_sec = 0
+                if player.current:
+                    cur_elapsed = int(time.time() - player.start_time) if player.start_time else 0
+                    est_sec += max(0, player.current.duration - cur_elapsed)
+                for q_song in list(player.queue)[:-1]:
+                    est_sec += max(0, q_song.duration)
+
+                est_str = time.strftime("%M:%S", time.gmtime(est_sec)) if est_sec > 0 else "Playing Next"
+                dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
+
                 embed = discord.Embed(
-                    title="⚡ Track Added to RAI VIBES 💗 Queue",
-                    description=f"[{song.title}]({song.webpage_url})",
+                    title="🎵 Added to queue",
+                    description=f"**[{song.title}]({song.webpage_url})**",
                     color=config.COLOR_PRIMARY
                 )
-                embed.set_thumbnail(url=song.thumbnail)
-                dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
-                embed.add_field(name="Duration", value=f"`{dur_str}`", inline=True)
-                embed.add_field(name="Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
-                embed.add_field(name="Requested By", value=ctx.author.mention, inline=True)
-                embed.set_footer(text="RAI VIBES 💗 • Command The Power, Hear The Rhythm", icon_url=config.RAI_ICON_URL)
-                await ctx.send(embed=embed)
+                embed.set_thumbnail(url=song.thumbnail or config.RAI_ICON_URL)
+                embed.add_field(name="⏱️ Track Duration", value=f"`{dur_str}`", inline=True)
+                embed.add_field(name="📍 Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
+                embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)
+                embed.set_footer(text=f"Requested by {ctx.author.display_name} • RAI VIBES 💗", icon_url=ctx.author.display_avatar.url)
+                
+                if ctx.interaction:
+                    await ctx.interaction.followup.send(embed=embed)
+                else:
+                    await ctx.send(embed=embed)
             else:
                 # If starting playback now, delete thinking message if interaction
                 if ctx.interaction:
@@ -650,7 +748,19 @@ class Music(commands.Cog):
                         pass
 
         except Exception as e:
-            await ctx.send(f"❌ Error while queuing track: `{e}`")
+            if ctx.interaction:
+                await ctx.interaction.followup.send(f"❌ Error while queuing track: `{e}`", ephemeral=True)
+            else:
+                await ctx.send(f"❌ Error while queuing track: `{e}`")
+
+    # =========================================================================
+    # COMMAND: JOIN / SUMMON
+    # =========================================================================
+    @commands.hybrid_command(name="join", aliases=["summon", "connect", "j"], description="Summon RAI VIBES to your current voice channel.")
+    async def join(self, ctx: commands.Context):
+        vc = await self.ensure_voice(ctx)
+        if vc:
+            await ctx.send(f"🔊 **Connected to:** `{vc.channel.name}` • Ready for music!")
 
     # =========================================================================
     # COMMAND: SEARCH (TOP 5 INTERACTIVE SELECTOR)
@@ -690,9 +800,9 @@ class Music(commands.Cog):
         if not player or not player.is_connected or not player.voice_client.is_playing():
             return await ctx.send("❌ Nothing is currently playing.", ephemeral=True)
         player.voice_client.pause()
-        await ctx.send("⏸️ **Playback paused.** Use `/resume` to continue.")
+        await ctx.send("⏸️ **Playback paused.** Use `!resume` or `/resume` to continue.")
 
-    @commands.hybrid_command(name="resume", description="Resume paused music playback.")
+    @commands.hybrid_command(name="resume", aliases=["unpause"], description="Resume paused music playback.")
     async def resume(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.is_connected or not player.voice_client.is_paused():
@@ -714,7 +824,26 @@ class Music(commands.Cog):
         await ctx.send(f"⏭️ **Skipped:** `{current_title}`")
 
     # =========================================================================
-    # COMMAND: STOP
+    # COMMAND: SKIPTO / JUMP
+    # =========================================================================
+    @commands.hybrid_command(name="skipto", aliases=["jump"], description="Skip directly to a specific track in the queue.")
+    @app_commands.describe(index="The track position to jump to (e.g. 3)")
+    async def skipto(self, ctx: commands.Context, index: int):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.queue:
+            return await ctx.send("❌ Queue is empty.", ephemeral=True)
+        if not 1 <= index <= len(player.queue):
+            return await ctx.send(f"❌ Invalid track position. Choose between 1 and {len(player.queue)}.", ephemeral=True)
+
+        for _ in range(index - 1):
+            player.queue.popleft()
+
+        target_song = player.queue[0].title if player.queue else "Track"
+        player.skip()
+        await ctx.send(f"⏭️ **Skipped directly to track #{index}:** `{target_song}`")
+
+    # =========================================================================
+    # COMMAND: STOP / DISCONNECT
     # =========================================================================
     @commands.hybrid_command(name="stop", aliases=["leave", "disconnect", "dc"], description="Stop music, clear queue, and leave voice.")
     async def stop(self, ctx: commands.Context):
@@ -723,7 +852,7 @@ class Music(commands.Cog):
             return await ctx.send("❌ RAI VIBES 💗 is not in a voice channel.", ephemeral=True)
         
         await player.stop()
-        await ctx.send("⏹️ **RAI VIBES 💗 stopped and disconnected. Queue cleared.**")
+        await ctx.send("⏹️ **Disconnected and cleared the queue.**")
 
     # =========================================================================
     # COMMAND: NOW PLAYING / NP
@@ -741,11 +870,11 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: QUEUE / Q
     # =========================================================================
-    @commands.hybrid_command(name="queue", aliases=["q"], description="Display upcoming songs in the RAI VIBES 💗 queue.")
+    @commands.hybrid_command(name="queue", aliases=["q"], description="Display upcoming songs in the queue.")
     async def queue(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or (not player.current and not player.queue):
-            return await ctx.send("📜 **The queue is currently empty.** Add tracks with `/play`!", ephemeral=True)
+            return await ctx.send("📜 **The queue is currently empty.** Add tracks with `!play <song>` or `/play`!", ephemeral=True)
 
         embed = player.build_queue_embed(page=0)
         view = QueuePaginationView(player, current_page=0)
@@ -754,7 +883,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: VOLUME
     # =========================================================================
-    @commands.hybrid_command(name="volume", aliases=["vol"], description="Adjust RAI VIBES 💗 player volume (0% - 200%).")
+    @commands.hybrid_command(name="volume", aliases=["vol", "v"], description="Adjust RAI VIBES 💗 player volume (0% - 200%).")
     @app_commands.describe(level="Volume level from 0 to 200 (Super Boost)")
     async def volume(self, ctx: commands.Context, level: int):
         player = self.get_player(ctx.guild.id)
@@ -769,9 +898,9 @@ class Music(commands.Cog):
         await ctx.send(f"🔊 **Volume adjusted to {level}%!**{boost_indicator}")
 
     # =========================================================================
-    # COMMAND: LOOP
+    # COMMAND: LOOP / REPEAT
     # =========================================================================
-    @commands.hybrid_command(name="loop", description="Toggle repeat mode: off, track, or queue.")
+    @commands.hybrid_command(name="loop", aliases=["repeat"], description="Toggle repeat mode: off, track, or queue.")
     @app_commands.choices(mode=[
         app_commands.Choice(name="Disable Loop (Off)", value="off"),
         app_commands.Choice(name="Repeat Current Track", value="track"),
@@ -797,7 +926,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: SHUFFLE
     # =========================================================================
-    @commands.hybrid_command(name="shuffle", description="Shuffle songs in the current queue.")
+    @commands.hybrid_command(name="shuffle", aliases=["sh"], description="Shuffle songs in the current queue.")
     async def shuffle(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or len(player.queue) < 2:
@@ -809,19 +938,76 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: REMOVE
     # =========================================================================
-    @commands.hybrid_command(name="remove", description="Remove a specific song from queue by its index.")
-    @app_commands.describe(index="The index number of the track from /queue")
+    @commands.hybrid_command(name="remove", aliases=["rm"], description="Remove a specific song from queue by its position.")
+    @app_commands.describe(index="The track position number from /queue")
     async def remove(self, ctx: commands.Context, index: int):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
             return await ctx.send("❌ Queue is empty.", ephemeral=True)
 
         if not 1 <= index <= len(player.queue):
-            return await ctx.send(f"❌ Invalid index. Choose between 1 and {len(player.queue)}.", ephemeral=True)
+            return await ctx.send(f"❌ Invalid position. Choose between 1 and {len(player.queue)}.", ephemeral=True)
 
         removed_song = player.queue[index - 1]
         del player.queue[index - 1]
         await ctx.send(f"🗑️ **Removed track #{index}:** `{removed_song.title}`")
+
+    # =========================================================================
+    # COMMAND: CLEAR QUEUE
+    # =========================================================================
+    @commands.hybrid_command(name="clearqueue", aliases=["cq", "emptyqueue", "qclear"], description="Clear all upcoming songs from the queue.")
+    async def clearqueue(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.queue:
+            return await ctx.send("❌ Queue is already empty.", ephemeral=True)
+
+        count = len(player.queue)
+        player.queue.clear()
+        await ctx.send(f"🗑️ **Cleared {count} tracks from the queue.**")
+
+    # =========================================================================
+    # COMMAND: REPLAY / RESTART
+    # =========================================================================
+    @commands.hybrid_command(name="replay", aliases=["restart"], description="Replay the currently playing song from the beginning.")
+    async def replay(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current or not player.voice_client:
+            return await ctx.send("❌ No track is currently playing.", ephemeral=True)
+
+        player.start_time = time.time()
+        await player.restart_current_with_filters()
+        await ctx.send(f"🔄 **Replaying:** `{player.current.title}`")
+
+    # =========================================================================
+    # COMMAND: SEEK
+    # =========================================================================
+    @commands.hybrid_command(name="seek", description="Seek to a specific timestamp in the current song (e.g. 1:30 or 90).")
+    @app_commands.describe(timestamp="Time position to jump to (e.g. 1:30 or seconds)")
+    async def seek(self, ctx: commands.Context, timestamp: str):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current or not player.voice_client:
+            return await ctx.send("❌ No track is currently playing.", ephemeral=True)
+
+        seconds = 0
+        try:
+            if ":" in timestamp:
+                parts = [int(p) for p in timestamp.split(":")]
+                if len(parts) == 2:
+                    seconds = parts[0] * 60 + parts[1]
+                elif len(parts) == 3:
+                    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+            else:
+                seconds = int(timestamp)
+        except Exception:
+            return await ctx.send("❌ Invalid format! Use `mm:ss` (e.g. `1:30`) or total seconds.", ephemeral=True)
+
+        if player.current.duration > 0 and seconds > player.current.duration:
+            return await ctx.send(f"❌ Timestamp exceeds song duration ({time.strftime('%M:%S', time.gmtime(player.current.duration))}).", ephemeral=True)
+
+        player.start_time = time.time() - seconds
+        await player.restart_current_with_filters()
+        seek_str = time.strftime('%M:%S', time.gmtime(seconds))
+        await ctx.send(f"⏩ **Seeked to:** `{seek_str}`")
 
 
 async def setup(bot: commands.Bot):

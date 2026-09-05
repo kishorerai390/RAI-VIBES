@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import asyncio
 import logging
 
@@ -14,13 +15,10 @@ from colorama import Fore, Style
 import config
 from utils.ffmpeg_setup import get_ffmpeg_executable
 from utils.persistent_views import (
-    VerifyButtonView,
     ColorRolesView,
     GamingRolesView,
     NotificationRolesView,
-    IdentityRolesView,
-    TicketCreateView,
-    TicketCloseView
+    IdentityRolesView
 )
 
 # Configure Logging
@@ -32,13 +30,13 @@ logging.basicConfig(
 logger = logging.getLogger("RaiVibes")
 
 BANNER = f"""
-{Fore.CYAN}  ████████╗██╗  ██╗ ██████╗ ██████╗     ██╗   ██╗██╗██████╗ ███████╗███████╗
-  ╚══██╔══╝██║  ██║██╔═══██╗██╔══██╗    ██║   ██║██║██╔══██╗██╔════╝██╔════╝
-     ██║   ███████║██║   ██║██████╔╝    ██║   ██║██║██████╔╝█████╗  ███████╗
-     ██║   ██╔══██║██║   ██║██╔══██╗    ╚██╗ ██╔╝██║██╔══██╗██╔══╝  ╚════██║
-     ██║   ██║  ██║╚██████╔╝██║  ██║     ╚████╔╝ ██║██████╔╝███████╗███████║
-     ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝      ╚═══╝  ╚═╝╚═════╝ ╚══════╝╚══════╝
-{Fore.YELLOW}          ⚡ COMMAND THE POWER • HEAR THE RHYTHM • DISCORD MUSIC BOT ⚡
+{Fore.MAGENTA}  ██████╗  █████╗ ██╗    ██╗   ██╗██╗██████╗ ███████╗███████╗
+{Fore.MAGENTA}  ██╔══██╗██╔══██╗██║    ██║   ██║██║██╔══██╗██╔════╝██╔════╝
+{Fore.CYAN}  ██████╔╝███████║██║    ██║   ██║██║██████╔╝█████╗  ███████╗
+{Fore.CYAN}  ██╔══██╗██╔══██║██║    ╚██╗ ██╔╝██║██╔══██╗██╔══╝  ╚════██║
+{Fore.MAGENTA}  ██║  ██║██║  ██║██║     ╚████╔╝ ██║██████╔╝███████╗███████║
+{Fore.MAGENTA}  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝      ╚═══╝  ╚═╝╚═════╝ ╚══════╝╚══════╝
+{Fore.LIGHTMAGENTA_EX}          💗 COMMAND THE VIBE • HEAR THE RHYTHM • DISCORD MUSIC BOT 💗
 """
 
 def create_bot(use_message_content: bool = True) -> commands.Bot:
@@ -76,20 +74,27 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
             except Exception as e:
                 logger.debug(f"Could not change nickname in {guild.name}: {e}")
 
-        logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
-
-    async def setup_hook():
-        # Register Persistent Views before gateway connection so buttons work 100% of the time
-        b.add_view(VerifyButtonView())
+        # Register Persistent Views for instant interaction without timeout
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
         b.add_view(IdentityRolesView())
-        b.add_view(TicketCreateView())
-        b.add_view(TicketCloseView())
-        logger.info("Registered all persistent interaction views in setup_hook.")
 
-    b.setup_hook = setup_hook
+        # Automatically synchronize slash commands tree to purge moderation commands
+        try:
+            synced = await b.tree.sync()
+            logger.info(f"✨ Successfully synchronized {len(synced)} dedicated Music & Vibe slash commands!")
+        except Exception as e:
+            logger.error(f"Failed to synchronize slash commands: {e}")
+
+        logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
+
+    @b.command(name="sync")
+    @commands.is_owner()
+    async def sync_cmd(ctx: commands.Context):
+        """Owner command to sync slash commands with Discord."""
+        synced = await b.tree.sync()
+        await ctx.send(f"✅ Successfully synchronized {len(synced)} slash commands!")
 
     @b.event
     async def on_message(message: discord.Message):
@@ -99,7 +104,16 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
         content = message.content.strip()
         lower = content.lower()
 
-        # 0. Dedicated Song Requests Channel Direct Queue (Zero-prefix)
+        # 0. Suggestions Auto-Reactions & Voting
+        if "suggestion" in message.channel.name.lower():
+            if not content.startswith("/"):
+                try:
+                    await message.add_reaction("👍")
+                    await message.add_reaction("👎")
+                except Exception:
+                    pass
+
+        # 1. Dedicated Song Requests Channel Direct Queue (Zero-prefix)
         if "song-request" in message.channel.name.lower() or "requests" in message.channel.name.lower():
             if content and not content.startswith("/"):
                 ctx = await b.get_context(message)
@@ -111,8 +125,56 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
                 if music_cog:
                     return await music_cog.play(ctx, query=content)
 
-        # 1. Direct Play triggers: /play, !play, play, /p, !p, p
-        play_prefixes = ["/play ", "!play ", "play ", "/p ", "!p ", "p "]
+        # 2. Check if bot is mentioned (e.g. @RAI VIBES /play song, @RAI VIBES play song, @RAI VIBES song)
+        if b.user in message.mentions and not message.mention_everyone:
+            raw_text = re.sub(rf"<@!?{b.user.id}>", "", content).strip()
+            ctx = await b.get_context(message)
+            music_cog = b.get_cog("Music")
+
+            if not raw_text:
+                embed = discord.Embed(
+                    title="🌸 RAI VIBES 💗 • Music Bot",
+                    description="Need music? Type `@RAI VIBES <song name>` or `!play <song>` or `/play <song>`!",
+                    color=config.COLOR_PRIMARY
+                )
+                embed.set_footer(text="RAI VIBES 💗 • Rythm Sound Engine", icon_url=config.RAI_ICON_URL)
+                return await message.channel.send(embed=embed)
+
+            # Check if mention is a simple command
+            mention_lower = raw_text.lower().strip()
+            simple_mention_cmds = {
+                "skip": "skip", "/skip": "skip", "!skip": "skip", "s": "skip",
+                "pause": "pause", "/pause": "pause", "!pause": "pause",
+                "resume": "resume", "/resume": "resume", "!resume": "resume", "unpause": "resume",
+                "stop": "stop", "/stop": "stop", "!stop": "stop", "dc": "stop", "leave": "stop",
+                "queue": "queue", "/queue": "queue", "!queue": "queue", "q": "queue",
+                "np": "nowplaying", "/np": "nowplaying", "!np": "nowplaying", "nowplaying": "nowplaying",
+                "loop": "loop", "/loop": "loop", "!loop": "loop", "repeat": "loop",
+                "shuffle": "shuffle", "/shuffle": "shuffle", "!shuffle": "shuffle",
+                "clear": "clearqueue", "cq": "clearqueue", "/clearqueue": "clearqueue",
+                "replay": "replay", "restart": "replay"
+            }
+            if mention_lower in simple_mention_cmds:
+                cmd = b.get_command(simple_mention_cmds[mention_lower])
+                if cmd:
+                    return await ctx.invoke(cmd)
+
+            # Extract clean song query or direct URL
+            url_match = re.search(r"https?://\S+", raw_text)
+            if url_match:
+                query = url_match.group(0).strip()
+            else:
+                query = raw_text
+                for prefix in ["/play ", "!play ", "play ", "/p ", "!p ", "p ", "/search ", "!search ", "search "]:
+                    if query.lower().startswith(prefix):
+                        query = query[len(prefix):].strip()
+                        break
+
+            if query and music_cog:
+                return await music_cog.play(ctx, query=query)
+
+        # 3. Direct Prefix Triggers: !play, !p
+        play_prefixes = ["!play ", "!p "]
         matched_prefix = next((p for p in play_prefixes if lower.startswith(p)), None)
 
         if matched_prefix:
@@ -123,16 +185,15 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
                 if music_cog:
                     return await music_cog.play(ctx, query=query)
 
-        # 2. Direct Simple Commands: /skip, /pause, /resume, /stop, /queue, /np, /radio
+        # 4. Direct Simple Commands: !skip, !pause, !resume, !stop, !queue, !np, !radio
         simple_cmds = {
-            "/skip": "skip", "!skip": "skip", "skip": "skip",
-            "/pause": "pause", "!pause": "pause", "pause": "pause",
-            "/resume": "resume", "!resume": "resume", "resume": "resume",
-            "/stop": "stop", "!stop": "stop", "stop": "stop",
-            "/queue": "queue", "!queue": "queue", "queue": "queue",
-            "/np": "nowplaying", "!np": "nowplaying", "np": "nowplaying",
-            "/nowplaying": "nowplaying", "!nowplaying": "nowplaying",
-            "/radio": "radio", "!radio": "radio"
+            "!skip": "skip",
+            "!pause": "pause",
+            "!resume": "resume",
+            "!stop": "stop",
+            "!queue": "queue",
+            "!np": "nowplaying",
+            "!radio": "radio"
         }
         if lower in simple_cmds:
             cmd_name = simple_cmds[lower]
@@ -140,24 +201,6 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
             cmd = b.get_command(cmd_name)
             if cmd:
                 return await ctx.invoke(cmd)
-
-        # 3. Mention Triggers (e.g. @RAI VIBES song)
-        mention_clean = f"<@{b.user.id}>"
-        mention_nick = f"<@!{b.user.id}>"
-
-        if content.startswith(mention_clean) or content.startswith(mention_nick) or (b.user in message.mentions and not message.mention_everyone):
-            raw_text = content.replace(mention_clean, "").replace(mention_nick, "").strip()
-            if raw_text:
-                query = raw_text
-                if query.lower().startswith("play "):
-                    query = query[5:].strip()
-                elif query.lower().startswith("p "):
-                    query = query[2:].strip()
-
-                ctx = await b.get_context(message)
-                music_cog = b.get_cog("Music")
-                if music_cog:
-                    return await music_cog.play(ctx, query=query)
 
         await b.process_commands(message)
 
@@ -182,7 +225,7 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
     return b
 
 async def load_cogs(bot_instance: commands.Bot):
-    # Pure Music, Radio & Audio FX Engine for RAI VIBES 💗
+    # Pure Music, Karaoke, Radio, Audio FX & Community Engine for RAI VIBES 💗
     initial_extensions = [
         "cogs.music",
         "cogs.radio",
@@ -190,6 +233,15 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.lyrics",
         "cogs.favorites",
         "cogs.general",
+        "cogs.voicehub",
+        "cogs.levels",
+        "cogs.minigames",
+        "cogs.giveaways",
+        "cogs.polls",
+        "cogs.welcome",
+        "cogs.qotd",
+        "cogs.counting",
+        "cogs.starboard",
     ]
     for extension in initial_extensions:
         try:

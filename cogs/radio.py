@@ -110,7 +110,12 @@ class Radio(commands.Cog):
         if player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()):
             player.skip()
 
-        text_channel = discord.utils.get(guild.text_channels, name="🎵・song-requests") or discord.utils.get(guild.text_channels, name="💬・general-chat")
+        text_channel = (
+            discord.utils.get(guild.text_channels, name="song-requests")
+            or discord.utils.get(guild.text_channels, name="🎵・song-requests")
+            or discord.utils.get(guild.text_channels, name="general-chat")
+            or discord.utils.get(guild.text_channels, name="💬・general-chat")
+        )
         if text_channel:
             player.text_channel = text_channel
             embed = discord.Embed(
@@ -125,15 +130,7 @@ class Radio(commands.Cog):
             except Exception:
                 pass
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """Auto-connect to 24-7 Radio channel on bot startup!"""
-        await asyncio.sleep(5)
-        for guild in self.bot.guilds:
-            radio_vc = discord.utils.get(guild.voice_channels, name="📻 | 24-7 RADIO") or next((vc for vc in guild.voice_channels if "24-7" in vc.name.lower() or "radio" in vc.name.lower()), None)
-            if radio_vc:
-                print(f"[Radio] Auto-joining 24/7 Tamil Nadu FM in {radio_vc.name} ({guild.name})...")
-                await self.start_radio_in_channel(radio_vc, "tamilnadu_fm")
+
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):

@@ -24,8 +24,8 @@ class RenameVoiceModal(discord.ui.Modal, title="Rename Your Voice Room"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             old_name = self.channel.name
-            await self.channel.edit(name=f"🔊・{self.new_name.value}")
-            await interaction.response.send_message(f"✅ Voice channel renamed from `{old_name}` to `🔊・{self.new_name.value}`!", ephemeral=True)
+            await self.channel.edit(name=f"🎧 {self.new_name.value}")
+            await interaction.response.send_message(f"✅ Voice channel renamed from `{old_name}` to `🎧 {self.new_name.value}`!", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Could not rename channel: {e}", ephemeral=True)
 
@@ -117,7 +117,7 @@ class VoiceHub(commands.Cog):
         # 1. User Joined the "Join to Create" channel
         if after.channel and ("join to create" in after.channel.name.lower() or "➕" in after.channel.name):
             category = after.channel.category
-            room_name = f"🔊・{member.display_name}'s Lounge"
+            room_name = f"🎧 {member.display_name}'s Lounge"
             
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(connect=True, speak=True),
@@ -200,8 +200,8 @@ class VoiceHub(commands.Cog):
         if vc.id not in self.temp_channels or self.temp_channels[vc.id] != ctx.author.id:
             return await ctx.send("❌ You can only rename voice channels you own.", ephemeral=True)
         
-        await vc.edit(name=f"🔊・{name}")
-        await ctx.send(f"✅ Voice channel renamed to `🔊・{name}`!", ephemeral=True)
+        await vc.edit(name=f"🎧 {name}")
+        await ctx.send(f"✅ Voice channel renamed to `🎧 {name}`!", ephemeral=True)
 
     @commands.hybrid_command(name="vlimit", description="Set user limit for your voice room (0-99).")
     @app_commands.describe(limit="Max users (0 for unlimited)")

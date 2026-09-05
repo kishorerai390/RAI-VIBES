@@ -55,6 +55,7 @@ class General(commands.Cog):
 
         filter_cmds = (
             "• `/bassboost <off|low|medium|high|extreme>` - Boost sub-bass\n"
+            "• `/karaoke` - Attenuate/remove vocals for karaoke singing\n"
             "• `/nightcore` - Nightcore pitch & speed\n"
             "• `/slowed` - Slowed + Reverb aesthetic\n"
             "• `/spatial8d` (`/8d`) - 8D 360° headphone rotation\n"
@@ -99,6 +100,46 @@ class General(commands.Cog):
         embed.add_field(name="🔊 Active Voice Streams", value=f"`{total_voice}`", inline=True)
         embed.add_field(name="⚡ Engine", value="`FFmpeg Equalizer + yt-dlp`", inline=True)
         embed.set_footer(text="RAI VIBES 💗 • The Powerful Discord Bot", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="guardian", aliases=["sentinel", "health"], description="Check RAI GUARDIAN auto-healing status & uptime telemetry.")
+    async def guardian(self, ctx: commands.Context):
+        import json
+        from pathlib import Path
+
+        status_file = Path(__file__).resolve().parent.parent / "data" / "guardian_status.json"
+        status_data = {}
+        if status_file.exists():
+            try:
+                with open(status_file, "r", encoding="utf-8") as f:
+                    status_data = json.load(f)
+            except Exception:
+                pass
+
+        g_status = status_data.get("guardian_status", "ACTIVE (MONITORING)")
+        recovers = status_data.get("total_recovers", 0)
+        last_reason = status_data.get("last_crash_reason", "None")
+
+        uptime_sec = int(time.time() - self.start_time)
+        hours, remainder = divmod(uptime_sec, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        days, hours = divmod(hours, 24)
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s" if days else f"{hours}h {minutes}m {seconds}s"
+
+        embed = discord.Embed(
+            title="🛡️ RAI GUARDIAN • Self-Healing Watchdog",
+            description="**Autonomous 24/7 Bot Supervisor & Error Recovery Engine**",
+            color=0x2ECC71 if recovers == 0 else config.COLOR_PRIMARY
+        )
+        embed.set_thumbnail(url=config.RAI_ICON_URL)
+        embed.add_field(name="🟢 Watchdog State", value=f"`{g_status}`", inline=True)
+        embed.add_field(name="⚡ Auto-Healing", value="`ENABLED (Active)`", inline=True)
+        embed.add_field(name="🛠️ Auto-Recoveries", value=f"`{recovers} incidents resolved`", inline=True)
+        embed.add_field(name="⏱️ Live Bot Uptime", value=f"`{uptime_str}`", inline=True)
+        embed.add_field(name="🔒 Voice Anchor", value="`✨ Lo-Fi Chillroom`", inline=True)
+        embed.add_field(name="📋 Last Incident", value=f"`{last_reason}`", inline=True)
+        embed.set_footer(text="RAI GUARDIAN • 99.9% Uptime SLA • Powered by AI", icon_url=config.RAI_ICON_URL)
+
         await ctx.send(embed=embed)
 
 async def setup(bot: commands.Bot):

@@ -1,10 +1,10 @@
 @echo off
-title Thor Vibes - Music Bot Engine
-color 09
+title RAI VIBES - Pure Music & Karaoke Sound Engine
+color 0D
 
 echo =========================================================
-echo       THOR VIBES DISCORD BOT - STARTUP
-echo       Command The Power - Hear The Rhythm
+echo       RAI VIBES DISCORD BOT - STARTUP
+echo       Pure Music - Karaoke - Sound Engine - 24/7 Vibe
 echo =========================================================
 echo.
 
