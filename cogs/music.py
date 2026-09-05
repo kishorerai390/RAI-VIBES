@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 import discord
 from discord.ext import commands
 from discord import app_commands
-from discord.ui import Select, View
+from discord.ui import Select, View, Button
 import yt_dlp
 
 import config
@@ -201,6 +201,80 @@ class SearchSelectView(View):
         await interaction.response.edit_message(content=None, embed=embed, view=None)
 
 
+class ResumePlaybackView(View):
+    """Interactive prompt to resume playback where you left off."""
+    def __init__(self, player: 'GuildMusicPlayer', snapshot: dict):
+        super().__init__(timeout=180)
+        self.player = player
+        self.snapshot = snapshot
+        pos_sec = snapshot.get("position", 0)
+        pos_str = time.strftime("%M:%S", time.gmtime(pos_sec))
+        
+        btn_resume = Button(label=f"Continue ({pos_str})", emoji="▶️", style=discord.ButtonStyle.success)
+        btn_resume.callback = self.resume_callback
+        self.add_item(btn_resume)
+        
+        btn_restart = Button(label="Replay (0:00)", emoji="🔄", style=discord.ButtonStyle.primary)
+        btn_restart.callback = self.restart_callback
+        self.add_item(btn_restart)
+        
+        btn_dismiss = Button(label="Dismiss", emoji="❌", style=discord.ButtonStyle.secondary)
+        btn_dismiss.callback = self.dismiss_callback
+        self.add_item(btn_dismiss)
+
+    async def resume_callback(self, interaction: discord.Interaction):
+        song = self.snapshot.get("song")
+        pos_sec = self.snapshot.get("position", 0)
+        if not song:
+            return await interaction.response.send_message("❌ Track no longer available.", ephemeral=True)
+            
+        vc = await self.player.cog.ensure_voice(interaction)
+        if not vc:
+            return
+            
+        self.player.voice_client = vc
+        self.player.text_channel = interaction.channel
+        self.player.current = song
+        self.player.start_time = time.time() - pos_sec
+        await self.player.restart_current_with_filters()
+        self.player.paused_snapshot = None
+        
+        pos_str = time.strftime("%M:%S", time.gmtime(pos_sec))
+        embed = discord.Embed(
+            title="▶️ Resumed Playback",
+            description=f"Resumed **[{song.title}]({song.webpage_url})** from `{pos_str}`!",
+            color=config.COLOR_PRIMARY
+        )
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
+
+    async def restart_callback(self, interaction: discord.Interaction):
+        song = self.snapshot.get("song")
+        if not song:
+            return await interaction.response.send_message("❌ Track no longer available.", ephemeral=True)
+            
+        vc = await self.player.cog.ensure_voice(interaction)
+        if not vc:
+            return
+            
+        self.player.voice_client = vc
+        self.player.text_channel = interaction.channel
+        self.player.current = song
+        self.player.start_time = time.time()
+        await self.player.restart_current_with_filters()
+        self.player.paused_snapshot = None
+        
+        embed = discord.Embed(
+            title="🔄 Replaying from Start",
+            description=f"Now playing **[{song.title}]({song.webpage_url})** from the beginning!",
+            color=config.COLOR_PRIMARY
+        )
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
+
+    async def dismiss_callback(self, interaction: discord.Interaction):
+        self.player.paused_snapshot = None
+        await interaction.response.edit_message(content="✨ Dismissed resume prompt.", embed=None, view=None)
+
+
 class GuildMusicPlayer:
     """Manages audio playback, queue, state, and UI for a specific Discord Guild."""
     def __init__(self, cog, guild: discord.Guild):
@@ -216,6 +290,9 @@ class GuildMusicPlayer:
         self.volume: int = config.DEFAULT_VOLUME
         self.text_channel: Optional[discord.TextChannel] = None
         self.now_playing_message: Optional[discord.Message] = None
+        
+        # Smart Resume snapshot
+        self.paused_snapshot: Optional[dict] = None
         
         # Audio Filters & Effects
         self.active_filters: List[str] = []
@@ -245,15 +322,24 @@ class GuildMusicPlayer:
         if self.current_source and isinstance(self.current_source, discord.PCMVolumeTransformer):
             self.current_source.volume = self.volume / 100.0
 
-    def pause(self):
+    def pause(self, user=None):
         vc = self.guild.voice_client
         if vc and vc.is_playing():
             vc.pause()
+            if self.current:
+                elapsed = max(0, int(time.time() - self.start_time)) if self.start_time else 0
+                self.paused_snapshot = {
+                    "song": self.current,
+                    "position": elapsed,
+                    "user_id": user.id if user else (self.current.requester.id if self.current.requester else None),
+                    "channel_id": self.text_channel.id if self.text_channel else None
+                }
 
     def resume(self):
         vc = self.guild.voice_client
         if vc and vc.is_paused():
             vc.resume()
+            self.paused_snapshot = None
 
     def skip(self):
         vc = self.guild.voice_client
@@ -266,6 +352,15 @@ class GuildMusicPlayer:
         self.queue = deque(temp)
 
     async def stop(self):
+        if self.current:
+            elapsed = max(0, int(time.time() - self.start_time)) if self.start_time else 0
+            if elapsed > 10:
+                self.paused_snapshot = {
+                    "song": self.current,
+                    "position": elapsed,
+                    "user_id": self.current.requester.id if self.current.requester else None,
+                    "channel_id": self.text_channel.id if self.text_channel else None
+                }
         self.queue.clear()
         self.loop_mode = "off"
         self.active_filters.clear()
@@ -367,8 +462,22 @@ class GuildMusicPlayer:
         ffmpeg_bin = get_ffmpeg_executable()
         filter_args = get_filter_string(self.active_filters, self.custom_speed)
         
-        before_opt = f"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss {elapsed} -nostdin"
-        ffmpeg_opt = f"-vn {filter_args}".strip()
+        # Ensure fresh stream URL if needed
+        stream_url = self.current.url
+        if not stream_url or "googlevideo.com" in stream_url:
+            try:
+                fresh_info = await self.bot.loop.run_in_executor(
+                    None,
+                    functools.partial(ytdl.extract_info, self.current.webpage_url, download=False, process=True)
+                )
+                if fresh_info:
+                    stream_url = fresh_info.get("url") or stream_url
+                    self.current.url = stream_url
+            except Exception:
+                pass
+
+        before_opt = f"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss {elapsed} -nostdin -probesize 10M -analyzeduration 0"
+        ffmpeg_opt = f"-vn -bufsize 4096k -threads 2 {filter_args}".strip()
 
         def after_playing(err):
             if err:
@@ -379,9 +488,10 @@ class GuildMusicPlayer:
         try:
             if self.voice_client.is_playing() or self.voice_client.is_paused():
                 self.voice_client.stop()
+                await asyncio.sleep(0.15)
 
             raw_source = discord.FFmpegPCMAudio(
-                self.current.url,
+                stream_url,
                 executable=ffmpeg_bin,
                 before_options=before_opt,
                 options=ffmpeg_opt
@@ -390,6 +500,19 @@ class GuildMusicPlayer:
             self.start_time = time.time() - elapsed
             self.voice_client.play(self.current_source, after=after_playing)
             self.is_restarting_for_filters = False
+
+            if self.text_channel:
+                embed = self.build_now_playing_embed()
+                view = MusicPlayerView(self.cog, self.guild.id)
+                if self.now_playing_message:
+                    try:
+                        await self.now_playing_message.delete()
+                    except Exception:
+                        pass
+                try:
+                    self.now_playing_message = await self.text_channel.send(embed=embed, view=view)
+                except Exception:
+                    pass
         except Exception as e:
             print(f"[Filter Restart Error] {e}")
             self.is_restarting_for_filters = False
@@ -799,7 +922,7 @@ class Music(commands.Cog):
         player = self.get_player(ctx.guild.id)
         if not player or not player.is_connected or not player.voice_client.is_playing():
             return await ctx.send("❌ Nothing is currently playing.", ephemeral=True)
-        player.voice_client.pause()
+        player.pause(ctx.author)
         await ctx.send("⏸️ **Playback paused.** Use `!resume` or `/resume` to continue.")
 
     @commands.hybrid_command(name="resume", aliases=["unpause"], description="Resume paused music playback.")
@@ -807,7 +930,7 @@ class Music(commands.Cog):
         player = self.get_player(ctx.guild.id)
         if not player or not player.is_connected or not player.voice_client.is_paused():
             return await ctx.send("❌ Audio is not paused.", ephemeral=True)
-        player.voice_client.resume()
+        player.resume()
         await ctx.send("▶️ **Playback resumed!**")
 
     # =========================================================================
@@ -1008,6 +1131,60 @@ class Music(commands.Cog):
         await player.restart_current_with_filters()
         seek_str = time.strftime('%M:%S', time.gmtime(seconds))
         await ctx.send(f"⏩ **Seeked to:** `{seek_str}`")
+
+    # =========================================================================
+    # EVENT LISTENER: SMART RESUME ON VOICE JOIN
+    # =========================================================================
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        if member.bot:
+            return
+
+        # Trigger when a user joins or switches into a voice channel
+        if after.channel is not None and before.channel != after.channel:
+            player = self.get_player(member.guild.id)
+            if not player or not player.paused_snapshot:
+                return
+
+            snapshot = player.paused_snapshot
+            target_user_id = snapshot.get("user_id")
+            # If the member is the one who paused it (or any member if no specific author)
+            if target_user_id is None or member.id == target_user_id:
+                song = snapshot.get("song")
+                if not song:
+                    return
+
+                pos_sec = snapshot.get("position", 0)
+                pos_str = time.strftime("%M:%S", time.gmtime(pos_sec))
+                tot_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
+
+                target_channel = (
+                    discord.utils.get(member.guild.text_channels, name="│🎵・song-requests")
+                    or discord.utils.get(member.guild.text_channels, name="song-requests")
+                    or player.text_channel
+                    or member.guild.system_channel
+                )
+
+                if target_channel:
+                    embed = discord.Embed(
+                        title="🌸 Welcome Back • Continue Where You Left Off?",
+                        description=(
+                            f"Hey {member.mention}! You left off listening to:\n"
+                            f"### 🎵 [{song.title}]({song.webpage_url})\n\n"
+                            f"⏱️ **Paused at:** `{pos_str}` / `{tot_str}`\n"
+                            f"🔊 **Target VC:** {after.channel.mention}\n\n"
+                            f"Click **Continue** below to instantly resume from `{pos_str}`!"
+                        ),
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_thumbnail(url=song.thumbnail or config.RAI_ICON_URL)
+                    embed.set_footer(text="RAI VIBES 💗 Smart Resume Engine", icon_url=config.RAI_ICON_URL)
+
+                    view = ResumePlaybackView(player, snapshot)
+                    try:
+                        await target_channel.send(content=member.mention, embed=embed, view=view)
+                    except Exception as e:
+                        print(f"[Smart Resume Prompt Error] {e}")
 
 
 async def setup(bot: commands.Bot):

@@ -45,12 +45,12 @@ class MusicPlayerView(View):
             return await interaction.response.send_message("❌ **RAI VIBES 💗 is not connected to a voice channel.**", ephemeral=True)
 
         if vc.is_paused():
-            vc.resume()
+            player.resume()
             button.label = "Pause"
             button.style = discord.ButtonStyle.success
             await interaction.response.send_message("▶️ **Resumed playback!**", ephemeral=True)
         elif vc.is_playing():
-            vc.pause()
+            player.pause(interaction.user)
             button.label = "Resume"
             button.style = discord.ButtonStyle.primary
             await interaction.response.send_message("⏸️ **Paused playback!**", ephemeral=True)
