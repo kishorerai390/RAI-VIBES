@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 import discord
@@ -17,52 +18,38 @@ class MusicPlayerView(View):
         self.music_cog = music_cog
         self.guild_id = guild_id
 
-    async def send_interaction_msg(self, interaction: discord.Interaction, text: str):
+    async def send_msg(self, interaction: discord.Interaction, text: str = None, embed: discord.Embed = None, view: View = None):
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message(text, ephemeral=True)
+                await interaction.response.send_message(content=text, embed=embed, view=view, ephemeral=True)
             else:
-                await interaction.followup.send(text, ephemeral=True)
+                await interaction.followup.send(content=text, embed=embed, view=view, ephemeral=True)
         except Exception:
             pass
 
     async def get_player(self, interaction: discord.Interaction):
         cog = self.music_cog or interaction.client.get_cog("Music")
         if not interaction.guild:
-            await self.send_interaction_msg(interaction, "❌ This command can only be used in a server.")
+            await self.send_msg(interaction, "❌ This button can only be used in a server.")
             return None
 
         if not cog:
-            await self.send_interaction_msg(interaction, "❌ Music module is currently unavailable.")
+            await self.send_msg(interaction, "❌ Music module is currently initializing.")
             return None
 
         player = cog.get_or_create_player(interaction.guild)
+        
+        # If bot is not in voice, attempt auto-connection if user is in a voice channel
         vc = interaction.guild.voice_client
-
-        if not vc or not vc.is_connected():
-            await self.send_interaction_msg(
-                interaction,
-                "⚡ **RAI VIBES 💗 is currently inactive.** Start playback anytime using `/play <song>` or `!play <song>`!"
-            )
-            return None
+        if (not vc or not vc.is_connected()) and getattr(getattr(interaction.user, "voice", None), "channel", None):
+            try:
+                vc = await cog.ensure_voice(interaction)
+            except Exception:
+                vc = interaction.guild.voice_client
 
         player.voice_client = vc
         if interaction.channel:
             player.text_channel = interaction.channel
-
-        # Allow admins, server managers, or members in the active voice channel
-        is_admin = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild
-        is_in_vc = vc.channel and interaction.user in vc.channel.members
-
-        if not is_admin and not is_in_vc:
-            if vc.channel:
-                await self.send_interaction_msg(
-                    interaction,
-                    f"⚡ **You must join {vc.channel.mention} to control RAI VIBES 💗.**"
-                )
-            else:
-                await self.send_interaction_msg(interaction, "⚡ Please join the voice channel to control RAI VIBES 💗.")
-            return None
 
         return player
 
@@ -74,20 +61,30 @@ class MusicPlayerView(View):
 
         vc = interaction.guild.voice_client
         if not vc or not vc.is_connected():
-            return await interaction.response.send_message("❌ **RAI VIBES 💗 is not connected to a voice channel.**", ephemeral=True)
+            # If user in voice, auto-connect
+            if getattr(getattr(interaction.user, "voice", None), "channel", None):
+                cog = self.music_cog or interaction.client.get_cog("Music")
+                vc = await cog.ensure_voice(interaction)
+                player.voice_client = vc
+
+        if not vc or not vc.is_connected():
+            return await self.send_msg(interaction, "⚡ Please join a voice channel and use `/play <song>` to start music!")
 
         if vc.is_paused():
             player.resume()
             button.label = "Pause"
             button.style = discord.ButtonStyle.success
-            await interaction.response.send_message("▶️ **Resumed playback!**", ephemeral=True)
+            await self.send_msg(interaction, "▶️ **Resumed playback!**")
         elif vc.is_playing():
             player.pause(interaction.user)
             button.label = "Resume"
             button.style = discord.ButtonStyle.primary
-            await interaction.response.send_message("⏸️ **Paused playback!**", ephemeral=True)
+            await self.send_msg(interaction, "⏸️ **Paused playback!**")
+        elif player.current or player.queue:
+            player.play_next_song.set()
+            await self.send_msg(interaction, "▶️ **Starting audio queue...**")
         else:
-            await interaction.response.send_message("ℹ️ No audio is currently streaming.", ephemeral=True)
+            await self.send_msg(interaction, "ℹ️ No audio is currently streaming. Add tracks with `/play <song>`!")
 
         if player.now_playing_message:
             try:
@@ -105,9 +102,12 @@ class MusicPlayerView(View):
         if vc and (vc.is_playing() or vc.is_paused()):
             current_title = player.current.title if player.current else "Track"
             vc.stop()
-            await interaction.response.send_message(f"⏭️ **Skipped:** `{current_title}`", ephemeral=True)
+            await self.send_msg(interaction, f"⏭️ **Skipped:** `{current_title}`")
+        elif player.queue:
+            player.play_next_song.set()
+            await self.send_msg(interaction, "⏭️ **Skipped to next queued track!**")
         else:
-            await interaction.response.send_message("ℹ️ Nothing is playing to skip.", ephemeral=True)
+            await self.send_msg(interaction, "ℹ️ Queue is empty. Use `/play <song>` to add tracks!")
 
     @button(label="Loop", style=discord.ButtonStyle.secondary, emoji="🔁", row=0, custom_id="music_btn_loop")
     async def loop_button(self, interaction: discord.Interaction, button: Button):
@@ -128,7 +128,7 @@ class MusicPlayerView(View):
             button.style = discord.ButtonStyle.secondary
             mode_text = "➡️ **Loop Mode: Disabled (Off)**"
 
-        await interaction.response.send_message(mode_text, ephemeral=True)
+        await self.send_msg(interaction, mode_text)
         if player.now_playing_message:
             try:
                 await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
@@ -142,11 +142,10 @@ class MusicPlayerView(View):
             return
 
         if len(player.queue) < 2:
-            await interaction.response.send_message("ℹ️ Queue needs at least 2 songs to shuffle.", ephemeral=True)
-            return
+            return await self.send_msg(interaction, "ℹ️ Queue needs at least 2 songs to shuffle.")
 
         player.shuffle()
-        await interaction.response.send_message("🔀 **Queue shuffled successfully!**", ephemeral=True)
+        await self.send_msg(interaction, "🔀 **Queue shuffled successfully!**")
 
     @button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️", row=0, custom_id="music_btn_stop")
     async def stop_button(self, interaction: discord.Interaction, button: Button):
@@ -155,7 +154,7 @@ class MusicPlayerView(View):
             return
 
         await player.stop()
-        await interaction.response.send_message("⏹️ **Playback stopped & queue cleared.**", ephemeral=True)
+        await self.send_msg(interaction, "⏹️ **Playback stopped & queue cleared.**")
 
     @button(label="Vol -", style=discord.ButtonStyle.secondary, emoji="🔉", row=1, custom_id="music_btn_voldown")
     async def vol_down_button(self, interaction: discord.Interaction, button: Button):
@@ -165,7 +164,7 @@ class MusicPlayerView(View):
 
         new_vol = max(0, player.volume - 10)
         player.set_volume(new_vol)
-        await interaction.response.send_message(f"🔉 **Volume:** `{new_vol}%`", ephemeral=True)
+        await self.send_msg(interaction, f"🔉 **Volume:** `{new_vol}%`")
         if player.now_playing_message:
             try:
                 await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
@@ -181,7 +180,7 @@ class MusicPlayerView(View):
         new_vol = min(200, player.volume + 10)
         player.set_volume(new_vol)
         boost = " 🔥 *(Boost)*" if new_vol > 100 else ""
-        await interaction.response.send_message(f"🔊 **Volume:** `{new_vol}%`{boost}", ephemeral=True)
+        await self.send_msg(interaction, f"🔊 **Volume:** `{new_vol}%`{boost}")
         if player.now_playing_message:
             try:
                 await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
@@ -196,7 +195,7 @@ class MusicPlayerView(View):
 
         embed = player.build_queue_embed(page=0)
         view = QueuePaginationView(player)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await self.send_msg(interaction, embed=embed, view=view)
 
     @button(label="Bass", style=discord.ButtonStyle.secondary, emoji="🎛️", row=1, custom_id="music_btn_bass")
     async def bass_button(self, interaction: discord.Interaction, button: Button):
@@ -213,8 +212,9 @@ class MusicPlayerView(View):
             button.style = discord.ButtonStyle.success
             state_msg = "Enabled 🔥 (Heavy Bass)"
 
-        await interaction.response.send_message(f"🎛️ **Bass Boost:** `{state_msg}`", ephemeral=True)
-        await player.restart_current_with_filters()
+        await self.send_msg(interaction, f"🎛️ **Bass Boost:** `{state_msg}`")
+        if player.voice_client and player.voice_client.is_playing():
+            await player.restart_current_with_filters()
         if player.now_playing_message:
             try:
                 await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
@@ -224,19 +224,23 @@ class MusicPlayerView(View):
     @button(label="Lyrics", style=discord.ButtonStyle.secondary, emoji="🎤", row=1, custom_id="music_btn_lyrics")
     async def lyrics_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
-        if not player or not player.current:
-            if not interaction.response.is_done():
-                return await interaction.response.send_message("❌ No song currently playing to fetch lyrics for.", ephemeral=True)
+        if not player:
             return
 
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True)
+        target_title = None
+        if player.current:
+            target_title = player.current.title
+        elif player.history:
+            target_title = player.history[-1].title
+
+        if not target_title:
+            return await self.send_msg(interaction, "❌ No song is currently playing. Search lyrics with `/lyrics <song>`!")
 
         lyrics_cog = interaction.client.get_cog("Lyrics")
-        lyrics_data = await lyrics_cog.fetch_lyrics(player.current.title) if lyrics_cog else None
+        lyrics_data = await lyrics_cog.fetch_lyrics(target_title) if lyrics_cog else None
 
         if not lyrics_data or "lyrics" not in lyrics_data:
-            return await interaction.followup.send(f"⚠️ Could not find synchronized lyrics for `{player.current.title[:50]}`.", ephemeral=True)
+            return await self.send_msg(interaction, f"⚠️ Could not find lyrics for `{target_title[:50]}`.")
 
         try:
             lyrics_text = lyrics_data.get("lyrics", "")
@@ -244,13 +248,12 @@ class MusicPlayerView(View):
                 lyrics_text = lyrics_text[:3990] + "...\n*(Lyrics truncated)*"
 
             embed = discord.Embed(
-                title=f"🎤 Lyrics: {lyrics_data.get('title', player.current.title)}",
+                title=f"🎤 Lyrics: {lyrics_data.get('title', target_title)}",
                 description=f"```fix\n{lyrics_text}\n```" if len(lyrics_text) < 1800 else lyrics_text,
                 color=config.COLOR_PRIMARY
             )
             embed.set_author(name=lyrics_data.get("author", "RAI VIBES 💗 Lyrics Engine"), icon_url=config.RAI_ICON_URL)
             
-            # Safe thumbnail resolution
             thumb = lyrics_data.get("thumbnail")
             if isinstance(thumb, str) and thumb.startswith("http"):
                 embed.set_thumbnail(url=thumb)
@@ -260,9 +263,9 @@ class MusicPlayerView(View):
                 embed.set_thumbnail(url=player.current.thumbnail)
 
             embed.set_footer(text=f"RAI VIBES 💗 • Source: {lyrics_data.get('source', 'Synced Lyrics')}", icon_url=config.RAI_ICON_URL)
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.send_msg(interaction, embed=embed)
         except Exception as e:
-            await interaction.followup.send(f"❌ Error displaying lyrics: {e}", ephemeral=True)
+            await self.send_msg(interaction, f"❌ Error displaying lyrics: {e}")
 
 
 class QueuePaginationView(View):
@@ -284,7 +287,10 @@ class QueuePaginationView(View):
             self.current_page -= 1
             self.update_buttons()
             embed = self.player.build_queue_embed(self.current_page)
-            await interaction.response.edit_message(embed=embed, view=self)
+            try:
+                await interaction.response.edit_message(embed=embed, view=self)
+            except Exception:
+                pass
 
     @button(label="Next", style=discord.ButtonStyle.secondary, emoji="➡️")
     async def next_button(self, interaction: discord.Interaction, button: Button):
@@ -293,15 +299,7 @@ class QueuePaginationView(View):
             self.current_page += 1
             self.update_buttons()
             embed = self.player.build_queue_embed(self.current_page)
-            await interaction.response.edit_message(embed=embed, view=self)
-
-    @button(label="Clear Queue", style=discord.ButtonStyle.danger, emoji="🗑️")
-    async def clear_button(self, interaction: discord.Interaction, button: Button):
-        if interaction.user not in self.player.voice_client.channel.members:
-            await interaction.response.send_message("❌ You must be in the voice channel to clear the queue.", ephemeral=True)
-            return
-
-        self.player.queue.clear()
-        embed = self.player.build_queue_embed(0)
-        self.update_buttons()
-        await interaction.response.edit_message(embed=embed, view=self)
+            try:
+                await interaction.response.edit_message(embed=embed, view=self)
+            except Exception:
+                pass
