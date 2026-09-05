@@ -321,10 +321,30 @@ class GuildMusicPlayer:
         vc = self.guild.voice_client
         return vc is not None and vc.is_connected()
 
+    def get_volume_factor(self) -> float:
+        """Returns the psychoacoustic volume gain multiplier (0.0 to 2.0)."""
+        if self.volume <= 0:
+            return 0.0
+        if self.volume <= 100:
+            # Perceptual logarithmic-response curve (squared amplitude)
+            return float((self.volume / 100.0) ** 2)
+        # Linear boost up to 200% (2.0x gain)
+        return float(min(2.0, 1.0 + ((self.volume - 100) / 100.0)))
+
     def set_volume(self, val: int):
         self.volume = max(0, min(200, val))
-        if self.current_source and isinstance(self.current_source, discord.PCMVolumeTransformer):
-            self.current_source.volume = self.volume / 100.0
+        vol_factor = self.get_volume_factor()
+
+        # Update player current_source
+        if self.current_source and hasattr(self.current_source, "volume"):
+            self.current_source.volume = vol_factor
+
+        # Update active voice_client source directly
+        vc = self.guild.voice_client
+        if vc and vc.source and hasattr(vc.source, "volume"):
+            vc.source.volume = vol_factor
+
+        print(f"[Volume] Guild {self.guild.name} ({self.guild.id}) adjusted volume to {self.volume}% (gain: {vol_factor:.3f})")
 
     def pause(self, user=None):
         vc = self.guild.voice_client
@@ -500,7 +520,7 @@ class GuildMusicPlayer:
                 before_options=before_opt,
                 options=ffmpeg_opt
             )
-            self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.volume / 100.0)
+            self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.get_volume_factor())
             self.start_time = time.time() - elapsed
             self.voice_client.play(self.current_source, after=after_playing)
             self.is_restarting_for_filters = False
@@ -623,7 +643,7 @@ class GuildMusicPlayer:
                     before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin -probesize 10M -analyzeduration 0",
                     options=ffmpeg_opt
                 )
-                self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.volume / 100.0)
+                self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.get_volume_factor())
                 self.start_time = time.time()
                 if self.voice_client and self.voice_client.is_connected():
                     if self.voice_client.is_playing() or self.voice_client.is_paused():
