@@ -16,15 +16,14 @@ class RenameVoiceModal(discord.ui.Modal, title="Rename Your Voice Room"):
         required=True
     )
 
-    def __init__(self, channel: discord.VoiceChannel):
-        super().__init__()
-        self.channel = channel
-
     async def on_submit(self, interaction: discord.Interaction):
+        vc = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if not vc:
+            return await interaction.response.send_message("❌ You are not connected to a voice room.", ephemeral=True)
         try:
-            old_name = self.channel.name
-            await self.channel.edit(name=f"🎧 {self.new_name.value}")
-            await interaction.response.send_message(f"✅ Voice channel renamed from `{old_name}` to `🎧 {self.new_name.value}`!", ephemeral=True)
+            old_name = vc.name
+            await vc.edit(name=f"🎧 {self.new_name.value}")
+            await interaction.response.send_message(f"✅ Voice room renamed from `{old_name}` to `🎧 {self.new_name.value}`!", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Could not rename channel: {e}", ephemeral=True)
 
@@ -37,15 +36,14 @@ class LimitVoiceModal(discord.ui.Modal, title="Set Room Member Limit"):
         required=True
     )
 
-    def __init__(self, channel: discord.VoiceChannel):
-        super().__init__()
-        self.channel = channel
-
     async def on_submit(self, interaction: discord.Interaction):
+        vc = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if not vc:
+            return await interaction.response.send_message("❌ You are not connected to a voice room.", ephemeral=True)
         try:
             val = int(self.limit.value.strip())
             if 0 <= val <= 99:
-                await self.channel.edit(user_limit=val)
+                await vc.edit(user_limit=val)
                 limit_text = "Unlimited" if val == 0 else str(val)
                 await interaction.response.send_message(f"👥 Room limit set to **{limit_text}** members!", ephemeral=True)
             else:
@@ -57,44 +55,52 @@ class LimitVoiceModal(discord.ui.Modal, title="Set Room Member Limit"):
 
 
 class VoiceControlView(discord.ui.View):
-    def __init__(self, owner: discord.Member, channel: discord.VoiceChannel):
+    """Persistent 24/7 Voice Room Controls for Dynamic Voice Hub."""
+    def __init__(self):
         super().__init__(timeout=None)
-        self.owner = owner
-        self.channel = channel
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.owner.id and not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("🔒 Only the owner of this voice room can use these controls.", ephemeral=True)
-            return False
-        return True
+    def get_user_vc(self, interaction: discord.Interaction) -> Optional[discord.VoiceChannel]:
+        return getattr(getattr(interaction.user, "voice", None), "channel", None)
 
-    @discord.ui.button(label="🔒 Lock", style=discord.ButtonStyle.danger, custom_id="vc_lock")
+    @discord.ui.button(label="Lock", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="vc_lock")
     async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.channel.set_permissions(interaction.guild.default_role, connect=False)
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to lock it.", ephemeral=True)
+        await vc.set_permissions(interaction.guild.default_role, connect=False)
         await interaction.response.send_message("🔒 **Room Locked!** Only users you permit can join.", ephemeral=True)
 
-    @discord.ui.button(label="🔓 Unlock", style=discord.ButtonStyle.success, custom_id="vc_unlock")
+    @discord.ui.button(label="Unlock", style=discord.ButtonStyle.success, emoji="🔓", custom_id="vc_unlock")
     async def unlock(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.channel.set_permissions(interaction.guild.default_role, connect=None)
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to unlock it.", ephemeral=True)
+        await vc.set_permissions(interaction.guild.default_role, connect=None)
         await interaction.response.send_message("🔓 **Room Unlocked!** Everyone can join.", ephemeral=True)
 
-    @discord.ui.button(label="🏷️ Rename", style=discord.ButtonStyle.primary, custom_id="vc_rename")
+    @discord.ui.button(label="Rename", style=discord.ButtonStyle.primary, emoji="🏷️", custom_id="vc_rename")
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = RenameVoiceModal(self.channel)
-        await interaction.response.send_modal(modal)
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to rename it.", ephemeral=True)
+        await interaction.response.send_modal(RenameVoiceModal())
 
-    @discord.ui.button(label="👥 Limit", style=discord.ButtonStyle.secondary, custom_id="vc_limit")
+    @discord.ui.button(label="Limit", style=discord.ButtonStyle.secondary, emoji="👥", custom_id="vc_limit")
     async def limit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = LimitVoiceModal(self.channel)
-        await interaction.response.send_modal(modal)
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to change limits.", ephemeral=True)
+        await interaction.response.send_modal(LimitVoiceModal())
 
-    @discord.ui.button(label="👻 Ghost (Hide)", style=discord.ButtonStyle.secondary, custom_id="vc_ghost")
+    @discord.ui.button(label="Ghost (Hide)", style=discord.ButtonStyle.secondary, emoji="👻", custom_id="vc_ghost")
     async def ghost(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Toggle view channel permission
-        current_perms = self.channel.overwrites_for(interaction.guild.default_role)
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to ghost it.", ephemeral=True)
+        current_perms = vc.overwrites_for(interaction.guild.default_role)
         is_hidden = current_perms.view_channel is False
         new_state = None if is_hidden else False
-        await self.channel.set_permissions(interaction.guild.default_role, view_channel=new_state)
+        await vc.set_permissions(interaction.guild.default_role, view_channel=new_state)
         status = "Visible to everyone" if is_hidden else "Hidden / Ghosted"
         await interaction.response.send_message(f"👻 Voice room is now **{status}**!", ephemeral=True)
 
@@ -147,7 +153,7 @@ class VoiceHub(commands.Cog):
                 )
                 embed.set_footer(text="Apex Voice Hub • Instant Controls", icon_url=config.RAI_ICON_URL)
                 
-                view = VoiceControlView(owner=member, channel=temp_vc)
+                view = VoiceControlView()
                 await temp_vc.send(content=member.mention, embed=embed, view=view)
 
             except Exception as e:
