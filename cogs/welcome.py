@@ -3,7 +3,6 @@ from discord.ext import commands
 import logging
 
 import config
-from utils.clan_tagger import apply_rf_tag
 
 logger = logging.getLogger("Welcome")
 
@@ -16,9 +15,6 @@ class Welcome(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         guild = member.guild
         member_count = len(guild.members)
-
-        # 0. Auto Clan Tag
-        await apply_rf_tag(member)
 
         # 1. Automatic Role Assignment on Join
         try:

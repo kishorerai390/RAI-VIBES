@@ -5,7 +5,6 @@ import logging
 from typing import Optional
 
 import config
-from utils.clan_tagger import apply_rf_tag
 
 logger = logging.getLogger("VoiceHub")
 
@@ -109,10 +108,6 @@ class VoiceHub(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         guild = member.guild
-
-        # Auto-apply RF Clan Tag when joining any voice channel
-        if after.channel is not None:
-            await apply_rf_tag(member)
 
         # 1. User Joined the "Join to Create" channel
         if after.channel and ("join to create" in after.channel.name.lower() or "➕" in after.channel.name):

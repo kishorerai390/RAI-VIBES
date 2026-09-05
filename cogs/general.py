@@ -142,5 +142,28 @@ class General(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="cleartags", aliases=["removetags", "untag"], description="Remove 'RF | ' tag prefix from member nicknames.")
+    async def cleartags(self, ctx: commands.Context):
+        import re
+        guild = ctx.guild
+        owner_id = guild.owner_id
+        cleaned = 0
+        for member in guild.members:
+            if member.bot or member.id == owner_id:
+                continue
+            nick = member.nick
+            if not nick:
+                continue
+            clean_nick = re.sub(r'^(?:RF\s*\|\s*|RF\s*・\s*|RF\s*\|\s*|RF\s+)', '', nick, flags=re.IGNORECASE).strip()
+            global_name = member.global_name or member.name
+            if clean_nick != nick:
+                try:
+                    target_nick = clean_nick if clean_nick != global_name else None
+                    await member.edit(nick=target_nick, reason="Remove RF clan tag")
+                    cleaned += 1
+                except Exception:
+                    pass
+        await ctx.send(f"✅ Cleaned RF tags from **{cleaned}** member(s)!")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(General(bot))

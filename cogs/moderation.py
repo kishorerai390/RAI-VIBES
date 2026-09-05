@@ -10,7 +10,6 @@ from discord.ext import commands
 from discord import app_commands
 
 import config
-from utils.clan_tagger import apply_rf_tag
 
 INVITE_REGEX = re.compile(r"(?:https?://)?(?:www\.)?(?:discord\.(?:gg|io|me|li|com/invite)/[a-zA-Z0-9]+)")
 
@@ -291,9 +290,6 @@ class Moderation(commands.Cog):
 
         member = message.author
         now = datetime.datetime.now().timestamp()
-
-        # Auto-apply RF Clan Tag on chat
-        await apply_rf_tag(member)
 
         # Bypass for Server Owner & Admins
         if member.id == message.guild.owner_id or member.guild_permissions.administrator:

@@ -87,6 +87,24 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
         except Exception as e:
             logger.error(f"Failed to synchronize slash commands: {e}")
 
+        # Clean RF tags from all members on startup
+        for guild in b.guilds:
+            for member in guild.members:
+                if member.bot or member.id == guild.owner_id:
+                    continue
+                nick = member.nick
+                if not nick:
+                    continue
+                clean_nick = re.sub(r'^(?:RF\s*\|\s*|RF\s*・\s*|RF\s*\|\s*|RF\s+)', '', nick, flags=re.IGNORECASE).strip()
+                global_name = member.global_name or member.name
+                if clean_nick != nick:
+                    try:
+                        target_nick = clean_nick if clean_nick != global_name else None
+                        await member.edit(nick=target_nick, reason="Remove RF clan tag prefix")
+                        logger.info(f"✅ Cleaned RF tag: '{nick}' -> '{clean_nick}' (Reset: {target_nick is None})")
+                    except Exception as e:
+                        logger.debug(f"Could not clean nick for {member.name}: {e}")
+
         logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
 
     @b.before_invoke
