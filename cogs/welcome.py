@@ -396,33 +396,7 @@ class Welcome(commands.Cog):
             except Exception as e:
                 logger.error(f"Failed to send grand welcome message: {e}")
 
-        # 6. Send Royal Direct Message (DM) Onboarding Letter
-        if not member.bot:
-            try:
-                dm_embed = discord.Embed(
-                    title=f"🌸 Welcome to {guild.name}, {member.display_name}! 💗",
-                    description=(
-                        f"Hey **{member.name}**, thank you for joining **{guild.name}**!\n\n"
-                        f"We are delighted to have you with us. Here is your quick VIP starter kit:\n\n"
-                        f"✨ **Granted Role:** `🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘`\n"
-                        f"🪙 **Bonus Received:** `+100 Coins` & `+50 XP`\n\n"
-                        f"**🎵 Music & Radio:**\n"
-                        f"• Use `/play <song name>` to stream high-fidelity music.\n"
-                        f"• Use `/radio` for 24/7 non-stop lofi, Tamil, and EDM stations.\n"
-                        f"• Use `/musicquiz` to challenge friends in audio trivia!\n\n"
-                        f"**🍿 Cinema & Gaming:**\n"
-                        f"• Join our Cinema Lounge for weekly watch parties.\n"
-                        f"• Join dynamic voice rooms to hang out with friends!\n\n"
-                        f"Have an awesome time, and don't hesitate to ask our Staff team if you need anything! 🌸✨"
-                    ),
-                    color=config.COLOR_PRIMARY
-                )
-                dm_embed.set_thumbnail(url=guild.icon.url if guild.icon else config.RAI_ICON_URL)
-                dm_embed.set_footer(text="RAI VIBES 💗 • Music & Community Bot", icon_url=config.RAI_ICON_URL)
-                await member.send(embed=dm_embed)
-            except Exception:
-                # User has DMs closed
-                pass
+        # 6. Welcome DM disabled to avoid spamming member inboxes
 
         # 7. Anti-Alt Account Check
         now_dt = discord.utils.utcnow()
@@ -503,29 +477,7 @@ class Welcome(commands.Cog):
         except Exception as e:
             logger.warning(f"Could not generate goodbye card for {member.name}: {e}")
 
-        # 3. Post Goodbye Announcement in Dedicated Goodbye Channel
-        goodbye_chan = (
-            guild.get_channel(1546122222329008199) or
-            discord.utils.get(guild.text_channels, name="👋・good-bye") or
-            discord.utils.get(guild.text_channels, name="good-bye") or
-            discord.utils.get(guild.text_channels, name="goodbye")
-        )
-
-        if goodbye_chan:
-            user_display = member.display_name if member.display_name else member.name
-            msg_content = f"👋 **{user_display}** has left **{guild.name}** ."
-            try:
-                if card_file:
-                    await goodbye_chan.send(
-                        content=msg_content,
-                        file=card_file
-                    )
-                else:
-                    await goodbye_chan.send(
-                        content=msg_content
-                    )
-            except Exception as e:
-                logger.error(f"Failed to send goodbye announcement: {e}")
+        # 3. Public Goodbye channel spam disabled to keep chat clean
 
         # 4. Mod Log Record
         log_chan = discord.utils.get(guild.text_channels, name="📋・mod-logs")
