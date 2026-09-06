@@ -24,6 +24,7 @@ class VoiceStats(commands.Cog):
         self.track_voice_loop.cancel()
         self.save_stats()
 
+
     def load_stats(self) -> dict:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         if STATS_FILE.exists():
@@ -77,6 +78,7 @@ class VoiceStats(commands.Cog):
     @track_voice_loop.before_loop
     async def before_track(self):
         await self.bot.wait_until_ready()
+
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):

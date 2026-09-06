@@ -99,10 +99,10 @@ class Levels(commands.Cog):
                         new_lvl = u_data["level"]
                         # Check role reward
                         reward_role_name = None
-                        if new_lvl >= 50: reward_role_name = "💎 ┊ Rai Legend"
-                        elif new_lvl >= 30: reward_role_name = "🔥 ┊ Rai Champion"
-                        elif new_lvl >= 15: reward_role_name = "✨ ┊ Rai Active"
-                        elif new_lvl >= 5: reward_role_name = "🌱 ┊ Rai Novice"
+                        if new_lvl >= 50: reward_role_name = "Elite Legend 👑"
+                        elif new_lvl >= 30: reward_role_name = "Gold Vibe 🥇"
+                        elif new_lvl >= 15: reward_role_name = "Silver Vibe 🥈"
+                        elif new_lvl >= 5: reward_role_name = "Bronze Vibe 🥉"
                         if reward_role_name:
                             role = discord.utils.get(guild.roles, name=reward_role_name)
                             if role and role not in member.roles:
@@ -161,13 +161,13 @@ class Levels(commands.Cog):
             # Role reward check
             reward_role_name = None
             if new_lvl >= 50:
-                reward_role_name = "💎 ┊ Rai Legend"
+                reward_role_name = "Elite Legend 👑"
             elif new_lvl >= 30:
-                reward_role_name = "🔥 ┊ Rai Champion"
+                reward_role_name = "Gold Vibe 🥇"
             elif new_lvl >= 15:
-                reward_role_name = "✨ ┊ Rai Active"
+                reward_role_name = "Silver Vibe 🥈"
             elif new_lvl >= 5:
-                reward_role_name = "🌱 ┊ Rai Novice"
+                reward_role_name = "Bronze Vibe 🥉"
 
             reward_text = ""
             if reward_role_name:

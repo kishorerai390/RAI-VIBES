@@ -138,7 +138,7 @@ class Radio(commands.Cog):
         if member.bot:
             return
 
-        if after.channel and ("24-7" in after.channel.name.lower() or "radio" in after.channel.name.lower()):
+        if after.channel and ("24-7" in after.channel.name.lower() or "radio" in after.channel.name.lower() or "lo-fi" in after.channel.name.lower()):
             guild = after.channel.guild
             voice_client = guild.voice_client
             if not voice_client or voice_client.channel != after.channel or not voice_client.is_playing():

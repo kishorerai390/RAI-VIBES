@@ -1,4 +1,5 @@
 import re
+import time
 import datetime
 import asyncio
 import json
@@ -37,6 +38,7 @@ INAPPROPRIATE_REGEX = re.compile("|".join(INAPPROPRIATE_KEYWORDS), re.IGNORECASE
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 INFRACTIONS_FILE = DATA_DIR / "infractions.json"
+FROZEN_FILE = DATA_DIR / "frozen_members.json"
 
 
 def load_infractions() -> Dict[str, Dict]:
@@ -54,6 +56,56 @@ def save_infractions(data: Dict[str, Dict]):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(INFRACTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def load_frozen_members() -> Dict[str, Dict]:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if FROZEN_FILE.exists():
+        try:
+            with open(FROZEN_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_frozen_members(data: Dict[str, Dict]):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(FROZEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+class FreezeActionView(discord.ui.View):
+    """Interactive Staff Quick-Action button to unfreeze an isolated member."""
+    def __init__(self, target_id: int, target_name: str, bot: commands.Bot):
+        super().__init__(timeout=86400)
+        self.target_id = target_id
+        self.target_name = target_name
+        self.bot = bot
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if not interaction.user.guild_permissions.moderate_members and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only staff moderators can unfreeze members.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Unfreeze Member", style=discord.ButtonStyle.success, emoji="🔓")
+    async def unfreeze_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        member = guild.get_member(self.target_id)
+        mod_cog = self.bot.get_cog("Moderation")
+
+        if member and mod_cog:
+            try:
+                await mod_cog.execute_unfreeze(guild, member, interaction.user)
+                button.disabled = True
+                button.label = "Unfrozen ✅"
+                await interaction.response.edit_message(view=self)
+                await interaction.followup.send(f"🔓 **{member.mention}** has been released from Freeze Isolation by {interaction.user.mention}.")
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Failed to unfreeze member: {e}", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Member or Moderation system unavailable.", ephemeral=True)
 
 
 class QuickModActionView(discord.ui.View):
@@ -136,6 +188,8 @@ class Moderation(commands.Cog):
         self.bot = bot
         self.message_logs = {} # user_id: [timestamps]
         self.infractions = load_infractions()
+        self.frozen_members = load_frozen_members()
+        self.voice_spam_tracker = {} # user_id: [timestamps]
 
     async def log_mod_action(self, guild: discord.Guild, embed: discord.Embed, view: Optional[discord.ui.View] = None):
         log_channel = (
@@ -696,5 +750,362 @@ class Moderation(commands.Cog):
         await ctx.send(embed=embed)
 
 
+    # =========================================================================
+    # VOICE ISOLATION & NOISE FREEZE CHAMBER SYSTEM
+    # =========================================================================
+
+    async def get_or_create_freeze_chamber(self, guild: discord.Guild) -> discord.VoiceChannel:
+        """Finds or creates a secure, isolated Freeze Chamber voice channel."""
+        for ch in guild.voice_channels:
+            if "freeze chamber" in ch.name.lower() or "isolation" in ch.name.lower() or "🧊" in ch.name:
+                return ch
+
+        # Find target category (Sentinel Defense or Private Zone or first category)
+        category = (
+            discord.utils.get(guild.categories, name="🛡️ | 𝑺𝑬𝑵𝑻𝑰𝑵𝑬𝑳 𝑫𝑬𝑭𝑬𝑵𝑺𝑬") or
+            discord.utils.get(guild.categories, name="🔒 | 𝑷𝑹𝑰𝑽𝑨𝑻𝑬-𝒁𝑶𝑵𝑬") or
+            (guild.categories[0] if guild.categories else None)
+        )
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False,
+                connect=False,
+                speak=False
+            )
+        }
+
+        # Ensure administrators / moderators can always access
+        for role in guild.roles:
+            if role.permissions.administrator or role.permissions.moderate_members:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    connect=True,
+                    speak=True,
+                    move_members=True,
+                    mute_members=True
+                )
+
+        channel = await guild.create_voice_channel(
+            name="🧊 | FREEZE CHAMBER",
+            category=category,
+            user_limit=10,
+            overwrites=overwrites,
+            reason="Created secure Voice Freeze & Noise Isolation Chamber"
+        )
+        return channel
+
+    async def execute_freeze(self, guild: discord.Guild, member: discord.Member, moderator: discord.Member, minutes: int = 10, reason: str = "Extreme noise / mic spamming"):
+        """Isolates member in Freeze Chamber, applies server mute/deafen, and locks permissions."""
+        chamber = await self.get_or_create_freeze_chamber(guild)
+        
+        # 1. Set trap permissions for the member on Freeze Chamber
+        await chamber.set_permissions(
+            member,
+            view_channel=True,
+            connect=True,
+            speak=False,
+            stream=False,
+            use_soundboard=False,
+            use_voice_activity=False
+        )
+
+        # 2. Server Mute & Deafen member + move to chamber if connected
+        try:
+            if member.voice:
+                await member.edit(
+                    mute=True,
+                    deafen=True,
+                    voice_channel=chamber,
+                    reason=f"Voice Freeze by {moderator.name}: {reason}"
+                )
+            else:
+                # Member not currently in voice, but will be trapped when they connect
+                pass
+        except Exception as e:
+            logger = logging.getLogger("RaiSentinel")
+            logger.warning(f"Could not move/mute frozen member: {e}")
+
+        # 3. Apply Discord Text & Voice Timeout
+        try:
+            if minutes > 0:
+                await member.timeout(
+                    datetime.timedelta(minutes=minutes),
+                    reason=f"Voice Freeze & Noise Isolation by {moderator.name}: {reason}"
+                )
+            else:
+                await member.timeout(
+                    datetime.timedelta(days=28),
+                    reason=f"Permanent Voice Freeze: {reason}"
+                )
+        except Exception as e:
+            logger = logging.getLogger("RaiSentinel")
+            logger.warning(f"Could not apply timeout: {e}")
+
+        # 4. Save freeze record
+        g_key = str(guild.id)
+        u_key = str(member.id)
+        if g_key not in self.frozen_members:
+            self.frozen_members[g_key] = {}
+
+        expire_time = (datetime.datetime.now() + datetime.timedelta(minutes=minutes)).isoformat() if minutes > 0 else "PERMANENT"
+        self.frozen_members[g_key][u_key] = {
+            "expires_at": expire_time,
+            "reason": reason,
+            "moderator": moderator.name,
+            "moderator_id": moderator.id,
+            "chamber_id": chamber.id,
+            "frozen_at": datetime.datetime.now().isoformat()
+        }
+        save_frozen_members(self.frozen_members)
+
+        # 5. Log action with interactive unfreeze button
+        embed = discord.Embed(
+            title="🧊 [VOICE FREEZE & TIMEOUT] Member Isolated in Freeze Chamber",
+            description=(
+                f"**Target Member:** {member.mention} (`{member.id}`)\n"
+                f"**Enforcer:** {moderator.mention}\n"
+                f"**Duration:** `{minutes} minute(s)`" + (" *(Permanent until /unfreeze)*" if minutes == 0 else "") + "\n"
+                f"**Reason:** `{reason}`\n"
+                f"**Isolation Chamber:** {chamber.mention}\n\n"
+                f"🔒 **Enforcements Active:**\n"
+                f"• Server Muted & Server Deafened\n"
+                f"• Discord Timeout Applied (Text & Voice Restricted)\n"
+                f"• Voice/Video Transmission & Soundboards Blocked\n"
+                f"• Channel Hopping Locked (Auto-Yank Back)"
+            ),
+            color=0x3498DB,
+            timestamp=datetime.datetime.now()
+        )
+        embed.set_footer(text="RAI SENTINEL 🛡️ Voice Isolation & AutoMod", icon_url=config.RAI_ICON_URL)
+        view = FreezeActionView(member.id, member.display_name, self.bot)
+        await self.log_mod_action(guild, embed, view=view)
+
+        # 6. DM Member
+        try:
+            await member.send(
+                f"🧊 **You have been timed out and moved to the Voice Freeze Chamber in {guild.name}.**\n"
+                f"**Duration:** `{minutes} minute(s)`\n"
+                f"**Reason:** `{reason}`\n"
+                f"*Please refrain from loud noises, earrape, mic spam, or soundboard trolling.*"
+            )
+        except Exception:
+            pass
+
+    async def execute_unfreeze(self, guild: discord.Guild, member: discord.Member, moderator: discord.Member):
+        """Releases member from Freeze Chamber and restores standard voice & text permissions."""
+        g_key = str(guild.id)
+        u_key = str(member.id)
+
+        # 1. Clear permissions on Freeze Chamber
+        chamber = await self.get_or_create_freeze_chamber(guild)
+        try:
+            await chamber.set_permissions(member, overwrite=None)
+        except Exception:
+            pass
+
+        # 2. Lift server mute and deafen
+        try:
+            if member.voice:
+                await member.edit(mute=False, deafen=False, reason=f"Unfrozen by {moderator.name}")
+        except Exception:
+            pass
+
+        # 3. Remove Discord Timeout
+        try:
+            await member.timeout(None, reason=f"Unfrozen by {moderator.name}")
+        except Exception:
+            pass
+
+        # 4. Remove from frozen registry
+        if g_key in self.frozen_members and u_key in self.frozen_members[g_key]:
+            del self.frozen_members[g_key][u_key]
+            save_frozen_members(self.frozen_members)
+
+        # 5. Log mod action
+        embed = discord.Embed(
+            title="🔓 [VOICE UNFREEZE] Member Released from Freeze Chamber",
+            description=(
+                f"**Member:** {member.mention} (`{member.id}`)\n"
+                f"**Moderator:** {moderator.mention}\n"
+                f"**Status:** All voice restrictions, timeout, mutes, and deafens lifted."
+            ),
+            color=config.COLOR_SUCCESS,
+            timestamp=datetime.datetime.now()
+        )
+        embed.set_footer(text="RAI SENTINEL 🛡️ Voice Isolation Engine", icon_url=config.RAI_ICON_URL)
+        await self.log_mod_action(guild, embed)
+
+    @commands.hybrid_command(name="freeze", aliases=["isolate", "jailvc", "silencevc"], description="Freeze a noisy/trolling member and isolate them in the Freeze Chamber.")
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(
+        member="Member making extreme noise or trolling in voice",
+        minutes="Duration in minutes (0 for permanent until unfreeze)",
+        reason="Reason for voice freeze"
+    )
+    async def freeze_command(self, ctx: commands.Context, member: discord.Member, minutes: int = 10, *, reason: str = "Extreme noise / mic spamming"):
+        await ctx.defer()
+        if member.top_role >= ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
+            return await ctx.send("❌ You cannot freeze a member with an equal or higher role.", ephemeral=True)
+
+        await self.execute_freeze(ctx.guild, member, ctx.author, minutes=minutes, reason=reason)
+        embed = discord.Embed(
+            title="🧊 Member Frozen & Timed Out",
+            description=(
+                f"✅ **{member.mention}** has been moved to the **Freeze Chamber**, server muted, and timed out for `{minutes} minute(s)`.\n"
+                f"**Reason:** `{reason}`"
+            ),
+            color=0x3498DB
+        )
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="unfreeze", aliases=["unisolate", "unjailvc"], description="Unfreeze an isolated member and restore voice access.")
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(member="Member to unfreeze and release")
+    async def unfreeze_command(self, ctx: commands.Context, member: discord.Member):
+        await ctx.defer()
+        g_key = str(ctx.guild.id)
+        u_key = str(member.id)
+        if g_key not in self.frozen_members or u_key not in self.frozen_members[g_key]:
+            # Still attempt to clear mute/deafen and timeout
+            if member.voice:
+                try:
+                    await member.edit(mute=False, deafen=False)
+                except Exception:
+                    pass
+            try:
+                await member.timeout(None)
+            except Exception:
+                pass
+            return await ctx.send(f"ℹ️ {member.mention} was not registered in the active freeze list (restrictions cleared).", ephemeral=True)
+
+        await self.execute_unfreeze(ctx.guild, member, ctx.author)
+        embed = discord.Embed(
+            title="🔓 Member Unfrozen",
+            description=f"✅ **{member.mention}** has been released from the Freeze Chamber and timeout lifted by {ctx.author.mention}.",
+            color=config.COLOR_SUCCESS
+        )
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="soundboard_timeout", aliases=["sbtimeout", "sbmute"], description="Apply a 15-minute voice & soundboard timeout to a member.")
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(member="Member interrupting with soundboard", minutes="Timeout minutes (default: 15)", reason="Reason for timeout")
+    async def soundboard_timeout_cmd(self, ctx: commands.Context, member: discord.Member, minutes: int = 15, reason: str = "Disruptive Soundboard / Noise Interruption in VC"):
+        await ctx.defer()
+        
+        # Apply Discord voice & chat timeout
+        try:
+            await member.timeout(datetime.timedelta(minutes=minutes), reason=f"Soundboard Timeout by {ctx.author.name}: {reason}")
+        except Exception as e:
+            logger.error(f"Failed to timeout member: {e}")
+
+        # Server mute if in voice
+        if member.voice:
+            try:
+                await member.edit(mute=True, reason=f"Soundboard Timeout: {reason}")
+            except Exception:
+                pass
+
+        embed = discord.Embed(
+            title="🔇 15-Minute Soundboard & Voice Timeout Applied",
+            description=(
+                f"✅ **{member.mention}** has been placed on a **{minutes}-minute Soundboard & Voice Timeout** by {ctx.author.mention}!\n\n"
+                f"⏳ **Duration:** `{minutes} Minutes`\n"
+                f"📝 **Reason:** `{reason}`\n"
+                f"🛡️ **Status:** Voice Muted & Discord Timed Out"
+            ),
+            color=config.COLOR_WARNING,
+            timestamp=datetime.datetime.now()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text="RAI SENTINEL 🛡️ Voice Moderation", icon_url=config.RAI_ICON_URL)
+
+        await ctx.send(embed=embed)
+
+        # Log action to mod-logs
+        log_chan = discord.utils.get(ctx.guild.text_channels, name="📋・mod-logs")
+        if log_chan:
+            try:
+                await log_chan.send(embed=embed)
+            except Exception:
+                pass
+
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Enforces isolation on frozen members and automatically detects extreme noise/spam."""
+        if member.bot:
+            return
+
+        guild = member.guild
+        g_key = str(guild.id)
+        u_key = str(member.id)
+
+        # 1. Check if user is currently frozen
+        if g_key in self.frozen_members and u_key in self.frozen_members[g_key]:
+            freeze_info = self.frozen_members[g_key][u_key]
+            expires_at = freeze_info.get("expires_at")
+
+            # Check expiration
+            if expires_at and expires_at != "PERMANENT":
+                try:
+                    exp_dt = datetime.datetime.fromisoformat(expires_at)
+                    if datetime.datetime.now() >= exp_dt:
+                        # Expired: Auto unfreeze
+                        await self.execute_unfreeze(guild, member, guild.me)
+                        return
+                except Exception:
+                    pass
+
+            # Member is still frozen!
+            chamber = await self.get_or_create_freeze_chamber(guild)
+
+            # If member is in voice but NOT in the freeze chamber -> yank them right back
+            if after.channel and after.channel.id != chamber.id:
+                try:
+                    await member.edit(
+                        voice_channel=chamber,
+                        mute=True,
+                        deafen=True,
+                        reason="Auto-Enforcing Freeze Chamber Isolation"
+                    )
+                except Exception:
+                    pass
+
+            # Ensure they remain muted & deafened in the chamber
+            elif after.channel and after.channel.id == chamber.id:
+                if not after.mute or not after.deaf:
+                    try:
+                        await member.edit(mute=True, deafen=True, reason="Enforcing Freeze Chamber Silence")
+                    except Exception:
+                        pass
+            return
+
+        # 2. Automated Voice Spam & Noise Detection
+        # Detects rapid channel hopping, earrape mic-spamming, or rapid connect/disconnect trolling
+        if not member.guild_permissions.moderate_members and not member.guild_permissions.administrator:
+            now = time.time()
+            u_id = member.id
+            if u_id not in self.voice_spam_tracker:
+                self.voice_spam_tracker[u_id] = []
+
+            # Keep actions within last 4 seconds
+            self.voice_spam_tracker[u_id] = [t for t in self.voice_spam_tracker[u_id] if now - t < 4.0]
+            self.voice_spam_tracker[u_id].append(now)
+
+            # If member triggers 4 or more rapid voice actions in 4 seconds (e.g. channel hopping or rapid mic noise)
+            if len(self.voice_spam_tracker[u_id]) >= 4:
+                self.voice_spam_tracker[u_id].clear()
+                # Automatically Freeze and Timeout for 10 minutes
+                await self.execute_freeze(
+                    guild=guild,
+                    member=member,
+                    moderator=guild.me,
+                    minutes=10,
+                    reason="🚨 [AUTOMOD] Extreme Voice Noise / Mic Spamming / Rapid Channel Hopping"
+                )
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
+

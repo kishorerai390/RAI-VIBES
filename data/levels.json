@@ -1,16 +1,16 @@
 {
     "1457382179981099090": {
         "1457380609641938981": {
-            "xp": 9045,
-            "level": 21,
-            "messages": 46,
-            "voice_minutes": 274
+            "xp": 13093,
+            "level": 26,
+            "messages": 58,
+            "voice_minutes": 390
         },
         "1365981348589862923": {
-            "xp": 3448,
-            "level": 11,
+            "xp": 6298,
+            "level": 16,
             "messages": 3,
-            "voice_minutes": 90
+            "voice_minutes": 166
         },
         "694962550739042335": {
             "xp": 408,
@@ -19,10 +19,10 @@
             "voice_minutes": 10
         },
         "1520474235183566948": {
-            "xp": 696,
-            "level": 4,
-            "messages": 1,
-            "voice_minutes": 18
+            "xp": 1686,
+            "level": 7,
+            "messages": 2,
+            "voice_minutes": 44
         },
         "1289971269227515948": {
             "xp": 18,
@@ -31,10 +31,22 @@
             "voice_minutes": 0
         },
         "1497578912484430055": {
-            "xp": 562,
+            "xp": 492,
+            "level": 3,
+            "messages": 3,
+            "voice_minutes": 16
+        },
+        "872384645373788170": {
+            "xp": 16,
+            "level": 1,
+            "messages": 1,
+            "voice_minutes": 0
+        },
+        "1541841989308514389": {
+            "xp": 617,
             "level": 4,
             "messages": 3,
-            "voice_minutes": 18
+            "voice_minutes": 22
         }
     }
 }

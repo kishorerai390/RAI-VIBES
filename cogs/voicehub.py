@@ -1,8 +1,10 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import logging
 import re
+import os
+import json
 from typing import Optional
 
 import config
@@ -148,6 +150,69 @@ class RevokeUserSelectView(discord.ui.View):
             await interaction.response.send_message("❌ No valid members selected.", ephemeral=True)
 
 
+class KickUserSelectView(discord.ui.View):
+    """User dropdown menu to disconnect a user from the room."""
+    def __init__(self, vc: discord.VoiceChannel, owner: discord.Member):
+        super().__init__(timeout=90)
+        self.vc = vc
+        self.owner = owner
+
+    @discord.ui.select(
+        cls=discord.ui.UserSelect,
+        placeholder="Select member(s) to kick from this voice room...",
+        min_values=1,
+        max_values=5
+    )
+    async def kick_members(self, interaction: discord.Interaction, select: discord.ui.UserSelect):
+        if interaction.user.id != self.owner.id:
+            return await interaction.response.send_message("❌ Only the voice room owner can kick members.", ephemeral=True)
+
+        kicked = []
+        for user in select.values:
+            if isinstance(user, discord.Member) and user.id != self.owner.id:
+                if user in self.vc.members:
+                    try:
+                        await user.move_to(None)
+                        kicked.append(user.mention)
+                    except Exception:
+                        pass
+
+        if kicked:
+            await interaction.response.send_message(f"👢 **Kicked from voice room:** {', '.join(kicked)}", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Selected member(s) are not in this voice channel.", ephemeral=True)
+
+
+class TransferOwnerSelectView(discord.ui.View):
+    """User dropdown menu to transfer voice room ownership."""
+    def __init__(self, vc: discord.VoiceChannel, owner: discord.Member, cog):
+        super().__init__(timeout=90)
+        self.vc = vc
+        self.owner = owner
+        self.cog = cog
+
+    @discord.ui.select(
+        cls=discord.ui.UserSelect,
+        placeholder="Select a squadmate to transfer ownership to...",
+        min_values=1,
+        max_values=1
+    )
+    async def transfer_owner(self, interaction: discord.Interaction, select: discord.ui.UserSelect):
+        if interaction.user.id != self.owner.id:
+            return await interaction.response.send_message("❌ Only current room owner can transfer ownership.", ephemeral=True)
+
+        new_owner = select.values[0]
+        if not isinstance(new_owner, discord.Member) or new_owner.bot or new_owner.id == self.owner.id:
+            return await interaction.response.send_message("❌ Please select a valid squadmate.", ephemeral=True)
+
+        self.cog.temp_channels[self.vc.id] = new_owner.id
+        self.cog._save_temp_channels()
+
+        # Update perms
+        await self.vc.set_permissions(new_owner, connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
+        await interaction.response.send_message(f"👑 **Ownership Transferred!** {new_owner.mention} is now the host of `{self.vc.name}`!", ephemeral=False)
+
+
 class VoiceControlView(discord.ui.View):
     """Persistent 24/7 Voice Room Controls for Dynamic Voice Hub."""
     def __init__(self):
@@ -216,7 +281,7 @@ class VoiceControlView(discord.ui.View):
                 ephemeral=True
             )
 
-    @discord.ui.button(label="Permit / Invite", style=discord.ButtonStyle.primary, emoji="✉️", row=1, custom_id="vc_permit")
+    @discord.ui.button(label="Permit", style=discord.ButtonStyle.primary, emoji="✉️", row=1, custom_id="vc_permit")
     async def permit(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
@@ -234,7 +299,29 @@ class VoiceControlView(discord.ui.View):
         view = RevokeUserSelectView(vc, interaction.user)
         await interaction.response.send_message("🚫 **Select members below to revoke access & hide this channel from:**", view=view, ephemeral=True)
 
-    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, emoji="💬", row=1, custom_id="vc_status")
+    @discord.ui.button(label="Kick Member", style=discord.ButtonStyle.danger, emoji="👢", row=2, custom_id="vc_kick")
+    async def kick_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to kick members.", ephemeral=True)
+        
+        view = KickUserSelectView(vc, interaction.user)
+        await interaction.response.send_message("👢 **Select member(s) to disconnect from this voice room:**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Transfer Host", style=discord.ButtonStyle.primary, emoji="👑", row=2, custom_id="vc_transfer")
+    async def transfer_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await interaction.response.send_message("❌ You must be inside your voice channel to transfer ownership.", ephemeral=True)
+        
+        cog = interaction.client.get_cog("VoiceHub")
+        if not cog or vc.id not in cog.temp_channels or cog.temp_channels[vc.id] != interaction.user.id:
+            return await interaction.response.send_message("❌ You can only transfer ownership of rooms you created.", ephemeral=True)
+
+        view = TransferOwnerSelectView(vc, interaction.user, cog)
+        await interaction.response.send_message("👑 **Select a squadmate to become the new room host:**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, emoji="💬", row=2, custom_id="vc_status")
     async def status(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
@@ -244,9 +331,64 @@ class VoiceControlView(discord.ui.View):
 
 class VoiceHub(commands.Cog):
     """Dynamic Join-to-Create temporary private voice channels with interactive Ghost & Permission controls."""
+    TEMP_PREFIXES = ("🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ")
+    TEMP_SUFFIXES = ("'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.temp_channels = {}  # channel_id: owner_id
+        self.temp_db_path = os.path.join("data", "temp_vcs.json")
+        self._load_temp_channels()
+        self.cleanup_temp_channels_task.start()
+
+    def cog_unload(self):
+        self.cleanup_temp_channels_task.cancel()
+
+    def _load_temp_channels(self):
+        try:
+            if os.path.exists(self.temp_db_path):
+                with open(self.temp_db_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.temp_channels = {int(k): int(v) for k, v in data.items()}
+        except Exception as e:
+            logger.warning(f"Could not load temp channels: {e}")
+
+    def _save_temp_channels(self):
+        try:
+            os.makedirs(os.path.dirname(self.temp_db_path), exist_ok=True)
+            with open(self.temp_db_path, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.temp_channels.items()}, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save temp channels: {e}")
+
+    def is_temporary_channel(self, channel: discord.VoiceChannel) -> bool:
+        if channel.id in self.temp_channels:
+            return True
+        # Also check name patterns in case bot restarted
+        name = channel.name
+        if any(name.startswith(p) for p in self.TEMP_PREFIXES) and any(name.endswith(s) for s in self.TEMP_SUFFIXES):
+            return True
+        return False
+
+    @tasks.loop(seconds=30)
+    async def cleanup_temp_channels_task(self):
+        """Periodically scans for and deletes any empty temporary voice channels."""
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            for channel in guild.voice_channels:
+                if self.is_temporary_channel(channel) and len(channel.members) == 0:
+                    try:
+                        if channel.id in self.temp_channels:
+                            del self.temp_channels[channel.id]
+                            self._save_temp_channels()
+                        await channel.delete(reason="Periodic cleanup: temporary voice room was empty.")
+                        logger.info(f"Swept & deleted empty temp voice channel '{channel.name}' in {guild.name}")
+                    except Exception as e:
+                        logger.debug(f"Failed to delete channel {channel.name}: {e}")
+
+    @cleanup_temp_channels_task.before_loop
+    async def before_cleanup_task(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
@@ -295,6 +437,7 @@ class VoiceHub(commands.Cog):
                     reason=f"Join-to-Create Voice Room for {member.name}"
                 )
                 self.temp_channels[temp_vc.id] = member.id
+                self._save_temp_channels()
                 await member.move_to(temp_vc)
                 logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}) for {member.name}")
 
@@ -323,9 +466,11 @@ class VoiceHub(commands.Cog):
                 logger.error(f"Failed to create temp voice channel: {e}")
 
         # 2. User Left a temporary voice channel -> Delete if empty
-        if before.channel and before.channel.id in self.temp_channels:
+        if before.channel and self.is_temporary_channel(before.channel):
             if len(before.channel.members) == 0:
-                del self.temp_channels[before.channel.id]
+                if before.channel.id in self.temp_channels:
+                    del self.temp_channels[before.channel.id]
+                    self._save_temp_channels()
                 try:
                     await before.channel.delete(reason="Temporary voice channel is empty.")
                     logger.info(f"Deleted empty temp voice channel '{before.channel.name}'")

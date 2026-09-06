@@ -197,29 +197,34 @@ class MusicPlayerView(View):
         view = QueuePaginationView(player)
         await self.send_msg(interaction, embed=embed, view=view)
 
-    @button(label="Bass", style=discord.ButtonStyle.secondary, emoji="🎛️", row=1, custom_id="music_btn_bass")
-    async def bass_button(self, interaction: discord.Interaction, button: Button):
+    @button(label="Fav", style=discord.ButtonStyle.secondary, emoji="💖", row=1, custom_id="music_btn_fav")
+    async def fav_button(self, interaction: discord.Interaction, button: Button):
         player = await self.get_player(interaction)
-        if not player:
-            return
+        if not player or not player.current:
+            return await self.send_msg(interaction, "❌ No song is currently playing to add to favorites.")
 
-        if "bassboost" in player.active_filters:
-            player.active_filters.remove("bassboost")
-            button.style = discord.ButtonStyle.secondary
-            state_msg = "Disabled (Flat EQ)"
-        else:
-            player.active_filters.append("bassboost")
-            button.style = discord.ButtonStyle.success
-            state_msg = "Enabled 🔥 (Heavy Bass)"
+        fav_cog = interaction.client.get_cog("Favorites")
+        if not fav_cog:
+            return await self.send_msg(interaction, "❌ Favorites module is unavailable.")
 
-        await self.send_msg(interaction, f"🎛️ **Bass Boost:** `{state_msg}`")
-        if player.voice_client and player.voice_client.is_playing():
-            await player.restart_current_with_filters()
-        if player.now_playing_message:
-            try:
-                await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
-            except Exception:
-                pass
+        from cogs.favorites import load_favorites, save_favorites
+        user_id = str(interaction.user.id)
+        data = load_favorites()
+        if user_id not in data:
+            data[user_id] = []
+
+        if any(item.get("title") == player.current.title for item in data[user_id]):
+            return await self.send_msg(interaction, f"⚠️ `{player.current.title}` is already in your favorites!")
+
+        data[user_id].append({
+            "title": player.current.title,
+            "url": player.current.webpage_url,
+            "duration": player.current.duration,
+            "thumbnail": player.current.thumbnail,
+            "artist": player.current.data.get("uploader", "Unknown")
+        })
+        save_favorites(data)
+        await self.send_msg(interaction, f"💖 **Added to Favorites:** `{player.current.title}`\nPlay anytime with `/favorite play`!")
 
     @button(label="Lyrics", style=discord.ButtonStyle.secondary, emoji="🎤", row=1, custom_id="music_btn_lyrics")
     async def lyrics_button(self, interaction: discord.Interaction, button: Button):

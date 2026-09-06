@@ -232,6 +232,14 @@ music_commands_payload = [
 
     # 4. Utilities & Info
     {
+        "name": "c",
+        "description": "Browse all RAI VIBES commands in an interactive Rythm-style directory."
+    },
+    {
+        "name": "commands",
+        "description": "Browse all RAI VIBES commands (interactive category directory)."
+    },
+    {
         "name": "ping",
         "description": "Check RAI VIBES response latency."
     },

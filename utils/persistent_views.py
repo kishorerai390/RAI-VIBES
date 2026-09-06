@@ -1,167 +1,130 @@
+import unicodedata
 import discord
 from discord.ui import View, Button, button
 
 ROLE_ID_MAP = {
-    # Colors
-    "Sakura Pink 🌸": 1545516328016805979,
-    "Neon Violet 💜": 1545516370785996882,
-    "Cyber Cyan 🩵": 1545516378046337074,
-    "Royal Gold 💛": 1545516381426950214,
+    # Gaming Squads
+    "Free Fire": 1545516397034078269,
+    "BGMI": 1545516399663779871,
+    "GTA RP": 1546062595293978694,
+    "Roblox": 1545516402188881991,
 
-    # Gaming & Device
-    "Free Fire 💥": 1545516397034078269,
-    "BGMI ⚡": 1545516399663779871,
-    "Roblox 🧸": 1545516402188881991,
-    "Mobile Player 📱": 1545516404302811256,
-    "PC Player 💻": 1545516406454493257,
+    # Notifications & Pings
+    "Announcements": 1546088542885642324,
+    "Giveaways": 1546088546555924534,
+    "Tournaments": 1546088548913119323,
+    "Movie Nights": 1546062599253135420,
 
-    # Notification Pings
-    "Movie Alerts 🍿": 1545516408375353376,
-    "Giveaways 🎉": 1545516411659620383,
-    "Server News 📢": 1545516414016815169,
-    "Music Jam 🎵": 1545516416969609296,
-
-    # Identity & Pronouns (inspired by photo 2)
-    "Male 🤴": 1545516419121422377,
-    "Female 👸": 1545516421583208551,
-    "They / Them 🌈": 1545516423789543651,
-    "18+ Verified 🔞": 1545516426893197392,
+    # Member Identification
+    "Male": 1546095934935531520,
+    "Female": 1546095937015910434,
+    "18+ Adult": 1546095939582828616,
+    "Under 18": 1546095941818392647,
 }
 
-ALL_COLOR_ROLES = [
-    "Sakura Pink 🌸",
-    "Neon Violet 💜",
-    "Cyber Cyan 🩵",
-    "Royal Gold 💛"
+COLOR_ROLE_IDS = [
+    1546088552293728268, # Sakura Pink
+    1546088554747142174, # Neon Purple
+    1546088557742129232, # Cyber Cyan
+    1546088559830634586, # Royal Gold
 ]
 
-def find_role(guild: discord.Guild, role_name: str) -> discord.Role | None:
-    role_id = ROLE_ID_MAP.get(role_name)
+def find_role_by_key(guild: discord.Guild, key: str) -> discord.Role | None:
+    role_id = ROLE_ID_MAP.get(key)
     if role_id:
         r = guild.get_role(role_id)
         if r:
             return r
     for r in guild.roles:
-        if r.name.lower() == role_name.lower() or role_name.lower() in r.name.lower():
+        norm = unicodedata.normalize('NFKD', r.name).upper()
+        if key.upper() in norm:
             return r
     return None
 
-class ColorRoleButton(Button):
-    def __init__(self, role_name: str, label: str, emoji: str, style: discord.ButtonStyle, row: int = 0):
-        super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"colorrole_{role_name}")
-        self.role_name = role_name
+class SelfRoleButton(Button):
+    def __init__(self, key: str, label: str, emoji: str, style: discord.ButtonStyle, row: int = 0):
+        super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"selfrole_{key.replace(' ', '_').lower()}")
+        self.key = key
 
     async def callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
+        await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-        member = interaction.user
-        role = find_role(guild, self.role_name)
+        if not guild:
+            return await interaction.followup.send("❌ Server error.", ephemeral=True)
+
+        role = find_role_by_key(guild, self.key)
         if not role:
-            return await interaction.followup.send(f"❌ Role `{self.role_name}` not found.", ephemeral=True)
+            return await interaction.followup.send(f"❌ Role for `{self.key}` not found.", ephemeral=True)
+
+        member = interaction.user
+        if isinstance(member, discord.User):
+            member = await guild.fetch_member(interaction.user.id)
 
         if role in member.roles:
-            await member.remove_roles(role)
+            await member.remove_roles(role, reason="Self-Role Toggle Off")
+            await interaction.followup.send(f"⚪ Removed **{role.name}**", ephemeral=True)
+        else:
+            await member.add_roles(role, reason="Self-Role Toggle On")
+            await interaction.followup.send(f"✅ Equipped **{role.name}**!", ephemeral=True)
+
+
+class ColorRoleButton(Button):
+    def __init__(self, key: str, label: str, emoji: str, style: discord.ButtonStyle, row: int = 0):
+        super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"colorrole_{key.replace(' ', '_').lower()}")
+        self.key = key
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        if not guild:
+            return await interaction.followup.send("❌ Server error.", ephemeral=True)
+
+        role = find_role_by_key(guild, self.key)
+        if not role:
+            return await interaction.followup.send(f"❌ Color role for `{self.key}` not found.", ephemeral=True)
+
+        member = interaction.user
+        if isinstance(member, discord.User):
+            member = await guild.fetch_member(interaction.user.id)
+
+        if role in member.roles:
+            await member.remove_roles(role, reason="Removed Color Role")
             return await interaction.followup.send(f"⚪ Removed color: **{role.name}**", ephemeral=True)
 
-        # Remove other color roles first
-        roles_to_remove = [r for r in member.roles if r.name in ALL_COLOR_ROLES and r != role]
-        if roles_to_remove:
-            await member.remove_roles(*roles_to_remove)
+        # Remove other active color roles first so member only has 1 name color
+        roles_to_strip = [r for r in member.roles if r.id in COLOR_ROLE_IDS and r.id != role.id]
+        if roles_to_strip:
+            await member.remove_roles(*roles_to_strip, reason="Switching Color Role")
 
-        await member.add_roles(role)
-        await interaction.followup.send(f"🎨 **Equipped Color:** {role.mention}!", ephemeral=True)
-
-
-class SelfRoleButton(Button):
-    def __init__(self, role_name: str, label: str, emoji: str, style: discord.ButtonStyle, row: int = 0):
-        super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"selfrole_{role_name}")
-        self.role_name = role_name
-
-    async def callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
-        guild = interaction.guild
-        role = find_role(guild, self.role_name)
-        if not role:
-            return await interaction.followup.send(f"❌ Role `{self.role_name}` not found.", ephemeral=True)
-
-        member = interaction.user
-        if role in member.roles:
-            await member.remove_roles(role)
-            await interaction.followup.send(f"➖ **Removed Role:** {role.name}", ephemeral=True)
-        else:
-            await member.add_roles(role)
-            await interaction.followup.send(f"➕ **Added Role:** {role.name}", ephemeral=True)
-
-
-class ColorRolesView(View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(ColorRoleButton("Sakura Pink 🌸", "Sakura Pink", "🌸", discord.ButtonStyle.secondary, row=0))
-        self.add_item(ColorRoleButton("Neon Violet 💜", "Neon Violet", "💜", discord.ButtonStyle.primary, row=0))
-        self.add_item(ColorRoleButton("Cyber Cyan 🩵", "Cyber Cyan", "🩵", discord.ButtonStyle.secondary, row=0))
-        self.add_item(ColorRoleButton("Royal Gold 💛", "Royal Gold", "💛", discord.ButtonStyle.success, row=0))
+        await member.add_roles(role, reason="Equipped Color Role")
+        await interaction.followup.send(f"🎨 **Equipped Name Color:** {role.mention}!", ephemeral=True)
 
 
 class GamingRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("Free Fire 💥", "Free Fire", "💥", discord.ButtonStyle.danger, row=0))
-        self.add_item(SelfRoleButton("BGMI ⚡", "BGMI", "⚡", discord.ButtonStyle.primary, row=0))
-        self.add_item(SelfRoleButton("Roblox 🧸", "Roblox", "🧸", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("Mobile Player 📱", "Mobile Player", "📱", discord.ButtonStyle.secondary, row=1))
-        self.add_item(SelfRoleButton("PC Player 💻", "PC Player", "💻", discord.ButtonStyle.secondary, row=1))
+        self.add_item(SelfRoleButton("Free Fire", "Free Fire", "💥", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("BGMI", "BGMI", "⚡", discord.ButtonStyle.primary, row=0))
+        self.add_item(SelfRoleButton("GTA RP", "GTA RP", "🔫", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Roblox", "Roblox", "🧸", discord.ButtonStyle.secondary, row=0))
 
 
 class NotificationRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("Movie Alerts 🍿", "Movie Alerts", "🍿", discord.ButtonStyle.danger, row=0))
-        self.add_item(SelfRoleButton("Giveaways 🎉", "Giveaways", "🎉", discord.ButtonStyle.success, row=0))
-        self.add_item(SelfRoleButton("Server News 📢", "Server News", "📢", discord.ButtonStyle.primary, row=0))
-        self.add_item(SelfRoleButton("Music Jam 🎵", "Music Jam", "🎵", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Announcements", "Announcements", "📢", discord.ButtonStyle.primary, row=0))
+        self.add_item(SelfRoleButton("Giveaways", "Giveaways", "🎁", discord.ButtonStyle.success, row=0))
+        self.add_item(SelfRoleButton("Tournaments", "Tournaments", "🏆", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("Movie Nights", "Movie Nights", "🍿", discord.ButtonStyle.secondary, row=0))
 
 
-class IdentityRolesView(View):
+class ColorRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("Male 🤴", "Male", "🤴", discord.ButtonStyle.primary, row=0))
-        self.add_item(SelfRoleButton("Female 👸", "Female", "👸", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("They / Them 🌈", "They / Them", "🌈", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("18+ Verified 🔞", "18+ Verified", "🔞", discord.ButtonStyle.danger, row=0))
-
-
-class VerifyButtonView(View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @button(label="Verify & Enter Community", emoji="✅", style=discord.ButtonStyle.success, custom_id="verify_member_btn")
-    async def verify_button(self, interaction: discord.Interaction, btn: Button):
-        await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-        verified_role = (
-            discord.utils.get(guild.roles, name="RAI FAMILY 🌸") or
-            discord.utils.get(guild.roles, name="🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘") or
-            discord.utils.get(guild.roles, name="👥 Verified Member")
-        )
-        if not verified_role:
-            return await interaction.followup.send("❌ Verified role not found.", ephemeral=True)
-
-        if verified_role in interaction.user.roles:
-            return await interaction.followup.send(f"✨ You already have {verified_role.mention}!", ephemeral=True)
-
-        try:
-            await interaction.user.add_roles(verified_role)
-            await interaction.followup.send(f"🎉 **Role Added!** Welcome to **{guild.name}**! 💗🍿🎵", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
+        self.add_item(ColorRoleButton("Sakura Pink", "Sakura Pink", "🌸", discord.ButtonStyle.secondary, row=0))
+        self.add_item(ColorRoleButton("Neon Purple", "Neon Purple", "💜", discord.ButtonStyle.primary, row=0))
+        self.add_item(ColorRoleButton("Cyber Cyan", "Cyber Cyan", "🩵", discord.ButtonStyle.secondary, row=0))
+        self.add_item(ColorRoleButton("Royal Gold", "Royal Gold", "💛", discord.ButtonStyle.success, row=0))
 
 
 class TicketCloseView(View):
@@ -178,6 +141,49 @@ class TicketCloseView(View):
             await interaction.followup.send(f"❌ Failed to delete ticket: {e}", ephemeral=True)
 
 
+class IdentityRolesView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+
+class VerifyButtonView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @button(label="Verify & Enter Community", emoji="✅", style=discord.ButtonStyle.success, custom_id="verify_member_btn")
+    async def verify_button(self, interaction: discord.Interaction, btn: Button):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        if not guild:
+            return await interaction.followup.send("❌ Server error.", ephemeral=True)
+
+        verified_role = None
+        for r in guild.roles:
+            norm_name = unicodedata.normalize('NFKD', r.name).upper()
+            if "RAI FAMILY" in norm_name or "FAMILY" in norm_name or "VERIFIED" in norm_name:
+                verified_role = r
+                break
+
+        if not verified_role:
+            verified_role = discord.utils.get(guild.roles, id=1545494584203673740)
+
+        if verified_role and verified_role in interaction.user.roles:
+            return await interaction.followup.send("✨ **You are already verified!** Enjoy your stay! 🌸", ephemeral=True)
+
+        if verified_role:
+            try:
+                member = interaction.user
+                if isinstance(member, discord.User):
+                    member = await guild.fetch_member(interaction.user.id)
+                await member.add_roles(verified_role, reason="Passed Verification Gate")
+                await interaction.followup.send(f"🎉 **Verification Successful!** Welcome to **{guild.name}**! 🌸", ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(f"❌ Failed to assign role: {e}", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ Verification role not found.", ephemeral=True)
+
+
+
 class TicketCreateView(View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -186,8 +192,8 @@ class TicketCreateView(View):
     async def open_ticket_button(self, interaction: discord.Interaction, btn: Button):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-        staff_role = discord.utils.get(guild.roles, name="M O D E R A T O R 🛡️") or discord.utils.get(guild.roles, name="🛡️ ┊ 𝐆𝐔𝐀𝐑𝐃𝐈𝐀𝐍")
-        cat = discord.utils.get(guild.categories, name="🛡️ | 𝙎𝙏𝘼𝙁𝙁 𝙕𝙊𝙉𝙀")
+        staff_role = discord.utils.get(guild.roles, name="🛡️ ┆ 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐎𝐑 🛡️") or discord.utils.get(guild.roles, name="M O D E R A T O R 🛡️")
+        cat = discord.utils.get(guild.categories, name="🛡️ | 𝑺𝑬𝑵𝑻𝑰𝑵𝑬𝑳 𝑫𝑬𝑭𝑬𝑵𝑺𝑬") or discord.utils.get(guild.categories, name="🛡️ | 𝙎𝙏𝘼𝙁𝙁 𝙕𝙊𝙉𝙀")
 
         ticket_channel_name = f"ticket-{interaction.user.name.lower()}"
         existing = discord.utils.get(guild.text_channels, name=ticket_channel_name)

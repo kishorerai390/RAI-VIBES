@@ -1,9 +1,12 @@
 import asyncio
+import time
+import datetime
 import discord
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button, Select
 from typing import Optional, Dict
+
 
 import config
 from utils.ffmpeg_setup import get_ffmpeg_executable
@@ -71,6 +74,9 @@ SOUND_EFFECTS = {
     }
 }
 
+# Soundboard spam & interruption tracker: user_id -> list of timestamps
+USER_SOUNDBOARD_USAGE: Dict[int, list] = {}
+
 class SoundboardButton(Button):
     def __init__(self, sfx_key: str, sfx_data: dict):
         super().__init__(
@@ -84,6 +90,64 @@ class SoundboardButton(Button):
     async def callback(self, interaction: discord.Interaction):
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.response.send_message("❌ You must join a voice channel to use the Soundboard!", ephemeral=True)
+
+        member = interaction.user
+        channel = member.voice.channel
+        now = time.time()
+        uid = member.id
+
+        # Soundboard Interruption & Spam Watchdog
+        # If in VC with other members talking and member spams soundboard
+        if not member.guild_permissions.moderate_members and not member.guild_permissions.administrator:
+            if uid not in USER_SOUNDBOARD_USAGE:
+                USER_SOUNDBOARD_USAGE[uid] = []
+            
+            # Keep timestamps within 15 seconds
+            USER_SOUNDBOARD_USAGE[uid] = [t for t in USER_SOUNDBOARD_USAGE[uid] if now - t < 15.0]
+            USER_SOUNDBOARD_USAGE[uid].append(now)
+
+            # Trigger automatic 15-minute timeout if > 2 soundboard sounds in 15 seconds in multi-user VC
+            non_bot_members = [m for m in channel.members if not m.bot]
+            if len(non_bot_members) >= 2 and len(USER_SOUNDBOARD_USAGE[uid]) >= 3:
+                USER_SOUNDBOARD_USAGE[uid].clear()
+                
+                # Apply 15-minute Discord timeout
+                timeout_duration = datetime.timedelta(minutes=15)
+                try:
+                    await member.timeout(timeout_duration, reason="Automatic 15-minute Soundboard Interruption Timeout")
+                except Exception:
+                    pass
+                
+                # Server Mute in VC
+                try:
+                    await member.edit(mute=True, reason="Soundboard Spam in VC")
+                except Exception:
+                    pass
+
+                # Announce in Channel
+                alert_embed = discord.Embed(
+                    title="🔇 Automated 15-Minute Soundboard Timeout",
+                    description=(
+                        f"⚠️ {member.mention} has been put on a **15-minute Voice & Soundboard Timeout** for interrupting and spamming sound effects during active conversation in {channel.mention}!\n\n"
+                        f"⏳ **Duration:** `15 Minutes`\n"
+                        f"🛡️ **Enforcement:** Automatic Soundboard Watchdog"
+                    ),
+                    color=config.COLOR_WARNING
+                )
+                alert_embed.set_footer(text="RAI SENTINEL 🛡️ Voice Protection", icon_url=config.RAI_ICON_URL)
+                
+                # Log to mod-logs
+                log_chan = discord.utils.get(interaction.guild.text_channels, name="📋・mod-logs")
+                if log_chan:
+                    try:
+                        await log_chan.send(embed=alert_embed)
+                    except Exception:
+                        pass
+
+                return await interaction.response.send_message(
+                    f"⛔ **Soundboard Timeout Applied!** You have been timed out for **15 minutes** for spamming sound effects during an active VC conversation.",
+                    ephemeral=True
+                )
 
         music_cog = interaction.client.get_cog("Music")
         if not music_cog:
@@ -109,6 +173,7 @@ class SoundboardButton(Button):
 
         vc.play(transformed)
         await interaction.response.send_message(f"🔊 Playing sound effect: **{self.sfx_data['name']}** in {vc.channel.mention}!", ephemeral=True)
+
 
 
 class SoundboardView(View):

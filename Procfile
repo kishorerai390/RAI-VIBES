@@ -1,1 +1,1 @@
-worker: python keep_alive_supervisor.py
+worker: python run_24_7.py
