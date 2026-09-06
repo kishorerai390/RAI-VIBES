@@ -25,21 +25,18 @@ yt_dlp.utils.bug_reports_message = lambda *args, **kargs: ""
 
 YTDL_OPTIONS = {
     "format": "bestaudio/best",
-    "extractaudio": True,
-    "audioformat": "mp3",
-    "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
-    "restrictfilenames": True,
     "noplaylist": True,
     "nocheckcertificate": True,
-    "ignoreerrors": False,
+    "ignoreerrors": True,
     "logtostderr": False,
     "quiet": True,
     "no_warnings": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
+    "skip_download": True,
     "extractor_args": {
         "youtube": {
-            "player_client": ["android", "ios", "web_embedded", "mweb"]
+            "player_client": ["android", "ios", "web_embedded", "mweb", "tv_embedded"]
         }
     }
 }
@@ -500,7 +497,7 @@ class GuildMusicPlayer:
             except Exception:
                 pass
 
-        before_opt = f"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss {elapsed} -nostdin -probesize 10M -analyzeduration 0"
+        before_opt = f"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss {elapsed} -nostdin -probesize 32k -analyzeduration 0"
         ffmpeg_opt = f"-vn -bufsize 4096k -threads 2 {filter_args}".strip()
 
         def after_playing(err):
@@ -630,7 +627,7 @@ class GuildMusicPlayer:
                 raw_source = discord.FFmpegPCMAudio(
                     stream_url,
                     executable=ffmpeg_bin,
-                    before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin -probesize 10M -analyzeduration 0",
+                    before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin -probesize 32k -analyzeduration 0",
                     options=ffmpeg_opt
                 )
                 self.current_source = discord.PCMVolumeTransformer(raw_source, volume=self.get_volume_factor())

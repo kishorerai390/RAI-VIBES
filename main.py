@@ -39,10 +39,12 @@ BANNER = f"""
 {Fore.LIGHTMAGENTA_EX}          💗 COMMAND THE VIBE • HEAR THE RHYTHM • DISCORD MUSIC BOT 💗
 """
 
-def create_bot(use_message_content: bool = True) -> commands.Bot:
+def create_bot(use_members: bool = True, use_message_content: bool = True) -> commands.Bot:
     intents = discord.Intents.default()
     intents.voice_states = True
     intents.guilds = True
+    if use_members:
+        intents.members = True
     if use_message_content:
         intents.message_content = True
 
@@ -77,12 +79,14 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
         # Register Persistent Views for instant interaction without timeout
         from cogs.voicehub import VoiceControlView
         from utils.views import MusicPlayerView
+        from cogs.verify import VerifyButtonView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
         b.add_view(IdentityRolesView())
         b.add_view(VoiceControlView())
         b.add_view(MusicPlayerView())
+        b.add_view(VerifyButtonView())
 
         # Synchronize slash commands directly to each guild for instant updates
         try:
@@ -94,24 +98,6 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
             logger.info(f"✨ Global slash commands tree synchronized ({len(synced)} commands).")
         except Exception as e:
             logger.error(f"Failed to synchronize slash commands: {e}")
-
-        # Clean RF tags from all members on startup
-        for guild in b.guilds:
-            for member in guild.members:
-                if member.bot or member.id == guild.owner_id:
-                    continue
-                nick = member.nick
-                if not nick:
-                    continue
-                clean_nick = re.sub(r'^(?:RF\s*\|\s*|RF\s*・\s*|RF\s*\|\s*|RF\s+)', '', nick, flags=re.IGNORECASE).strip()
-                global_name = member.global_name or member.name
-                if clean_nick != nick:
-                    try:
-                        target_nick = clean_nick if clean_nick != global_name else None
-                        await member.edit(nick=target_nick, reason="Remove RF clan tag prefix")
-                        logger.info(f"✅ Cleaned RF tag: '{nick}' -> '{clean_nick}' (Reset: {target_nick is None})")
-                    except Exception as e:
-                        logger.debug(f"Could not clean nick for {member.name}: {e}")
 
         logger.info(f"{config.BOT_NAME} is ONLINE & ready to play music in your server!")
 
@@ -226,15 +212,14 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
                 if music_cog:
                     return await music_cog.play(ctx, query=query)
 
-        # 4. Direct Simple Commands: !skip, !pause, !resume, !stop, !queue, !np, !radio
+        # 4. Direct Simple Commands: !skip, !pause, !resume, !stop, !queue, !np
         simple_cmds = {
             "!skip": "skip",
             "!pause": "pause",
             "!resume": "resume",
             "!stop": "stop",
             "!queue": "queue",
-            "!np": "nowplaying",
-            "!radio": "radio"
+            "!np": "nowplaying"
         }
         if lower in simple_cmds:
             cmd_name = simple_cmds[lower]
@@ -263,31 +248,49 @@ def create_bot(use_message_content: bool = True) -> commands.Bot:
             except Exception:
                 pass
 
+    @b.tree.error
+    async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        logger.error(f"Slash command error ({interaction.command.name if interaction.command else 'Unknown'}): {error}")
+        msg = "❌ An error occurred while running this command. Make sure you are connected to a voice channel!"
+        if isinstance(error, discord.app_commands.CommandOnCooldown):
+            msg = f"⏳ Command is on cooldown. Try again in `{error.retry_after:.1f}s`."
+        elif isinstance(error, discord.app_commands.MissingPermissions):
+            msg = "❌ You lack the required permissions to execute this command."
+
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
+
     return b
 
 async def load_cogs(bot_instance: commands.Bot):
-    # Pure Music, Karaoke, Radio, Audio FX & Community Engine for RAI VIBES 💗
+    # Pure Music, Karaoke, Audio FX & Community Engine for RAI VIBES 💗
     initial_extensions = [
         "cogs.music",
-        "cogs.radio",
         "cogs.filters",
         "cogs.lyrics",
         "cogs.favorites",
         "cogs.general",
         "cogs.voicehub",
-        "cogs.levels",
-        "cogs.minigames",
         "cogs.giveaways",
         "cogs.polls",
-        "cogs.welcome",
         "cogs.qotd",
-        "cogs.counting",
         "cogs.starboard",
-        "cogs.music_quiz",
         "cogs.soundboard",
         "cogs.dj",
         "cogs.voice_stats",
+        "cogs.birthday",
+        "cogs.server_stats",
+        "cogs.economy",
+        "cogs.bump_tracker",
+        "cogs.anime_feed",
+        "cogs.welcome",
     ]
+
     for extension in initial_extensions:
         try:
             await bot_instance.load_extension(extension)
@@ -295,8 +298,8 @@ async def load_cogs(bot_instance: commands.Bot):
         except Exception as e:
             logger.error(f"Failed to load extension {extension}: {e}")
 
-async def start_bot(use_message_content: bool = True):
-    bot_instance = create_bot(use_message_content=use_message_content)
+async def start_bot(use_members: bool = True, use_message_content: bool = True):
+    bot_instance = create_bot(use_members=use_members, use_message_content=use_message_content)
     async with bot_instance:
         await load_cogs(bot_instance)
         await bot_instance.start(config.DISCORD_TOKEN)
@@ -317,14 +320,17 @@ async def main():
     logger.info(f"FFmpeg ready at: {ffmpeg_path}")
 
     try:
-        await start_bot(use_message_content=True)
+        await start_bot(use_members=True, use_message_content=True)
     except discord.errors.PrivilegedIntentsRequired:
         logger.warning(
-            "[NOTICE] Message Content Intent is not enabled in Discord Developer Portal.\n"
-            "[NOTICE] Slash commands (/play) work 100%, but to enable @APEX DJ play <song> text mentions,\n"
-            "[NOTICE] go to https://discord.com/developers/applications -> APEX VIBES -> Bot -> Enable 'Message Content Intent'."
+            "[NOTICE] Privileged Intents (Server Members or Message Content) not enabled in Developer Portal.\n"
+            "[NOTICE] To enable automatic Welcome Cards on join, enable 'SERVER MEMBERS INTENT' at:\n"
+            "[NOTICE] https://discord.com/developers/applications -> Bot -> Privileged Gateway Intents."
         )
-        await start_bot(use_message_content=False)
+        try:
+            await start_bot(use_members=False, use_message_content=True)
+        except discord.errors.PrivilegedIntentsRequired:
+            await start_bot(use_members=False, use_message_content=False)
 
 if __name__ == "__main__":
     try:
