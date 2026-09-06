@@ -1,5 +1,11 @@
 import os
+import sys
 import paramiko
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 HOST = "fi12.bot-hosting.cloud"
 PORT = 2022
@@ -56,6 +62,20 @@ def deploy():
                 local_path = os.path.join("utils", f)
                 remote_path = f"utils/{f}"
                 print(f"Uploading {local_path} -> {remote_path}...", flush=True)
+                sftp.put(local_path, remote_path)
+                print(f"Uploaded {remote_path} successfully.", flush=True)
+
+    # Upload assets folder (GIF banners, icons)
+    if os.path.exists("assets"):
+        try:
+            sftp.mkdir("assets")
+        except Exception:
+            pass
+        for f in os.listdir("assets"):
+            if f.endswith((".gif", ".jpg", ".png")):
+                local_path = os.path.join("assets", f)
+                remote_path = f"assets/{f}"
+                print(f"Uploading asset {local_path} -> {remote_path}...", flush=True)
                 sftp.put(local_path, remote_path)
                 print(f"Uploaded {remote_path} successfully.", flush=True)
 

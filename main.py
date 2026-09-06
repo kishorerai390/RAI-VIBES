@@ -88,6 +88,29 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(MusicPlayerView())
         b.add_view(VerifyButtonView())
 
+        # Update bot profile banner to animated GIF
+        banner_path = os.path.join("assets", "rai_vibes_banner.gif")
+        if os.path.exists(banner_path):
+            try:
+                if not b.user.banner or not str(b.user.banner).startswith("a_"):
+                    with open(banner_path, "rb") as f:
+                        await b.user.edit(banner=f.read())
+                    logger.info("✨ [RAI VIBES] Successfully applied animated GIF profile banner!")
+            except Exception as e:
+                logger.debug(f"[RAI VIBES] Banner update notice: {e}")
+
+        # Attempt to set server banner (succeeds if server has Boost Level 2)
+        fam_banner_path = os.path.join("assets", "rai_fam_server_banner.gif")
+        if os.path.exists(fam_banner_path):
+            target_guild = b.get_guild(1457382179981099090)
+            if target_guild:
+                try:
+                    with open(fam_banner_path, "rb") as f:
+                        await target_guild.edit(banner=f.read())
+                    logger.info("✨ Successfully set animated GIF server banner for RAI FAM!")
+                except Exception as e:
+                    logger.info(f"Server banner note (requires Server Boost Level 2): {e}")
+
         # Synchronize slash commands directly to each guild for instant updates
         try:
             for guild in b.guilds:

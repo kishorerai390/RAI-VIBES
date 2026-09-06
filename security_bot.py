@@ -68,6 +68,17 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
             except Exception as e:
                 logger.debug(f"View init note: {e}")
 
+        # Update Sentinel bot banner to animated GIF
+        banner_path = os.path.join("assets", "rai_sentinel_banner.gif")
+        if os.path.exists(banner_path):
+            try:
+                if not bot.user.banner or not str(bot.user.banner).startswith("a_"):
+                    with open(banner_path, "rb") as f:
+                        await bot.user.edit(banner=f.read())
+                    logger.info("✨ [RAI SENTINEL] Successfully applied animated GIF profile banner!")
+            except Exception as e:
+                logger.debug(f"[RAI SENTINEL] Banner update notice: {e}")
+
         try:
             for guild in bot.guilds:
                 bot.tree.copy_global_to(guild=guild)
