@@ -1,12 +1,15 @@
 import io
 import json
+import unicodedata
 import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
-import asyncio
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+try:
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
+except ImportError:
+    pass
 
 import config
 
@@ -47,6 +50,14 @@ def award_welcome_bonus(user_id: str):
             json.dump(lvl_data, f, indent=2)
     except Exception as e:
         logger.warning(f"Could not award levels XP to {user_id}: {e}")
+
+
+def sanitize_for_canvas(text: str, max_len: int = 16) -> str:
+    norm = unicodedata.normalize('NFKD', text)
+    clean = "".join([c for c in norm if ord(c) < 128 or c.isalnum() or c in " -_!."]).strip()
+    if not clean:
+        clean = "RAI Member"
+    return clean[:max_len] if len(clean) <= max_len else f"{clean[:max_len-2]}.."
 
 
 def create_grand_welcome_image(avatar_bytes: bytes, username: str, member_count: int, guild_name: str) -> io.BytesIO:
@@ -97,8 +108,6 @@ def create_grand_welcome_image(avatar_bytes: bytes, username: str, member_count:
         draw.ellipse([58, 80, 252, 274], outline=(255, 215, 0, 180), width=6)
         draw.ellipse([62, 84, 248, 270], outline=(0, 240, 255, 220), width=4)
         draw.ellipse([65, 87, 245, 267], outline=(255, 20, 147, 255), width=3)
-        
-        # Paste Circular Avatar
         img.paste(avatar_circle, (65, 87), avatar_circle)
     except Exception as e:
         logger.warning(f"Could not render avatar image: {e}")
@@ -120,7 +129,7 @@ def create_grand_welcome_image(avatar_bytes: bytes, username: str, member_count:
     draw.text((280, 75), f"✨ WELCOME TO {guild_name.upper()} ✨", fill=(255, 105, 180, 255), font=font_sub)
     
     # Username with Glow/Shadow Effect
-    clean_name = username if len(username) <= 16 else f"{username[:14]}..."
+    clean_name = sanitize_for_canvas(username, max_len=18)
     draw.text((282, 112), clean_name, fill=(20, 10, 30, 255), font=font_name)
     draw.text((280, 110), clean_name, fill=(255, 255, 255, 255), font=font_name)
     
@@ -150,12 +159,82 @@ def create_grand_welcome_image(avatar_bytes: bytes, username: str, member_count:
     return output
 
 
+def create_grand_goodbye_image(avatar_bytes: bytes, username: str, member_count: int = 0, guild_name: str = "") -> io.BytesIO:
+    """Generates an exact Koya-style clean dark goodbye card."""
+    WIDTH, HEIGHT = 800, 450
+    # Discord dark background: #2b2d31
+    img = Image.new("RGBA", (WIDTH, HEIGHT), color=(43, 45, 49, 255))
+    draw = ImageDraw.Draw(img)
+
+    # 1. Centered Circular Avatar
+    avatar_size = 190
+    avatar_x = (WIDTH - avatar_size) // 2
+    avatar_y = 40
+
+    try:
+        raw_avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
+        raw_avatar = raw_avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
+        
+        # High-res circular mask for ultra-smooth anti-aliasing
+        mask_scale = 4
+        big_mask = Image.new("L", (avatar_size * mask_scale, avatar_size * mask_scale), 0)
+        mask_draw = ImageDraw.Draw(big_mask)
+        mask_draw.ellipse((0, 0, avatar_size * mask_scale, avatar_size * mask_scale), fill=255)
+        smooth_mask = big_mask.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
+
+        avatar_circle = ImageOps.fit(raw_avatar, (avatar_size, avatar_size), centering=(0.5, 0.5))
+        avatar_circle.putalpha(smooth_mask)
+
+        # White Circular Border
+        draw.ellipse([avatar_x - 5, avatar_y - 5, avatar_x + avatar_size + 5, avatar_y + avatar_size + 5], outline=(255, 255, 255, 255), width=5)
+        img.paste(avatar_circle, (avatar_x, avatar_y), avatar_circle)
+    except Exception as e:
+        logger.warning(f"Could not render goodbye avatar: {e}")
+        draw.ellipse([avatar_x, avatar_y, avatar_x + avatar_size, avatar_y + avatar_size], fill=(255, 105, 180, 255))
+
+    # 2. Typography
+    try:
+        font_title = ImageFont.truetype("arialbd.ttf", 52)
+        font_name = ImageFont.truetype("arialbd.ttf", 36)
+    except Exception:
+        font_title = ImageFont.load_default()
+        font_name = font_title
+
+    # "GOOD BYE" (Centered Bold White with clean shadow)
+    title_text = "GOOD BYE"
+    bbox_title = draw.textbbox((0, 0), title_text, font=font_title)
+    w_title = bbox_title[2] - bbox_title[0]
+    tx = (WIDTH - w_title) // 2
+    ty = 255
+    # Shadow
+    draw.text((tx + 2, ty + 2), title_text, fill=(18, 18, 20, 255), font=font_title)
+    # Main text
+    draw.text((tx, ty), title_text, fill=(255, 255, 255, 255), font=font_title)
+
+    # Username (Centered Bold White with clean shadow)
+    clean_user = sanitize_for_canvas(username, max_len=20).upper()
+    bbox_name = draw.textbbox((0, 0), clean_user, font=font_name)
+    w_name = bbox_name[2] - bbox_name[0]
+    nx = (WIDTH - w_name) // 2
+    ny = 325
+    # Shadow
+    draw.text((nx + 2, ny + 2), clean_user, fill=(18, 18, 20, 255), font=font_name)
+    # Main text
+    draw.text((nx, ny), clean_user, fill=(255, 255, 255, 255), font=font_name)
+
+    # 3. Export
+    output = io.BytesIO()
+    img.save(output, format="PNG")
+    output.seek(0)
+    return output
+
+
 class WelcomeQuickActionsView(discord.ui.View):
     """Interactive Buttons attached to the Welcome Announcement."""
-    def __init__(self, member: discord.Member):
+    def __init__(self, member: discord.Member = None):
         super().__init__(timeout=None)
-        self.member_id = member.id
-        self.member_mention = member.mention
+        self.member_id = member.id if member else None
+        self.member_mention = member.mention if member else "our new member"
 
     @discord.ui.button(label="📜 Server Rules", style=discord.ButtonStyle.secondary, emoji="📜", custom_id="welcome_rules_btn")
     async def rules_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -245,74 +324,62 @@ class Welcome(commands.Cog):
                 except Exception:
                     pass
 
-        # 4. Generate Dynamic Canvas Welcome Card
-        card_file = None
-        try:
-            avatar_bytes = await member.display_avatar.with_format("png").with_size(256).read()
-            card_bytes = await asyncio.to_thread(
-                create_grand_welcome_image,
-                avatar_bytes,
-                member.display_name,
-                member_count,
-                guild.name
-            )
-            card_file = discord.File(card_bytes, filename="grand_welcome.png")
-        except Exception as e:
-            logger.error(f"Failed to generate grand welcome image: {e}")
+        # 4. Default Welcome Image (Image 1 - The Office Celebration GIF)
+        DEFAULT_WELCOME_IMAGE_URL = "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"
 
         # 5. Send Grand Announcement in Welcome Channel
-        welcome_chan = (
-            discord.utils.get(guild.text_channels, name="welcome") or
-            discord.utils.get(guild.text_channels, name="👋・welcome") or
-            discord.utils.get(guild.text_channels, name="╭・「👋」welcome") or
-            discord.utils.get(guild.text_channels, name="general-chat")
-        )
+        welcome_chan = next((ch for ch in guild.text_channels if "welcome" in ch.name.lower()), None)
+        if not welcome_chan:
+            welcome_chan = discord.utils.get(guild.text_channels, name="general")
 
         if welcome_chan:
-            rules_chan = discord.utils.get(guild.text_channels, name="rules") or discord.utils.get(guild.text_channels, name="├・「📜」rules-and-guidelines")
-            roles_chan = discord.utils.get(guild.text_channels, name="self-roles") or discord.utils.get(guild.text_channels, name="├・「⭐」self-roles")
-            gen_chan = discord.utils.get(guild.text_channels, name="💬・general-chat") or discord.utils.get(guild.text_channels, name="general-chat")
+            rules_chan = next((ch for ch in guild.text_channels if "rules" in ch.name.lower()), None)
+            verify_chan = next((ch for ch in guild.text_channels if "verify" in ch.name.lower()), None)
+            roles_chan = next((ch for ch in guild.text_channels if "role" in ch.name.lower()), None)
+            gen_chan = next((ch for ch in guild.text_channels if "general" in ch.name.lower()), None)
+            gaming_chan = next((ch for ch in guild.text_channels if "gaming" in ch.name.lower()), None)
+            fun_vc = next((vc for vc in guild.voice_channels if "fun" in vc.name.lower()), None)
+            lofi_vc = next((vc for vc in guild.voice_channels if "lo-fi" in vc.name.lower() or "lofi" in vc.name.lower()), None)
 
-            rules_mention = rules_chan.mention if rules_chan else "#rules"
-            roles_mention = roles_chan.mention if roles_chan else "#self-roles"
-            gen_mention = gen_chan.mention if gen_chan else "#general-chat"
+            rules_ref = rules_chan.mention if rules_chan else "#rules"
+            verify_ref = verify_chan.mention if verify_chan else "#verify"
+            roles_ref = roles_chan.mention if roles_chan else "#self-roles"
+            gen_ref = gen_chan.mention if gen_chan else "#general"
+            gaming_ref = gaming_chan.mention if gaming_chan else "#gaming-chat"
+            fun_ref = fun_vc.mention if fun_vc else "🐣 ┊ Fun Time"
+            lofi_ref = lofi_vc.mention if lofi_vc else "🌧️ ┊ Lo-Fi Chill"
 
             embed = discord.Embed(
-                title=f"🌸 GRAND ROYAL WELCOME TO {guild.name.upper()}! 🌸",
+                title=f"🌸 {guild.name.upper()} !",
                 description=(
-                    f"A heartfelt royal welcome to {member.mention}! You are officially part of the **`🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘`**! 🎉✨\n\n"
-                    f"👑 **You are our honored Member #{member_count}**\n\n"
-                    f"🎁 **Starter Gift Credited:**\n"
-                    f"• **+100 Apex Coins** 🪙 deposited to your wallet (`/balance`)\n"
-                    f"• **+50 Starter XP** ✨ added to your rank profile (`/rank`)\n\n"
-                    f"**🚀 Explore The Community:**\n"
-                    f"1️⃣ **Rules & Guidelines:** Check {rules_mention} to stay informed\n"
-                    f"2️⃣ **Self Roles:** Pick custom colors and gaming tags in {roles_mention}\n"
-                    f"3️⃣ **Hangout:** Come say hi to everyone in {gen_mention} and join our voice lounges!\n"
+                    f"**HEY BUDDY!** **{member.display_name}** ({member.mention})\n\n"
+                    f"**Welcome To {guild.name} !**\n"
+                    f"**Get started with below:** {rules_ref}\n\n"
+                    f"**Follow The Server Guidelines:** {rules_ref}\n\n"
+                    f"**Verify For Full Access:** {verify_ref}\n\n"
+                    f"**Claim Your Roles:** {roles_ref}\n\n"
+                    f"**Fun With Us:** {fun_ref}\n\n"
+                    f"**Gaming Zone:** {gaming_ref}\n\n"
+                    f"**24/7 Lo-Fi & Beats:** {lofi_ref}\n\n"
+                    f"**Join And Chill With Us!:** {gen_ref}\n\n"
+                    f"**Thanks For Joining. Hope You Have A Great Time Here!**"
                 ),
-                color=config.COLOR_PRIMARY
+                color=0xFF69B4  # Vibrant Sakura Pink
             )
-            if card_file:
-                embed.set_image(url="attachment://grand_welcome.png")
-            else:
-                embed.set_thumbnail(url=member.display_avatar.url)
-            embed.set_footer(text=f"User ID: {member.id} • RAI FAM Luxury Welcome System 💗", icon_url=config.RAI_ICON_URL)
+            embed.set_author(name=f"{guild.name}", icon_url=guild.icon.url if guild.icon else None)
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text=f"Member #{member_count} • User ID: {member.id} • RAI FAM Luxury Welcome 💗", icon_url=guild.icon.url if guild.icon else None)
+            embed.set_image(url=DEFAULT_WELCOME_IMAGE_URL)
 
             view = WelcomeQuickActionsView(member)
             try:
-                if card_file:
-                    await welcome_chan.send(
-                        content=f"🎉 **Everyone welcome {member.mention} to {guild.name}!** 🌸✨",
-                        embed=embed,
-                        file=card_file,
-                        view=view
-                    )
-                else:
-                    await welcome_chan.send(
-                        content=f"🎉 **Everyone welcome {member.mention} to {guild.name}!** 🌸✨",
-                        embed=embed,
-                        view=view
-                    )
+                user_name = member.display_name if member.display_name else member.name
+                welcome_text = f"🎉 Welcome **{user_name}** ({member.mention}) to **{guild.name}**! 🚀"
+                await welcome_chan.send(
+                    content=welcome_text,
+                    embed=embed,
+                    view=view
+                )
             except Exception as e:
                 logger.error(f"Failed to send grand welcome message: {e}")
 
@@ -400,15 +467,63 @@ class Welcome(commands.Cog):
         guild = member.guild
         member_count = len(guild.members)
 
+        # 1. Update Server Stats Channel
+        for vc in guild.voice_channels:
+            if "members:" in vc.name.lower() or "member count" in vc.name.lower():
+                try:
+                    await vc.edit(name=f"👥・Members: {member_count}")
+                except Exception:
+                    pass
+
+        # 2. Generate Dynamic Goodbye Canvas Card
+        card_file = None
+        try:
+            avatar_bytes = await member.display_avatar.with_format("png").with_size(256).read()
+            card_bytes = await asyncio.to_thread(
+                create_grand_goodbye_image,
+                avatar_bytes,
+                member.display_name,
+                member_count,
+                guild.name
+            )
+            card_file = discord.File(card_bytes, filename="grand_goodbye.png")
+        except Exception as e:
+            logger.warning(f"Could not generate goodbye card for {member.name}: {e}")
+
+        # 3. Post Goodbye Announcement in Dedicated Goodbye Channel
+        goodbye_chan = (
+            guild.get_channel(1546122222329008199) or
+            discord.utils.get(guild.text_channels, name="👋・good-bye") or
+            discord.utils.get(guild.text_channels, name="good-bye") or
+            discord.utils.get(guild.text_channels, name="goodbye")
+        )
+
+        if goodbye_chan:
+            user_display = member.display_name if member.display_name else member.name
+            msg_content = f"👋 **{user_display}** has left **{guild.name}** ."
+            try:
+                if card_file:
+                    await goodbye_chan.send(
+                        content=msg_content,
+                        file=card_file
+                    )
+                else:
+                    await goodbye_chan.send(
+                        content=msg_content
+                    )
+            except Exception as e:
+                logger.error(f"Failed to send goodbye announcement: {e}")
+
+        # 4. Mod Log Record
         log_chan = discord.utils.get(guild.text_channels, name="📋・mod-logs")
         if log_chan:
-            embed = discord.Embed(
+            log_embed = discord.Embed(
                 title="👋 Member Left",
-                description=f"**{member.name}** (`{member.id}`) has left the server. Member count is now **{member_count}**.",
+                description=f"**{member.name}** (`{member.id}`) has departed. Member count is now **{member_count}**.",
                 color=config.COLOR_SECONDARY
             )
             try:
-                await log_chan.send(embed=embed)
+                await log_chan.send(embed=log_embed)
             except Exception:
                 pass
 
@@ -418,6 +533,7 @@ class Welcome(commands.Cog):
         target = member or ctx.author
         guild = ctx.guild
         member_count = len(guild.members)
+        target_name = target.display_name if target.display_name else target.name
         
         await ctx.defer()
         try:
@@ -425,39 +541,87 @@ class Welcome(commands.Cog):
             card_bytes = await asyncio.to_thread(
                 create_grand_welcome_image,
                 avatar_bytes,
-                target.display_name,
+                target_name,
                 member_count,
                 guild.name
             )
             card_file = discord.File(card_bytes, filename="grand_welcome_preview.png")
             
+            rules_chan = discord.utils.get(guild.text_channels, name="📜・rules") or discord.utils.get(guild.text_channels, name="rules")
+            verify_chan = discord.utils.get(guild.text_channels, name="✅・verify") or discord.utils.get(guild.text_channels, name="verify")
+            roles_chan = discord.utils.get(guild.text_channels, name="🎭・self-roles") or discord.utils.get(guild.text_channels, name="self-roles")
+            gen_chan = discord.utils.get(guild.text_channels, name="💬・general") or discord.utils.get(guild.text_channels, name="general")
+            gaming_chan = discord.utils.get(guild.text_channels, name="💬・gaming-text")
+            fun_vc = discord.utils.get(guild.voice_channels, name="🐣 | FUN TIME")
+            lofi_vc = discord.utils.get(guild.voice_channels, name="🎧 | LO-FI CHILL [24/7]")
+
+            rules_ref = rules_chan.mention if rules_chan else "#rules"
+            verify_ref = verify_chan.mention if verify_chan else "#verify"
+            roles_ref = roles_chan.mention if roles_chan else "#self-roles"
+            gen_ref = gen_chan.mention if gen_chan else "#general"
+            gaming_ref = gaming_chan.mention if gaming_chan else "#gaming-text"
+            fun_ref = fun_vc.mention if fun_vc else "🐣 | FUN TIME"
+            lofi_ref = lofi_vc.mention if lofi_vc else "🎧 | LO-FI CHILL [24/7]"
+
             embed = discord.Embed(
-                title=f"🌸 GRAND ROYAL WELCOME TO {guild.name.upper()}! 🌸",
+                title=f"🌸 {guild.name.upper()} !",
                 description=(
-                    f"A heartfelt royal welcome to {target.mention}! You are officially part of the **`🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘`**! 🎉✨\n\n"
-                    f"👑 **You are our honored Member #{member_count}**\n\n"
-                    f"🎁 **Starter Gift Credited:**\n"
-                    f"• **+100 Apex Coins** 🪙 deposited to your wallet (`/balance`)\n"
-                    f"• **+50 Starter XP** ✨ added to your rank profile (`/rank`)\n\n"
-                    f"**🚀 Explore The Community:**\n"
-                    f"1️⃣ **Rules & Guidelines:** Check `#rules-and-guidelines`\n"
-                    f"2️⃣ **Self Roles:** Pick custom colors and gaming tags in `#self-roles`\n"
-                    f"3️⃣ **Hangout:** Come say hi to everyone in `#general-chat`!\n"
+                    f"**HEY BUDDY!** **{target_name}** ({target.mention})\n\n"
+                    f"**Welcome To {guild.name} !**\n"
+                    f"**Get started with below:** {rules_ref}\n\n"
+                    f"**Follow The Server Guidelines:** {rules_ref}\n\n"
+                    f"**Verify For Full Access:** {verify_ref}\n\n"
+                    f"**Pick Your Roles:** {roles_ref}\n\n"
+                    f"**Fun With Us:** {fun_ref}\n\n"
+                    f"**Gaming Zone:** {gaming_ref}\n\n"
+                    f"**24/7 Lo-Fi & Beats:** {lofi_ref}\n\n"
+                    f"**Join And Chill With Us!:** {gen_ref}\n\n"
+                    f"**Thanks For Joining. Hope You Have A Great Time Here!**"
                 ),
-                color=config.COLOR_PRIMARY
+                color=0xFF69B4
             )
+            embed.set_author(name=f"{guild.name}", icon_url=guild.icon.url if guild.icon else None)
+            embed.set_thumbnail(url=target.display_avatar.url)
             embed.set_image(url="attachment://grand_welcome_preview.png")
-            embed.set_footer(text=f"User ID: {target.id} • Grand Royal Welcome Preview 💗", icon_url=config.RAI_ICON_URL)
+            embed.set_footer(text=f"Member #{member_count} • User ID: {target.id} • RAI FAM Luxury Welcome 💗", icon_url=guild.icon.url if guild.icon else None)
             
             view = WelcomeQuickActionsView(target)
             await ctx.send(
-                content=f"🎉 **[TEST PREVIEW] Everyone welcome {target.mention} to {guild.name}!** 🌸✨",
+                content=f"🎉 Welcome **{target_name}** to **{guild.name}**! 🚀",
                 embed=embed,
                 file=card_file,
                 view=view
             )
         except Exception as e:
             await ctx.send(f"❌ Failed to generate preview: {e}")
+
+    @commands.hybrid_command(name="testgoodbye", description="Preview the Grand Royal Farewell & Goodbye Card.")
+    @commands.has_permissions(administrator=True)
+    async def testgoodbye(self, ctx: commands.Context, member: discord.Member = None):
+        target = member or ctx.author
+        guild = ctx.guild
+        member_count = len(guild.members)
+        target_name = target.display_name if target.display_name else target.name
+        
+        await ctx.defer()
+        try:
+            avatar_bytes = await target.display_avatar.with_format("png").with_size(256).read()
+            card_bytes = await asyncio.to_thread(
+                create_grand_goodbye_image,
+                avatar_bytes,
+                target_name,
+                member_count,
+                guild.name
+            )
+            card_file = discord.File(card_bytes, filename="grand_goodbye_preview.png")
+
+            msg_content = f"👋 **{target_name}** has left **{guild.name}** ."
+            await ctx.send(
+                content=msg_content,
+                file=card_file
+            )
+        except Exception as e:
+            await ctx.send(f"❌ Failed to generate goodbye preview: {e}")
 
 
 async def setup(bot: commands.Bot):

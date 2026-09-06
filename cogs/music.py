@@ -605,23 +605,13 @@ class GuildMusicPlayer:
                 if not self.is_restarting_for_filters:
                     self.bot.loop.call_soon_threadsafe(self.play_next_song.set)
 
-            # Ensure voice client is connected before playing (Anchored to ✨ Lo-Fi Chillroom)
+            # Ensure voice client is connected before playing
+            self.voice_client = self.guild.voice_client
             if not self.voice_client or not self.voice_client.is_connected():
-                lofi_vc = discord.utils.get(self.guild.voice_channels, name="✨ Lo-Fi Chillroom") or self.guild.get_channel(1545781986193309789)
-                target_vc = lofi_vc or (self.guild.voice_channels[0] if self.guild.voice_channels else None)
-
-                if target_vc:
-                    try:
-                        await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
-                    except Exception:
-                        pass
-
-                # If still not connected, wait for connection
-                if not self.voice_client or not self.voice_client.is_connected():
-                    self.queue.appendleft(song)
-                    self.current = None
-                    await self.wait_for_voice()
-                    continue
+                self.queue.appendleft(song)
+                self.current = None
+                await self.wait_for_voice()
+                continue
 
             try:
                 # Ensure fresh streaming URL
@@ -681,15 +671,10 @@ class GuildMusicPlayer:
 
     async def wait_for_voice(self):
         while not self.voice_client or not self.voice_client.is_connected():
-            lofi_vc = discord.utils.get(self.guild.voice_channels, name="✨ Lo-Fi Chillroom") or self.guild.get_channel(1545781986193309789)
-            target_vc = lofi_vc or (self.guild.voice_channels[0] if self.guild.voice_channels else None)
-            if target_vc:
-                try:
-                    await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
-                    return
-                except Exception:
-                    pass
-            await asyncio.sleep(1.5)
+            self.voice_client = self.guild.voice_client
+            if self.voice_client and self.voice_client.is_connected():
+                return
+            await asyncio.sleep(1.0)
 
 
 class Music(commands.Cog):
@@ -716,26 +701,52 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx_or_interaction) -> Optional[discord.VoiceClient]:
         """Ensures the bot connects to or moves to the user's active voice channel."""
         guild = ctx_or_interaction.guild
+        if not guild:
+            return None
+
         voice_client = guild.voice_client
 
         author = getattr(ctx_or_interaction, "author", None) or getattr(ctx_or_interaction, "user", None)
         user_vc = getattr(getattr(author, "voice", None), "channel", None)
-        lofi_vc = discord.utils.get(guild.voice_channels, name="✨ Lo-Fi Chillroom") or guild.get_channel(1545781986193309789)
-        target_vc = user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None) or lofi_vc or (guild.voice_channels[0] if guild.voice_channels else None)
+        
+        # Target VC must be the user's voice channel or the bot's current active voice channel
+        target_vc = user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None)
+
 
         if not target_vc:
-            if hasattr(ctx_or_interaction, "send"):
-                await ctx_or_interaction.send("❌ Please join a voice channel first!", ephemeral=True)
+            try:
+                if hasattr(ctx_or_interaction, "send"):
+                    await ctx_or_interaction.send("❌ Please join a voice channel first!", ephemeral=True)
+                elif hasattr(ctx_or_interaction, "response"):
+                    if not ctx_or_interaction.response.is_done():
+                        await ctx_or_interaction.response.send_message("❌ Please join a voice channel first!", ephemeral=True)
+                    else:
+                        await ctx_or_interaction.followup.send("❌ Please join a voice channel first!", ephemeral=True)
+            except Exception:
+                pass
             return None
 
-        # If bot is not connected, connect to target_vc
+        # Clean up any dead/zombie voice_client before connecting
+        if voice_client and not voice_client.is_connected():
+            try:
+                await voice_client.disconnect(force=True)
+            except Exception:
+                pass
+            voice_client = None
+
         if not voice_client or not voice_client.is_connected():
             try:
-                voice_client = await target_vc.connect(timeout=20.0, reconnect=True, self_deaf=True)
+                voice_client = await target_vc.connect(timeout=25.0, reconnect=True, self_deaf=False)
+            except discord.ClientException:
+                voice_client = guild.voice_client
+                if user_vc and voice_client and voice_client.channel != user_vc:
+                    try:
+                        await voice_client.move_to(user_vc)
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[Voice Connect Error] {e}")
                 voice_client = guild.voice_client
-        # If bot is connected elsewhere, move directly to the user's active voice channel!
         elif user_vc and voice_client.channel != user_vc:
             try:
                 await voice_client.move_to(user_vc)
@@ -790,7 +801,7 @@ class Music(commands.Cog):
                 if t.get("thumbnail"):
                     song.thumbnail = t["thumbnail"]
                 
-                is_currently_playing = bool(player.current and player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()))
+                is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
                 player.queue.append(song)
 
                 if is_currently_playing:
@@ -865,7 +876,7 @@ class Music(commands.Cog):
                     return await ctx.interaction.followup.send(f"❌ No results found for query: `{query}`", ephemeral=True)
                 return await ctx.send(f"❌ No results found for query: `{query}`")
 
-            is_currently_playing = bool(player.current and player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()))
+            is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
             player.queue.append(song)
 
             if is_currently_playing:

@@ -25,10 +25,10 @@ BANNER = """
   ██╔══██╗██╔══██║██║    ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██║╚██╗██║██╔══╝  ██║     
   ██║  ██║██║  ██║██║    ███████║███████╗██║ ╚████║   ██║   ██║██║ ╚████║███████╗███████╗
   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝    ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
-           🛡️ AUTOMATED ANTI-RAID • MODERATION SENTINEL • SERVER DEFENDER 🛡️
+           🛡️ AUTOMATED WELCOME • VERIFICATION • TICKETS • SERVER SENTINEL 🛡️
 """
 
-def create_security_bot(use_members: bool = False, use_message_content: bool = False) -> commands.Bot:
+def create_security_bot(use_members: bool = True, use_message_content: bool = True) -> commands.Bot:
     intents = discord.Intents.default()
     intents.guilds = True
     if use_members:
@@ -46,7 +46,7 @@ def create_security_bot(use_members: bool = False, use_message_content: bool = F
 
         activity = discord.Activity(
             type=discord.ActivityType.watching,
-            name="RAI FAM Security & Anti-Raid 🛡️"
+            name="RAI FAM Security • Welcome • Tickets 🛡️"
         )
         await bot.change_presence(status=discord.Status.dnd, activity=activity)
         
@@ -59,32 +59,55 @@ def create_security_bot(use_members: bool = False, use_message_content: bool = F
             except Exception:
                 pass
 
+        # Register Persistent Views for Verification, Tickets and Welcome
         from utils.persistent_views import VerifyButtonView, TicketCreateView, TicketCloseView
-        bot.add_view(VerifyButtonView())
-        bot.add_view(TicketCreateView())
-        bot.add_view(TicketCloseView())
+        from cogs.welcome import WelcomeQuickActionsView
+        for view_cls in [VerifyButtonView, TicketCreateView, TicketCloseView, WelcomeQuickActionsView]:
+            try:
+                bot.add_view(view_cls())
+            except Exception as e:
+                logger.debug(f"View init note: {e}")
 
         try:
+            for guild in bot.guilds:
+                bot.tree.copy_global_to(guild=guild)
+                await bot.tree.sync(guild=guild)
             synced = await bot.tree.sync()
-            logger.info(f"🛡️ Synchronized {len(synced)} Security slash commands.")
+            logger.info(f"🛡️ Synchronized {len(synced)} Security, Welcome & Ticket slash commands.")
         except Exception as e:
             logger.error(f"Failed to sync security commands: {e}")
 
+    @bot.tree.error
+    async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        logger.error(f"Security slash command error: {error}")
+        msg = "❌ An error occurred while executing this command."
+        if isinstance(error, discord.app_commands.MissingPermissions):
+            msg = "❌ You require Staff / Moderator permissions to use this command."
+
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
+
     return bot
 
-async def start_sentinel(token: str, use_members: bool = False, use_message_content: bool = False):
+async def start_sentinel(token: str, use_members: bool = True, use_message_content: bool = True):
     bot = create_security_bot(use_members=use_members, use_message_content=use_message_content)
     
-    # Load only dedicated security, moderation, ticket, and verification modules
+    # Sentinel manages Welcome, Verification, Tickets, and Moderation Defense
     security_extensions = [
-        "cogs.moderation",
+        "cogs.welcome",
         "cogs.verify",
         "cogs.tickets",
+        "cogs.moderation",
     ]
     for ext in security_extensions:
         try:
             await bot.load_extension(ext)
-            logger.info(f"Loaded security module: {ext}")
+            logger.info(f"Loaded Sentinel module: {ext}")
         except Exception as e:
             logger.error(f"Could not load {ext}: {e}")
 
@@ -97,9 +120,13 @@ async def main():
         return
 
     try:
-        await start_sentinel(token, use_members=False, use_message_content=False)
-    except Exception as e:
-        logger.error(f"Sentinel connection error: {e}")
+        await start_sentinel(token, use_members=True, use_message_content=True)
+    except discord.errors.PrivilegedIntentsRequired:
+        logger.warning("[RAI SENTINEL] Privileged Gateway Intents not enabled. Falling back to basic intents.")
+        try:
+            await start_sentinel(token, use_members=False, use_message_content=True)
+        except discord.errors.PrivilegedIntentsRequired:
+            await start_sentinel(token, use_members=False, use_message_content=False)
 
 if __name__ == "__main__":
     try:
