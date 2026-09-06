@@ -336,42 +336,6 @@ class General(commands.Cog):
                     pass
         await ctx.send(f"✅ Cleaned RF tags from **{cleaned}** member(s)!")
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        """Automated 2-hour Disboard bump reminder listener."""
-        if not message.guild:
-            return
-
-        # Disboard Bot ID: 302050872383242240
-        if message.author.id == 302050872383242240:
-            # Check if bump was successful
-            is_bump_success = False
-            for embed in message.embeds:
-                desc = embed.description or ""
-                if "Bump done" in desc or "bump done" in desc or "thumbsup" in desc:
-                    is_bump_success = True
-                    break
-            
-            if "Bump done" in message.content or is_bump_success:
-                bump_chan = message.channel
-                await bump_chan.send("⏱️ **Bump detected!** I will remind you in **2 hours** to bump RAI FAM again! 🚀✨")
-                
-                await asyncio.sleep(7200) # 2 Hours
-                
-                reminder_embed = discord.Embed(
-                    title="🚀 TIME TO BUMP RAI FAM! 🌸",
-                    description=(
-                        "Hey everyone! It's been 2 hours since the last bump.\n\n"
-                        "👉 Type **`/bump`** right now to push **RAI FAM 💗** to the top of the Discord directory!"
-                    ),
-                    color=0x00F5D4
-                )
-                reminder_embed.set_footer(text="Disboard Server Growth Engine • RAI FAM 💗", icon_url=config.RAI_ICON_URL)
-                try:
-                    await bump_chan.send(content="🔔 <@&1545516411659620383> **It's Bump Time!**", embed=reminder_embed)
-                except Exception:
-                    await bump_chan.send(embed=reminder_embed)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(General(bot))
 
