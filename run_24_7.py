@@ -50,6 +50,8 @@ async def run_sentinel(token: str):
                 except Exception as e:
                     logger.error(f"Could not load {ext}: {e}")
             await bot.start(token)
+    except discord.errors.LoginFailure:
+        logger.warning("[RAI SENTINEL] Invalid token in SECURITY_BOT_TOKEN. Skipping Sentinel until a valid token is provided.")
     except discord.errors.PrivilegedIntentsRequired:
         logger.warning("[RAI SENTINEL] Privileged Gateway Intents missing, falling back to basic.")
         bot_fallback = create_security_bot(use_members=False, use_message_content=False)
@@ -60,7 +62,12 @@ async def run_sentinel(token: str):
                     logger.info(f"[RAI SENTINEL] Loaded extension: {ext}")
                 except Exception as e:
                     logger.error(f"Could not load {ext}: {e}")
-            await bot_fallback.start(token)
+            try:
+                await bot_fallback.start(token)
+            except discord.errors.LoginFailure:
+                logger.warning("[RAI SENTINEL] Invalid token in SECURITY_BOT_TOKEN.")
+    except Exception as e:
+        logger.error(f"[RAI SENTINEL] Error: {e}")
 
 async def main():
     token_vibes = os.getenv("DISCORD_BOT_TOKEN")
