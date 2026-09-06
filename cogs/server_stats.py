@@ -14,7 +14,10 @@ class ServerStats(commands.Cog):
     """Live Server Member Statistics Engine with Real-Time Datacenter Sync."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.stats_loop.start()
+
+    async def cog_load(self):
+        if not self.stats_loop.is_running():
+            self.stats_loop.start()
 
     def cog_unload(self):
         self.stats_loop.cancel()
@@ -80,7 +83,9 @@ class ServerStats(commands.Cog):
 
     @stats_loop.before_loop
     async def before_stats(self):
-        await self.bot.wait_until_ready()
+        import asyncio
+        while not self.bot.is_ready():
+            await asyncio.sleep(1)
 
 
 async def setup(bot: commands.Bot):

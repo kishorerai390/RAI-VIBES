@@ -339,7 +339,10 @@ class VoiceHub(commands.Cog):
         self.temp_channels = {}  # channel_id: owner_id
         self.temp_db_path = os.path.join("data", "temp_vcs.json")
         self._load_temp_channels()
-        self.cleanup_temp_channels_task.start()
+
+    async def cog_load(self):
+        if not self.cleanup_temp_channels_task.is_running():
+            self.cleanup_temp_channels_task.start()
 
     def cog_unload(self):
         self.cleanup_temp_channels_task.cancel()
@@ -388,7 +391,9 @@ class VoiceHub(commands.Cog):
 
     @cleanup_temp_channels_task.before_loop
     async def before_cleanup_task(self):
-        await self.bot.wait_until_ready()
+        import asyncio
+        while not self.bot.is_ready():
+            await asyncio.sleep(1)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
