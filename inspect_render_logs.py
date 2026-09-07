@@ -4,8 +4,13 @@ import sys
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-API_KEY = 'rnd_Qn2kLsTdyIyYTEA2fqTJp4EQbutH'
-SVC_ID = 'srv-dadipqn40ujc73bksugg'
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_KEY = os.getenv("RENDER_API_KEY", "")
+SVC_ID = os.getenv("RENDER_SERVICE_ID", "srv-dadipqn40ujc73bksugg")
 HEADERS = {
     'Authorization': f'Bearer {API_KEY}',
     'Accept': 'application/json'
