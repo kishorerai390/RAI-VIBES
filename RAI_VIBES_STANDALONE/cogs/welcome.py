@@ -340,89 +340,10 @@ class Welcome(commands.Cog):
         # 4. Default Welcome Image (Image 1 - The Office Celebration GIF)
         DEFAULT_WELCOME_IMAGE_URL = "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"
 
-        # 5. Send Grand Announcement in Welcome Channel
-        welcome_chan = next((ch for ch in guild.text_channels if "welcome" in ch.name.lower()), None)
-        if not welcome_chan:
-            welcome_chan = discord.utils.get(guild.text_channels, name="general")
+        # 5. Public Welcome Announcement disabled so Koya handles Welcome & Goodbye exclusively
+        # (Auto-role, XP bonus, and stats updates remain active in background)
 
-        if welcome_chan:
-            rules_chan = next((ch for ch in guild.text_channels if "rules" in ch.name.lower()), None)
-            verify_chan = next((ch for ch in guild.text_channels if "verify" in ch.name.lower()), None)
-            roles_chan = next((ch for ch in guild.text_channels if "role" in ch.name.lower()), None)
-            gen_chan = next((ch for ch in guild.text_channels if "general" in ch.name.lower()), None)
-            gaming_chan = next((ch for ch in guild.text_channels if "gaming" in ch.name.lower()), None)
-            fun_vc = next((vc for vc in guild.voice_channels if "fun" in vc.name.lower()), None)
-            lofi_vc = next((vc for vc in guild.voice_channels if "lo-fi" in vc.name.lower() or "lofi" in vc.name.lower()), None)
-
-            rules_ref = rules_chan.mention if rules_chan else "#rules"
-            verify_ref = verify_chan.mention if verify_chan else "#verify"
-            roles_ref = roles_chan.mention if roles_chan else "#self-roles"
-            gen_ref = gen_chan.mention if gen_chan else "#general"
-            gaming_ref = gaming_chan.mention if gaming_chan else "#gaming-chat"
-            fun_ref = fun_vc.mention if fun_vc else "🐣 ┊ Fun Time"
-            lofi_ref = lofi_vc.mention if lofi_vc else "🌧️ ┊ Lo-Fi Chill"
-
-            embed = discord.Embed(
-                title=f"🌸 {guild.name.upper()} !",
-                description=(
-                    f"**HEY BUDDY!** **{member.display_name}** ({member.mention})\n\n"
-                    f"**Welcome To {guild.name} !**\n"
-                    f"**Get started with below:** {rules_ref}\n\n"
-                    f"**Follow The Server Guidelines:** {rules_ref}\n\n"
-                    f"**Verify For Full Access:** {verify_ref}\n\n"
-                    f"**Claim Your Roles:** {roles_ref}\n\n"
-                    f"**Fun With Us:** {fun_ref}\n\n"
-                    f"**Gaming Zone:** {gaming_ref}\n\n"
-                    f"**24/7 Lo-Fi & Beats:** {lofi_ref}\n\n"
-                    f"**Join And Chill With Us!:** {gen_ref}\n\n"
-                    f"**Thanks For Joining. Hope You Have A Great Time Here!**"
-                ),
-                color=0xFF69B4  # Vibrant Sakura Pink
-            )
-            embed.set_author(name=f"{guild.name}", icon_url=guild.icon.url if guild.icon else None)
-            embed.set_thumbnail(url=member.display_avatar.url)
-            embed.set_footer(text=f"Member #{member_count} • User ID: {member.id} • RAI FAM Luxury Welcome 💗", icon_url=guild.icon.url if guild.icon else None)
-            embed.set_image(url=DEFAULT_WELCOME_IMAGE_URL)
-
-            view = WelcomeQuickActionsView(member)
-            try:
-                user_name = member.display_name if member.display_name else member.name
-                welcome_text = f"🎉 Welcome **{user_name}** ({member.mention}) to **{guild.name}**! 🚀"
-                await welcome_chan.send(
-                    content=welcome_text,
-                    embed=embed,
-                    view=view
-                )
-            except Exception as e:
-                logger.error(f"Failed to send grand welcome message: {e}")
-
-        # 6. Send Royal Direct Message (DM) Onboarding Letter
-        if not member.bot:
-            try:
-                dm_embed = discord.Embed(
-                    title=f"🌸 Welcome to {guild.name}, {member.display_name}! 💗",
-                    description=(
-                        f"Hey **{member.name}**, thank you for joining **{guild.name}**!\n\n"
-                        f"We are delighted to have you with us. Here is your quick VIP starter kit:\n\n"
-                        f"✨ **Granted Role:** `🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘`\n"
-                        f"🪙 **Bonus Received:** `+100 Coins` & `+50 XP`\n\n"
-                        f"**🎵 Music & Radio:**\n"
-                        f"• Use `/play <song name>` to stream high-fidelity music.\n"
-                        f"• Use `/radio` for 24/7 non-stop lofi, Tamil, and EDM stations.\n"
-                        f"• Use `/musicquiz` to challenge friends in audio trivia!\n\n"
-                        f"**🍿 Cinema & Gaming:**\n"
-                        f"• Join our Cinema Lounge for weekly watch parties.\n"
-                        f"• Join dynamic voice rooms to hang out with friends!\n\n"
-                        f"Have an awesome time, and don't hesitate to ask our Staff team if you need anything! 🌸✨"
-                    ),
-                    color=config.COLOR_PRIMARY
-                )
-                dm_embed.set_thumbnail(url=guild.icon.url if guild.icon else config.RAI_ICON_URL)
-                dm_embed.set_footer(text="RAI VIBES 💗 • Music & Community Bot", icon_url=config.RAI_ICON_URL)
-                await member.send(embed=dm_embed)
-            except Exception:
-                # User has DMs closed
-                pass
+        # 6. Welcome DM disabled to avoid spamming member inboxes
 
         # 7. Anti-Alt Account Check
         now_dt = discord.utils.utcnow()
@@ -503,29 +424,7 @@ class Welcome(commands.Cog):
         except Exception as e:
             logger.warning(f"Could not generate goodbye card for {member.name}: {e}")
 
-        # 3. Post Goodbye Announcement in Dedicated Goodbye Channel
-        goodbye_chan = (
-            guild.get_channel(1546122222329008199) or
-            discord.utils.get(guild.text_channels, name="👋・good-bye") or
-            discord.utils.get(guild.text_channels, name="good-bye") or
-            discord.utils.get(guild.text_channels, name="goodbye")
-        )
-
-        if goodbye_chan:
-            user_display = member.display_name if member.display_name else member.name
-            msg_content = f"👋 **{user_display}** has left **{guild.name}** ."
-            try:
-                if card_file:
-                    await goodbye_chan.send(
-                        content=msg_content,
-                        file=card_file
-                    )
-                else:
-                    await goodbye_chan.send(
-                        content=msg_content
-                    )
-            except Exception as e:
-                logger.error(f"Failed to send goodbye announcement: {e}")
+        # 3. Public Goodbye channel spam disabled to keep chat clean
 
         # 4. Mod Log Record
         log_chan = discord.utils.get(guild.text_channels, name="📋・mod-logs")
