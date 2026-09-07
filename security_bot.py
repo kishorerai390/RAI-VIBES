@@ -80,11 +80,12 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
                 logger.debug(f"[RAI SENTINEL] Banner update notice: {e}")
 
         try:
+            # Clear duplicate guild-scoped commands so each command only appears once (globally)
             for guild in bot.guilds:
-                bot.tree.copy_global_to(guild=guild)
+                bot.tree.clear_commands(guild=guild)
                 await bot.tree.sync(guild=guild)
             synced = await bot.tree.sync()
-            logger.info(f"🛡️ Synchronized {len(synced)} Security, Welcome & Ticket slash commands.")
+            logger.info(f"🛡️ Synchronized {len(synced)} clean Security slash commands (duplicates purged).")
         except Exception as e:
             logger.error(f"Failed to sync security commands: {e}")
 

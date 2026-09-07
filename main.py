@@ -113,12 +113,12 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
 
         # Synchronize slash commands directly to each guild for instant updates
         try:
+            # Purge duplicate guild-scoped commands so each command only appears once (globally)
             for guild in b.guilds:
-                b.tree.copy_global_to(guild=guild)
-                synced_guild = await b.tree.sync(guild=guild)
-                logger.info(f"✨ Successfully synchronized {len(synced_guild)} dedicated Music & Vibe slash commands to '{guild.name}'!")
+                b.tree.clear_commands(guild=guild)
+                await b.tree.sync(guild=guild)
             synced = await b.tree.sync()
-            logger.info(f"✨ Global slash commands tree synchronized ({len(synced)} commands).")
+            logger.info(f"✨ Synchronized {len(synced)} clean Music slash commands (duplicates purged).")
         except Exception as e:
             logger.error(f"Failed to synchronize slash commands: {e}")
 
