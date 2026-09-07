@@ -5,6 +5,7 @@ import logging
 import re
 import os
 import json
+import unicodedata
 from typing import Optional
 
 import config
@@ -400,9 +401,11 @@ class VoiceHub(commands.Cog):
         guild = member.guild
 
         # 1. User Joined a "Join to Create" / Chamber generator channel
-        if after.channel and ("join to create" in after.channel.name.lower() or "➕" in after.channel.name or "chamber" in after.channel.name.lower()):
-            category = after.channel.category
-            ch_name_lower = after.channel.name.lower()
+        if after.channel:
+            norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
+            if "join to create" in norm_name or "create" in norm_name or "➕" in after.channel.name or "chamber" in norm_name:
+                category = after.channel.category
+                ch_name_lower = norm_name
 
             # Determine initial user limit based on chamber name
             initial_limit = 0

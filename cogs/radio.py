@@ -1,6 +1,7 @@
 import asyncio
+import unicodedata
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 from typing import Optional, Literal
 
@@ -67,6 +68,29 @@ class Radio(commands.Cog):
     """24/7 Live Radio Stations, Tamil Nadu FM & Voice Channel Stay Mode."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.auto_stay_247_task.start()
+
+    def cog_unload(self):
+        self.auto_stay_247_task.cancel()
+
+    @tasks.loop(minutes=2)
+    async def auto_stay_247_task(self):
+        """Ensures RAI VIBES stays 24/7 inside the lo-fi voice channel streaming chill lo-fi beats."""
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            for vc in guild.voice_channels:
+                norm_name = unicodedata.normalize('NFKD', vc.name).lower()
+                if "lo-fi" in norm_name or "lofi" in norm_name:
+                    if not guild.voice_client or guild.voice_client.channel != vc or not guild.voice_client.is_playing():
+                        try:
+                            print(f"[Radio 24/7] Auto-connecting to {vc.name} in {guild.name}...")
+                            await self.start_radio_in_channel(vc, station_key="tamil_lofi")
+                        except Exception as e:
+                            print(f"[Radio 24/7 Auto-Stay Notice] {e}")
+
+    @auto_stay_247_task.before_loop
+    async def before_auto_stay_task(self):
+        await self.bot.wait_until_ready()
 
     async def start_radio_in_channel(self, channel: discord.VoiceChannel, station_key: str = "tamilnadu_fm", requester: Optional[discord.Member] = None):
         """Connects to a voice channel and starts streaming 24/7 Tamil Nadu FM radio continuously."""
@@ -138,12 +162,14 @@ class Radio(commands.Cog):
         if member.bot:
             return
 
-        if after.channel and ("24-7" in after.channel.name.lower() or "radio" in after.channel.name.lower() or "lo-fi" in after.channel.name.lower()):
-            guild = after.channel.guild
-            voice_client = guild.voice_client
-            if not voice_client or voice_client.channel != after.channel or not voice_client.is_playing():
-                print(f"[Radio] Member {member.name} joined {after.channel.name}, starting Tamil Nadu FM...")
-                await self.start_radio_in_channel(after.channel, "tamilnadu_fm", requester=member)
+        if after.channel:
+            norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
+            if "24-7" in norm_name or "radio" in norm_name or "lo-fi" in norm_name or "lofi" in norm_name:
+                guild = after.channel.guild
+                voice_client = guild.voice_client
+                if not voice_client or voice_client.channel != after.channel or not voice_client.is_playing():
+                    print(f"[Radio] Member {member.name} joined {after.channel.name}, starting Tamil Nadu FM...")
+                    await self.start_radio_in_channel(after.channel, "tamil_lofi" if "lo" in norm_name else "tamilnadu_fm", requester=member)
 
     @commands.hybrid_command(name="tamilnadufm", description="Stream 24/7 Live Tamil Nadu FM Radio non-stop!")
     async def tamilnadufm(self, ctx: commands.Context):

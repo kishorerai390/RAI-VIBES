@@ -57,39 +57,36 @@ class VerifyButtonView(View):
         if not guild:
             return await interaction.followup.send("❌ Server error.", ephemeral=True)
 
-        # 2. Find Verified Member / RAI FAMILY Role with NFKD Unicode normalization
-        verified_role = None
-        for r in guild.roles:
-            norm_name = unicodedata.normalize('NFKD', r.name).upper()
-            if "RAI FAMILY" in norm_name or "FAMILY" in norm_name or "VERIFIED" in norm_name:
-                verified_role = r
-                break
+        role_rai = discord.utils.get(guild.roles, id=1545494584203673740) or discord.utils.get(guild.roles, name="🌸 ✧ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘")
+        role_ver = discord.utils.get(guild.roles, id=1546540194310782976) or discord.utils.get(guild.roles, name="Verified")
 
-        if not verified_role:
-            verified_role = discord.utils.get(guild.roles, id=1545494584203673740)
+        member = interaction.user
+        if isinstance(member, discord.User):
+            member = await guild.fetch_member(interaction.user.id)
+
+        roles_to_add = []
+        if role_rai and role_rai not in member.roles:
+            roles_to_add.append(role_rai)
+        if role_ver and role_ver not in member.roles:
+            roles_to_add.append(role_ver)
 
         # 3. Check if already verified
-        if verified_role and verified_role in interaction.user.roles:
+        if not roles_to_add and (role_rai in member.roles or role_ver in member.roles):
             return await interaction.followup.send(
                 "✨ **You are already verified!** All community channels & voice lounges are open to you. 🌸 Enjoy your stay!",
                 ephemeral=True
             )
 
-        if verified_role:
+        if roles_to_add:
             try:
-                # Add role to user
-                member = interaction.user
-                if isinstance(member, discord.User):
-                    member = await guild.fetch_member(interaction.user.id)
-
-                await member.add_roles(verified_role, reason="Passed Verification Gate")
+                await member.add_roles(*roles_to_add, reason="Passed Verification Gate")
                 award_welcome_bonus(str(interaction.user.id))
 
                 embed = discord.Embed(
                     title="🎉 VERIFICATION SUCCESSFUL!",
                     description=(
                         f"Welcome to **{guild.name}**, {interaction.user.mention}! 💗\n\n"
-                        f"✅ Role Granted: {verified_role.mention}\n"
+                        f"✅ Roles Granted: {', '.join(r.mention for r in roles_to_add)}\n"
                         f"🎁 Starter Bonus: **+100 Coins** & **+50 XP**\n"
                         f"🔓 **All server channels & voice lounges are now unlocked!**\n\n"
                         f"Head over to <#1545502730699808768> (General Chat) and say hello! 🌸"
@@ -100,7 +97,7 @@ class VerifyButtonView(View):
                 embed.set_footer(text="RAI FAM 💗 • Verified Member", icon_url=guild.icon.url if guild.icon else None)
 
                 await interaction.followup.send(embed=embed, ephemeral=True)
-                logger.info(f"Verified {interaction.user.name} ({interaction.user.id}) and granted {verified_role.name}")
+                logger.info(f"Verified {interaction.user.name} ({interaction.user.id}) and granted {[r.name for r in roles_to_add]}")
             except Exception as e:
                 logger.error(f"Error granting role to {interaction.user.id}: {e}")
                 await interaction.followup.send(f"❌ Failed to assign member role: {e}", ephemeral=True)
