@@ -303,6 +303,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.soundboard",
         "cogs.dj",
         "cogs.server_stats",
+        "cogs.leveling",
     ]
 
     for extension in initial_extensions:

@@ -396,6 +396,28 @@ class VoiceHub(commands.Cog):
         while not self.bot.is_ready():
             await asyncio.sleep(1)
 
+    @app_commands.command(name="voicepanel", description="Display the interactive Voice Room Controls dashboard.")
+    async def voicepanel_command(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🎛️ Voice Room Controls Dashboard",
+            description=(
+                "Use the interactive buttons below to manage your temporary voice room:\n\n"
+                "• 🔒 **Lock** / 🔓 **Unlock**: Toggle public access\n"
+                "• 🏷️ **Rename**: Change room title\n"
+                "• 👥 **Limit**: Set maximum player capacity (0–99)\n"
+                "• 👻 **Ghost (Hide)**: Make room invisible to everyone except friends\n"
+                "• ✉️ **Permit**: Choose squadmates to reveal and invite into your room\n"
+                "• 🚫 **Revoke**: Eject users and re-hide channel\n"
+                "• 👢 **Kick**: Instantly disconnect someone from your room\n"
+                "• 👑 **Transfer Host**: Pass room ownership to a squadmate\n"
+                "• 💬 **Status**: Set customized activity text\n\n"
+                "*Note: You must be inside your voice channel to use these controls.*"
+            ),
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Dynamic Voice Hub", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed, view=VoiceControlView())
+
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         guild = member.guild

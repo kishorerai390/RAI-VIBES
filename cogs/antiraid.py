@@ -102,6 +102,66 @@ class AntiRaid(commands.Cog):
             except Exception:
                 pass
 
+        # 3. Account Age Shield (Anti-Alt Detection)
+        account_age_hours = (discord.utils.utcnow() - member.created_at).total_seconds() / 3600
+        if account_age_hours < 48:
+            log_channel = await self.get_log_channel(guild, settings)
+            if log_channel:
+                alt_embed = discord.Embed(
+                    title="⚠️ ANTI-ALT SHIELD • SUSPICIOUS ACCOUNT DETECTED",
+                    description=(
+                        f"**New member joined with a very recently created Discord account!**\n\n"
+                        f"• **User:** {member.mention} (`{member.name}` • ID: `{member.id}`)\n"
+                        f"• **Account Age:** `{account_age_hours:.1f} hours` (< 48h limit)\n"
+                        f"• **Created At:** <t:{int(member.created_at.timestamp())}:R>\n"
+                        f"• **Action Taken:** Flagged for surveillance / Requires standard verification"
+                    ),
+                    color=0xFFAA00
+                )
+                alt_embed.set_thumbnail(url=member.display_avatar.url)
+                alt_embed.set_footer(text="RAI SENTINEL 🛡️ Autonomous Server Defense Engine")
+                alt_embed.timestamp = discord.utils.utcnow()
+                try:
+                    await log_channel.send(embed=alt_embed, delete_after=120)
+                except Exception:
+                    pass
+
+    # -------------------------------------------------------------
+    # 2. ANTI-GHOSTPING INTERCEPTION
+    # -------------------------------------------------------------
+    @commands.Cog.listener()
+    async def on_message_delete(self, message: discord.Message):
+        if not message.guild or message.author.bot:
+            return
+
+        user_mentions = [m for m in message.mentions if not m.bot and m.id != message.author.id]
+        role_mentions = [r for r in message.role_mentions]
+
+        if not user_mentions and not role_mentions:
+            return
+
+        settings = await database.get_guild_settings(message.guild.id)
+        log_channel = await self.get_log_channel(message.guild, settings)
+        if log_channel:
+            all_mentions = [m.mention for m in user_mentions] + [r.mention for r in role_mentions]
+            embed = discord.Embed(
+                title="👻 GHOST-PING INTERCEPTED",
+                description=(
+                    f"A deleted message contained targeted mentions!\n\n"
+                    f"• **Offender:** {message.author.mention} (`{message.author.name}` • ID: `{message.author.id}`)\n"
+                    f"• **Channel:** {message.channel.mention}\n"
+                    f"• **Mentioned Target(s):** {', '.join(all_mentions)}\n"
+                    f"• **Deleted Message:** {message.content[:400] if message.content else '*No text content*'}"
+                ),
+                color=0xFF5500
+            )
+            embed.set_footer(text="RAI SENTINEL 🛡️ Ghost-Ping Surveillance")
+            embed.timestamp = discord.utils.utcnow()
+            try:
+                await log_channel.send(embed=embed, delete_after=90)
+            except Exception:
+                pass
+
     @app_commands.command(name="raidmode", description="Turn server-wide Raid Protection Mode ON or OFF.")
     @app_commands.describe(status="Choose whether Raid Mode is ON or OFF")
     @app_commands.choices(status=[

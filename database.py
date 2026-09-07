@@ -116,6 +116,18 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_levels (
+                guild_id INTEGER,
+                user_id INTEGER,
+                xp INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 0,
+                messages_count INTEGER DEFAULT 0,
+                last_xp_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, user_id)
+            )
+        """)
+
         await db.commit()
 
 async def save_channel_snapshot(guild_id: int, channel: discord.abc.GuildChannel):
@@ -180,7 +192,7 @@ async def update_guild_setting(guild_id: int, key: str, value: Any):
         await db.commit()
 
 async def is_whitelisted(guild: discord.Guild, member_or_user: Union[discord.Member, discord.User, int]) -> bool:
-    """Check if member/user is Server Owner or explicitly whitelisted."""
+    # Check if member/user is Server Owner or explicitly whitelisted.
     user_id = member_or_user.id if hasattr(member_or_user, "id") else member_or_user
     if user_id == guild.owner_id:
         return True
@@ -295,3 +307,83 @@ async def record_security_event(guild_id: int, event_type: str, details: str, se
             (guild_id, event_type, details, severity)
         )
         await db.commit()
+
+# -------------------------------------------------------------
+# LEVELING & XP SYSTEM
+# -------------------------------------------------------------
+def calculate_level(xp: int) -> int:
+    if xp <= 0:
+        return 0
+    return int((xp / 100) ** 0.5)
+
+def xp_for_level(level: int) -> int:
+    return (level ** 2) * 100
+
+async def add_user_xp(guild_id: int, user_id: int, xp_to_add: int) -> tuple:
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT xp, level, messages_count FROM user_levels WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id)
+        )
+        row = await cursor.fetchone()
+        if row:
+            curr_xp, curr_lvl, msg_count = row[0], row[1], row[2]
+            new_xp = curr_xp + xp_to_add
+            new_lvl = calculate_level(new_xp)
+            leveled_up = new_lvl > curr_lvl
+            await db.execute(
+                "UPDATE user_levels SET xp = ?, level = ?, messages_count = messages_count + 1, last_xp_time = CURRENT_TIMESTAMP WHERE guild_id = ? AND user_id = ?",
+                (new_xp, new_lvl, guild_id, user_id)
+            )
+        else:
+            new_xp = xp_to_add
+            new_lvl = calculate_level(new_xp)
+            leveled_up = new_lvl > 0
+            await db.execute(
+                "INSERT INTO user_levels (guild_id, user_id, xp, level, messages_count) VALUES (?, ?, ?, ?, 1)",
+                (guild_id, user_id, new_xp, new_lvl)
+            )
+        await db.commit()
+        return (new_xp, new_lvl, leveled_up)
+
+async def get_user_level_data(guild_id: int, user_id: int) -> dict:
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT xp, level, messages_count FROM user_levels WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id)
+        )
+        row = await cur.fetchone()
+        if not row:
+            return {"xp": 0, "level": 0, "messages_count": 0, "rank": 1, "next_level_xp": 100, "current_level_base_xp": 0}
+
+        xp, level, msg_count = row[0], row[1], row[2]
+        rank_cur = await db.execute(
+            "SELECT COUNT(*) FROM user_levels WHERE guild_id = ? AND xp > ?",
+            (guild_id, xp)
+        )
+        rank_row = await rank_cur.fetchone()
+        rank = (rank_row[0] if rank_row else 0) + 1
+
+        next_level_xp = xp_for_level(level + 1)
+        return {
+            "xp": xp,
+            "level": level,
+            "messages_count": msg_count,
+            "rank": rank,
+            "next_level_xp": next_level_xp,
+            "current_level_base_xp": xp_for_level(level)
+        }
+
+async def get_leaderboard(guild_id: int, limit: int = 10) -> list:
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT user_id, xp, level, messages_count FROM user_levels WHERE guild_id = ? ORDER BY xp DESC LIMIT ?",
+            (guild_id, limit)
+        )
+        rows = await cur.fetchall()
+        return [
+            {"user_id": r[0], "xp": r[1], "level": r[2], "messages_count": r[3], "rank": idx + 1}
+            for idx, r in enumerate(rows)
+        ]
+
+
