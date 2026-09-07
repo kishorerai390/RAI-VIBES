@@ -9,13 +9,13 @@ if hasattr(sys.stdout, "reconfigure"):
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ZIP = BASE_DIR / "rai_fam_cloud_bot.zip"
 
-# Strict runtime whitelist for Discloud 24/7 Hosting
+# Strict runtime whitelist for Discloud 24/7 Hosting (NEVER include real .env)
 CORE_ROOT_FILES = {
     "run_24_7.py",
     "main.py",
     "security_bot.py",
     "config.py",
-    ".env",
+    ".env.example",
     "discloud.config",
     "requirements.txt",
     "README.md"

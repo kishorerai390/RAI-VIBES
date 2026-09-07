@@ -18,6 +18,14 @@ bin/ffprobe.exe
 *.exe
 *.dll
 
+# Archives & Cloud packages
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
 # Logs & scratch data
 *.log
 scratch/
