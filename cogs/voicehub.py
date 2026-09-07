@@ -6,7 +6,9 @@ import re
 import os
 import json
 import unicodedata
-from typing import Optional
+import asyncio
+import time
+from typing import Optional, Dict
 
 import config
 
@@ -334,11 +336,13 @@ class VoiceHub(commands.Cog):
     """Dynamic Join-to-Create temporary private voice channels with interactive Ghost & Permission controls."""
     TEMP_PREFIXES = ("🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ")
     TEMP_SUFFIXES = ("'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man")
+    INACTIVITY_GRACE_SECONDS = 60  # Auto-delete empty temporary voice rooms after 60 seconds of inactivity
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.temp_channels = {}  # channel_id: owner_id
         self.temp_db_path = os.path.join("data", "temp_vcs.json")
+        self.deletion_tasks: Dict[int, asyncio.Task] = {}
         self._load_temp_channels()
 
     async def cog_load(self):
@@ -347,6 +351,9 @@ class VoiceHub(commands.Cog):
 
     def cog_unload(self):
         self.cleanup_temp_channels_task.cancel()
+        for task in self.deletion_tasks.values():
+            task.cancel()
+        self.deletion_tasks.clear()
 
     def _load_temp_channels(self):
         try:
@@ -366,6 +373,8 @@ class VoiceHub(commands.Cog):
             logger.warning(f"Could not save temp channels: {e}")
 
     def is_temporary_channel(self, channel: discord.VoiceChannel) -> bool:
+        if not channel or not isinstance(channel, discord.VoiceChannel):
+            return False
         if channel.id in self.temp_channels:
             return True
         # Also check name patterns in case bot restarted
@@ -374,21 +383,63 @@ class VoiceHub(commands.Cog):
             return True
         return False
 
+    def schedule_inactivity_deletion(self, channel: discord.VoiceChannel, delay: int = INACTIVITY_GRACE_SECONDS):
+        """Schedules a temporary voice channel for deletion after a period of inactivity."""
+        existing_task = self.deletion_tasks.get(channel.id)
+        if existing_task and not existing_task.done():
+            return  # Already scheduled and counting down
+
+        async def _delayed_delete():
+            try:
+                logger.info(f"Temporary VC '{channel.name}' (ID: {channel.id}) is inactive/empty. Scheduled auto-deletion in {delay}s.")
+                try:
+                    embed = discord.Embed(
+                        title="⏳ Inactivity Notice",
+                        description=(
+                            f"This voice room is now empty.\n"
+                            f"It will be **automatically deleted in {delay} seconds** unless someone rejoins!"
+                        ),
+                        color=discord.Color.gold()
+                    )
+                    await channel.send(embed=embed, delete_after=delay)
+                except Exception:
+                    pass
+
+                await asyncio.sleep(delay)
+
+                # Fetch fresh channel state from bot cache/API
+                ch = self.bot.get_channel(channel.id)
+                if ch and isinstance(ch, discord.VoiceChannel):
+                    if len(ch.members) == 0:
+                        if ch.id in self.temp_channels:
+                            del self.temp_channels[ch.id]
+                            self._save_temp_channels()
+                        await ch.delete(reason=f"Temporary voice channel inactive for {delay} seconds.")
+                        logger.info(f"Auto-deleted inactive temp voice channel '{ch.name}' (ID: {channel.id})")
+                    else:
+                        logger.info(f"Temporary VC '{ch.name}' is no longer empty; cancelling auto-deletion.")
+            except asyncio.CancelledError:
+                logger.info(f"Auto-deletion cancelled for '{channel.name}' (ID: {channel.id}) - member rejoined.")
+            except discord.NotFound:
+                if channel.id in self.temp_channels:
+                    del self.temp_channels[channel.id]
+                    self._save_temp_channels()
+            except Exception as e:
+                logger.error(f"Error during delayed deletion of temp channel {channel.id}: {e}")
+            finally:
+                self.deletion_tasks.pop(channel.id, None)
+
+        self.deletion_tasks[channel.id] = asyncio.create_task(_delayed_delete())
+
     @tasks.loop(seconds=30)
     async def cleanup_temp_channels_task(self):
-        """Periodically scans for and deletes any empty temporary voice channels."""
+        """Periodically scans for and schedules deletion for any empty temporary voice channels."""
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
             for channel in guild.voice_channels:
                 if self.is_temporary_channel(channel) and len(channel.members) == 0:
-                    try:
-                        if channel.id in self.temp_channels:
-                            del self.temp_channels[channel.id]
-                            self._save_temp_channels()
-                        await channel.delete(reason="Periodic cleanup: temporary voice room was empty.")
-                        logger.info(f"Swept & deleted empty temp voice channel '{channel.name}' in {guild.name}")
-                    except Exception as e:
-                        logger.debug(f"Failed to delete channel {channel.name}: {e}")
+                    if channel.id not in self.deletion_tasks or self.deletion_tasks[channel.id].done():
+                        self.schedule_inactivity_deletion(channel, delay=self.INACTIVITY_GRACE_SECONDS)
 
     @cleanup_temp_channels_task.before_loop
     async def before_cleanup_task(self):
@@ -422,90 +473,99 @@ class VoiceHub(commands.Cog):
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         guild = member.guild
 
-        # 1. User Joined a "Join to Create" / Chamber generator channel
+        # 1. Member joined/rejoined an existing temporary voice room that was counting down to auto-delete
+        if after.channel and self.is_temporary_channel(after.channel):
+            if after.channel.id in self.deletion_tasks:
+                task = self.deletion_tasks.pop(after.channel.id)
+                task.cancel()
+                logger.info(f"Cancelled auto-deletion for '{after.channel.name}' because {member.display_name} joined.")
+                try:
+                    embed = discord.Embed(
+                        title="✨ Voice Room Active",
+                        description=f"Welcome back, {member.mention}! Scheduled room auto-deletion has been cancelled.",
+                        color=discord.Color.green()
+                    )
+                    await after.channel.send(embed=embed, delete_after=10)
+                except Exception:
+                    pass
+
+        # 2. User Joined a "Join to Create" / Chamber generator channel
         if after.channel:
             norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
             if "join to create" in norm_name or "create" in norm_name or "➕" in after.channel.name or "chamber" in norm_name:
                 category = after.channel.category
                 ch_name_lower = norm_name
 
-            # Determine initial user limit based on chamber name
-            initial_limit = 0
-            if "solo" in ch_name_lower or "limit 1" in ch_name_lower:
-                initial_limit = 1
-                room_name = f"👤 {member.display_name}'s Solo"
-            elif "duo" in ch_name_lower or "limit 2" in ch_name_lower:
-                initial_limit = 2
-                room_name = f"👥 {member.display_name}'s Duo"
-            elif "trio" in ch_name_lower or "limit 3" in ch_name_lower:
-                initial_limit = 3
-                room_name = f"🔺 {member.display_name}'s Trio"
-            elif "squad" in ch_name_lower or "limit 4" in ch_name_lower:
-                initial_limit = 4
-                room_name = f"🛡️ {member.display_name}'s Squad"
-            elif "5-man" in ch_name_lower or "limit 5" in ch_name_lower:
-                initial_limit = 5
-                room_name = f"⭐ {member.display_name}'s 5-Man"
-            elif "6-man" in ch_name_lower or "limit 6" in ch_name_lower:
-                initial_limit = 6
-                room_name = f"🌟 {member.display_name}'s 6-Man"
-            else:
-                room_name = f"🎧 {member.display_name}'s Lounge"
+                # Determine initial user limit based on chamber name
+                initial_limit = 0
+                if "solo" in ch_name_lower or "limit 1" in ch_name_lower:
+                    initial_limit = 1
+                    room_name = f"👤 {member.display_name}'s Solo"
+                elif "duo" in ch_name_lower or "limit 2" in ch_name_lower:
+                    initial_limit = 2
+                    room_name = f"👥 {member.display_name}'s Duo"
+                elif "trio" in ch_name_lower or "limit 3" in ch_name_lower:
+                    initial_limit = 3
+                    room_name = f"🔺 {member.display_name}'s Trio"
+                elif "squad" in ch_name_lower or "limit 4" in ch_name_lower:
+                    initial_limit = 4
+                    room_name = f"🛡️ {member.display_name}'s Squad"
+                elif "5-man" in ch_name_lower or "limit 5" in ch_name_lower:
+                    initial_limit = 5
+                    room_name = f"⭐ {member.display_name}'s 5-Man"
+                elif "6-man" in ch_name_lower or "limit 6" in ch_name_lower:
+                    initial_limit = 6
+                    room_name = f"🌟 {member.display_name}'s 6-Man"
+                else:
+                    room_name = f"🎧 {member.display_name}'s Lounge"
 
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(connect=True, speak=True),
-                member: discord.PermissionOverwrite(connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
-            }
+                overwrites = {
+                    guild.default_role: discord.PermissionOverwrite(connect=True, speak=True),
+                    member: discord.PermissionOverwrite(connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
+                }
 
-            try:
-                temp_vc = await guild.create_voice_channel(
-                    name=room_name,
-                    category=category,
-                    user_limit=initial_limit,
-                    bitrate=after.channel.bitrate,
-                    overwrites=overwrites,
-                    reason=f"Join-to-Create Voice Room for {member.name}"
-                )
-                self.temp_channels[temp_vc.id] = member.id
-                self._save_temp_channels()
-                await member.move_to(temp_vc)
-                logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}) for {member.name}")
-
-                # Send interactive control dashboard in text-in-voice
-                embed = discord.Embed(
-                    title=f"🎛️ Voice Room Controls • {member.display_name}",
-                    description=(
-                        f"Welcome to your private voice channel, {member.mention}!\n\n"
-                        f"Use the buttons below to customize and secure your room:\n"
-                        f"• 🔒 **Lock / 🔓 Unlock**: Control who can enter\n"
-                        f"• 🏷️ **Rename**: Customize room title\n"
-                        f"• 👥 **Limit**: Set max member count\n"
-                        f"• 👻 **Ghost (Hide)**: Hide room so only you & permitted friends can see it\n"
-                        f"• ✉️ **Permit / Invite**: Pick members to reveal this hidden channel to\n"
-                        f"• 🚫 **Revoke**: Remove access & hide room from members\n\n"
-                        f"*This room will automatically delete when everyone leaves.*"
-                    ),
-                    color=config.COLOR_PRIMARY
-                )
-                embed.set_footer(text="RAI VIBES 💗 • Dynamic Voice Hub", icon_url=config.RAI_ICON_URL)
-                
-                view = VoiceControlView()
-                await temp_vc.send(content=member.mention, embed=embed, view=view)
-
-            except Exception as e:
-                logger.error(f"Failed to create temp voice channel: {e}")
-
-        # 2. User Left a temporary voice channel -> Delete if empty
-        if before.channel and self.is_temporary_channel(before.channel):
-            if len(before.channel.members) == 0:
-                if before.channel.id in self.temp_channels:
-                    del self.temp_channels[before.channel.id]
-                    self._save_temp_channels()
                 try:
-                    await before.channel.delete(reason="Temporary voice channel is empty.")
-                    logger.info(f"Deleted empty temp voice channel '{before.channel.name}'")
+                    temp_vc = await guild.create_voice_channel(
+                        name=room_name,
+                        category=category,
+                        user_limit=initial_limit,
+                        bitrate=after.channel.bitrate,
+                        overwrites=overwrites,
+                        reason=f"Join-to-Create Voice Room for {member.name}"
+                    )
+                    self.temp_channels[temp_vc.id] = member.id
+                    self._save_temp_channels()
+                    await member.move_to(temp_vc)
+                    logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}) for {member.name}")
+
+                    # Send interactive control dashboard in text-in-voice
+                    embed = discord.Embed(
+                        title=f"🎛️ Voice Room Controls • {member.display_name}",
+                        description=(
+                            f"Welcome to your private voice channel, {member.mention}!\n\n"
+                            f"Use the buttons below to customize and secure your room:\n"
+                            f"• 🔒 **Lock / 🔓 Unlock**: Control who can enter\n"
+                            f"• 🏷️ **Rename**: Customize room title\n"
+                            f"• 👥 **Limit**: Set max member count\n"
+                            f"• 👻 **Ghost (Hide)**: Hide room so only you & permitted friends can see it\n"
+                            f"• ✉️ **Permit / Invite**: Pick members to reveal this hidden channel to\n"
+                            f"• 🚫 **Revoke**: Remove access & hide room from members\n\n"
+                            f"*This room will automatically delete after {self.INACTIVITY_GRACE_SECONDS} seconds of inactivity once everyone leaves.*"
+                        ),
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_footer(text="RAI VIBES 💗 • Dynamic Voice Hub", icon_url=config.RAI_ICON_URL)
+                    
+                    view = VoiceControlView()
+                    await temp_vc.send(content=member.mention, embed=embed, view=view)
+
                 except Exception as e:
-                    logger.error(f"Failed to delete temp channel: {e}")
+                    logger.error(f"Failed to create temp voice channel: {e}")
+
+        # 3. User Left a temporary voice channel -> Schedule auto-delete after inactivity grace period
+        if before.channel and before.channel != after.channel and self.is_temporary_channel(before.channel):
+            if len(before.channel.members) == 0:
+                self.schedule_inactivity_deletion(before.channel, delay=self.INACTIVITY_GRACE_SECONDS)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(VoiceHub(bot))
