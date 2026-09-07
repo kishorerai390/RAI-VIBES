@@ -61,8 +61,9 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
 
         # Register Persistent Views for Verification, Tickets and Welcome
         from utils.persistent_views import VerifyButtonView, TicketCreateView, TicketCloseView
+        from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
         from cogs.welcome import WelcomeQuickActionsView
-        for view_cls in [VerifyButtonView, TicketCreateView, TicketCloseView, WelcomeQuickActionsView]:
+        for view_cls in [VerifyButtonView, TicketCreateView, TicketCloseView, PersistentTicketLauncherView, TicketChannelControlView, WelcomeQuickActionsView]:
             try:
                 bot.add_view(view_cls())
             except Exception as e:
