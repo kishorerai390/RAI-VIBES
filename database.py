@@ -90,7 +90,67 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS channel_snapshots (
+                guild_id INTEGER,
+                channel_id INTEGER,
+                name TEXT,
+                channel_type TEXT,
+                category_id INTEGER,
+                position INTEGER,
+                topic TEXT,
+                PRIMARY KEY (guild_id, channel_id)
+            )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS role_snapshots (
+                guild_id INTEGER,
+                role_id INTEGER,
+                name TEXT,
+                color INTEGER,
+                permissions INTEGER,
+                hoist INTEGER,
+                position INTEGER,
+                PRIMARY KEY (guild_id, role_id)
+            )
+        """)
+
         await db.commit()
+
+async def save_channel_snapshot(guild_id: int, channel: discord.abc.GuildChannel):
+    async with get_db() as db:
+        c_type = "voice" if isinstance(channel, discord.VoiceChannel) else ("category" if isinstance(channel, discord.CategoryChannel) else "text")
+        topic = getattr(channel, "topic", "") or ""
+        cat_id = channel.category_id if hasattr(channel, "category_id") else None
+        pos = channel.position if hasattr(channel, "position") else 0
+        await db.execute("""
+            INSERT OR REPLACE INTO channel_snapshots (guild_id, channel_id, name, channel_type, category_id, position, topic)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (guild_id, channel.id, channel.name, c_type, cat_id, pos, topic))
+        await db.commit()
+
+async def get_channel_snapshot(guild_id: int, channel_id: int) -> Optional[Dict[str, Any]]:
+    async with get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM channel_snapshots WHERE guild_id = ? AND channel_id = ?", (guild_id, channel_id))
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+async def save_role_snapshot(guild_id: int, role: discord.Role):
+    async with get_db() as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO role_snapshots (guild_id, role_id, name, color, permissions, hoist, position)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (guild_id, role.id, role.name, role.color.value, role.permissions.value, 1 if role.hoist else 0, role.position))
+        await db.commit()
+
+async def get_role_snapshot(guild_id: int, role_id: int) -> Optional[Dict[str, Any]]:
+    async with get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM role_snapshots WHERE guild_id = ? AND role_id = ?", (guild_id, role_id))
+        row = await cur.fetchone()
+        return dict(row) if row else None
 
 async def get_guild_settings(guild_id: int) -> Dict[str, Any]:
     async with get_db() as db:

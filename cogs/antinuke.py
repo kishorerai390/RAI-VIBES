@@ -137,14 +137,35 @@ class AntiNuke(commands.Cog):
                         if member:
                             await self.neutralize_attacker(guild, member, f"Mass Channel Deletion ({count}/{limit})")
 
-                        # Auto-restore channel
+                        # Auto-restore channel from SQLite snapshot or current channel object
                         restored = False
                         try:
-                            if isinstance(channel, discord.TextChannel):
-                                await guild.create_text_channel(name=channel.name, category=channel.category, position=channel.position)
+                            snap = await database.get_channel_snapshot(guild.id, channel.id)
+                            cat = channel.category
+                            topic = getattr(channel, "topic", None)
+                            pos = channel.position
+                            c_name = channel.name
+                            c_type = "voice" if isinstance(channel, discord.VoiceChannel) else ("category" if isinstance(channel, discord.CategoryChannel) else "text")
+
+                            if snap:
+                                c_name = snap.get("name") or c_name
+                                c_type = snap.get("channel_type") or c_type
+                                topic = snap.get("topic") or topic
+                                if snap.get("position") is not None:
+                                    pos = snap["position"]
+                                if snap.get("category_id"):
+                                    cat_obj = guild.get_channel(snap["category_id"])
+                                    if cat_obj and isinstance(cat_obj, discord.CategoryChannel):
+                                        cat = cat_obj
+
+                            if c_type == "voice":
+                                await guild.create_voice_channel(name=c_name, category=cat, position=pos)
                                 restored = True
-                            elif isinstance(channel, discord.VoiceChannel):
-                                await guild.create_voice_channel(name=channel.name, category=channel.category, position=channel.position)
+                            elif c_type == "category":
+                                await guild.create_category(name=c_name, position=pos)
+                                restored = True
+                            else:
+                                await guild.create_text_channel(name=c_name, category=cat, position=pos, topic=topic or None)
                                 restored = True
                         except Exception as e:
                             logger.error(f"Failed to auto-restore channel {channel.name}: {e}")
@@ -219,10 +240,25 @@ class AntiNuke(commands.Cog):
                         if member:
                             await self.neutralize_attacker(guild, member, f"Mass Role Deletion ({count}/{limit})")
 
-                        # Auto-restore role
+                        # Auto-restore role from SQLite snapshot or current role object
                         restored = False
                         try:
-                            await guild.create_role(name=role.name, color=role.color, permissions=role.permissions, hoist=role.hoist)
+                            snap = await database.get_role_snapshot(guild.id, role.id)
+                            name = role.name
+                            color = role.color
+                            permissions = role.permissions
+                            hoist = role.hoist
+
+                            if snap:
+                                name = snap.get("name") or name
+                                if snap.get("color") is not None:
+                                    color = discord.Color(snap["color"])
+                                if snap.get("permissions") is not None:
+                                    permissions = discord.Permissions(snap["permissions"])
+                                if snap.get("hoist") is not None:
+                                    hoist = bool(snap["hoist"])
+
+                            await guild.create_role(name=name, color=color, permissions=permissions, hoist=hoist)
                             restored = True
                         except Exception as e:
                             logger.error(f"Failed to auto-restore role {role.name}: {e}")

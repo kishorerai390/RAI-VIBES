@@ -110,6 +110,7 @@ async def start_sentinel(token: str, use_members: bool = True, use_message_conte
     
     # Sentinel manages Autonomous Defense, Anti-Nuke, Anti-Raid, Verification, and Tickets
     security_extensions = [
+        "cogs.autoprovision",
         "cogs.verify",
         "cogs.tickets",
         "cogs.moderation",

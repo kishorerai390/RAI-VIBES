@@ -46,6 +46,7 @@ async def run_vibes(token: str):
 
 async def run_sentinel(token: str):
     security_extensions = [
+        "cogs.autoprovision",
         "cogs.verify",
         "cogs.tickets",
         "cogs.moderation",
