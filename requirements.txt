@@ -7,3 +7,4 @@ requests
 aiohttp
 colorama
 Pillow
+aiosqlite>=0.20.0

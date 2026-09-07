@@ -23,6 +23,9 @@ def deploy():
     print("Remote directory before update:", sftp.listdir('.'), flush=True)
 
     items_to_upload = [
+        ".env",
+        "config.py",
+        "database.py",
         "main.py",
         "security_bot.py",
         "run_24_7.py",

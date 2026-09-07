@@ -28,6 +28,9 @@ bin/ffprobe.exe
 
 # Logs & scratch data
 *.log
+*.db
+*.sqlite
+*.sqlite3
 scratch/
 .system_generated/
 .idea/

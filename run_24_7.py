@@ -49,7 +49,17 @@ async def run_sentinel(token: str):
         "cogs.verify",
         "cogs.tickets",
         "cogs.moderation",
+        "cogs.antinuke",
+        "cogs.antiraid",
+        "cogs.antispam",
+        "cogs.antimention",
+        "cogs.antilink",
+        "cogs.whitelist",
+        "cogs.security_dashboard",
     ]
+    import database
+    await database.init_db()
+
     while True:
         try:
             # Use basic intents directly to prevent Discord 4014 Disallowed Intent disconnects

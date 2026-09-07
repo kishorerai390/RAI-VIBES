@@ -108,13 +108,22 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
 async def start_sentinel(token: str, use_members: bool = True, use_message_content: bool = True):
     bot = create_security_bot(use_members=use_members, use_message_content=use_message_content)
     
-    # Sentinel manages Welcome, Verification, Tickets, and Moderation Defense
+    # Sentinel manages Autonomous Defense, Anti-Nuke, Anti-Raid, Verification, and Tickets
     security_extensions = [
-        "cogs.welcome",
         "cogs.verify",
         "cogs.tickets",
         "cogs.moderation",
+        "cogs.antinuke",
+        "cogs.antiraid",
+        "cogs.antispam",
+        "cogs.antimention",
+        "cogs.antilink",
+        "cogs.whitelist",
+        "cogs.security_dashboard",
     ]
+    import database
+    await database.init_db()
+
     for ext in security_extensions:
         try:
             await bot.load_extension(ext)
