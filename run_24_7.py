@@ -527,7 +527,7 @@ HTML_STATUS_PAGE = """<!DOCTYPE html>
             <div class="section-title">🔗 Server Bot Dashboards Directory</div>
             <div class="dash-links">
                 <a href="https://koya.gg/en/dashboard/1457382179981099090" target="_blank" class="btn-dash">🌸 Koya Dashboard</a>
-                <a href="https://sapphire.cool/dashboard/1457382179981099090" target="_blank" class="btn-dash">💎 Sapphire Dashboard</a>
+                <a href="https://dashboard.sapph.xyz/" target="_blank" class="btn-dash">💎 Sapphire Dashboard</a>
                 <a href="https://invitetracker.net/dashboard/1457382179981099090" target="_blank" class="btn-dash">📨 Invite Tracker</a>
                 <a href="https://wickbot.com" target="_blank" class="btn-dash">🕯️ Wick Dashboard</a>
                 <a href="https://disboard.org" target="_blank" class="btn-dash">🌐 Disboard Listing</a>
