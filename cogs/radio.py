@@ -133,6 +133,8 @@ class Radio(commands.Cog):
         player.queue.appendleft(radio_song)
         if player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused()):
             player.skip()
+        else:
+            player.play_next_song.set()
 
         text_channel = (
             discord.utils.get(guild.text_channels, name="song-requests")
