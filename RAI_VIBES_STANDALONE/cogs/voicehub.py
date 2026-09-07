@@ -135,7 +135,10 @@ class RevokeUserSelectView(discord.ui.View):
         revoked = []
         for user in select.values:
             if isinstance(user, discord.Member) and user.id != self.owner.id:
-                await self.vc.set_permissions(user, overwrite=None)
+                if self.vc.overwrites_for(interaction.guild.default_role).view_channel is False:
+                    await self.vc.set_permissions(user, view_channel=False, connect=False)
+                else:
+                    await self.vc.set_permissions(user, overwrite=None)
                 if user in self.vc.members:
                     try:
                         await user.move_to(None)
@@ -266,10 +269,16 @@ class VoiceControlView(discord.ui.View):
         if is_hidden:
             # Un-ghost (make visible to @everyone again)
             await vc.set_permissions(interaction.guild.default_role, view_channel=None)
+            verified_role = discord.utils.get(interaction.guild.roles, name="Verified")
+            if verified_role:
+                await vc.set_permissions(verified_role, view_channel=None)
             await interaction.response.send_message("👁️ **Voice room is now VISIBLE to everyone in the server!**", ephemeral=True)
         else:
             # Ghost / Hide from @everyone
             await vc.set_permissions(interaction.guild.default_role, view_channel=False)
+            verified_role = discord.utils.get(interaction.guild.roles, name="Verified")
+            if verified_role:
+                await vc.set_permissions(verified_role, view_channel=False)
             # Ensure owner can always see & connect
             await vc.set_permissions(interaction.user, view_channel=True, connect=True, speak=True)
             # Ensure any current members in room can also see
@@ -279,7 +288,7 @@ class VoiceControlView(discord.ui.View):
             await interaction.response.send_message(
                 "👻 **Voice room is now GHOSTED (HIDDEN)!**\n"
                 "• Completely invisible to other members in the server.\n"
-                "• Only you and permitted members can see and join.\n"
+                "• Only you and permitted squadmates can see and join.\n"
                 "• Click **`✉️ Permit / Invite`** to select specific members to show this room to!",
                 ephemeral=True
             )
@@ -334,8 +343,8 @@ class VoiceControlView(discord.ui.View):
 
 class VoiceHub(commands.Cog):
     """Dynamic Join-to-Create temporary private voice channels with interactive Ghost & Permission controls."""
-    TEMP_PREFIXES = ("🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ")
-    TEMP_SUFFIXES = ("'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man")
+    TEMP_PREFIXES = ("🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ", "👻 ", "🔒 ")
+    TEMP_SUFFIXES = ("'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man", "'s Private", "'s Ghost")
     INACTIVITY_GRACE_SECONDS = 60  # Auto-delete empty temporary voice rooms after 60 seconds of inactivity
 
     def __init__(self, bot: commands.Bot):
@@ -496,6 +505,9 @@ class VoiceHub(commands.Cog):
                 category = after.channel.category
                 ch_name_lower = norm_name
 
+                # Check if this is a Private / Hidden / Ghost VC generator
+                is_private_hidden = any(w in ch_name_lower for w in ("private", "ghost", "secret", "hidden"))
+
                 # Determine initial user limit based on chamber name
                 initial_limit = 0
                 if "solo" in ch_name_lower or "limit 1" in ch_name_lower:
@@ -516,13 +528,24 @@ class VoiceHub(commands.Cog):
                 elif "6-man" in ch_name_lower or "limit 6" in ch_name_lower:
                     initial_limit = 6
                     room_name = f"🌟 {member.display_name}'s 6-Man"
+                elif is_private_hidden:
+                    room_name = f"👻 {member.display_name}'s Private"
                 else:
                     room_name = f"🎧 {member.display_name}'s Lounge"
 
-                overwrites = {
-                    guild.default_role: discord.PermissionOverwrite(connect=True, speak=True),
-                    member: discord.PermissionOverwrite(connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
-                }
+                if is_private_hidden:
+                    overwrites = {
+                        guild.default_role: discord.PermissionOverwrite(view_channel=False, connect=False),
+                        member: discord.PermissionOverwrite(view_channel=True, connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
+                    }
+                    verified_role = discord.utils.get(guild.roles, name="Verified")
+                    if verified_role:
+                        overwrites[verified_role] = discord.PermissionOverwrite(view_channel=False, connect=False)
+                else:
+                    overwrites = {
+                        guild.default_role: discord.PermissionOverwrite(connect=True, speak=True),
+                        member: discord.PermissionOverwrite(connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
+                    }
 
                 try:
                     temp_vc = await guild.create_voice_channel(
@@ -536,12 +559,20 @@ class VoiceHub(commands.Cog):
                     self.temp_channels[temp_vc.id] = member.id
                     self._save_temp_channels()
                     await member.move_to(temp_vc)
-                    logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}) for {member.name}")
+                    logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}, private: {is_private_hidden}) for {member.name}")
 
                     # Send interactive control dashboard in text-in-voice
-                    embed = discord.Embed(
-                        title=f"🎛️ Voice Room Controls • {member.display_name}",
-                        description=(
+                    if is_private_hidden:
+                        desc = (
+                            f"👻 **Welcome to your Private Hidden Voice Room, {member.mention}!**\n\n"
+                            f"🔒 **This room is 100% INVISIBLE to everyone else on the server.**\n\n"
+                            f"• Click **`✉️ Permit / Invite`** below to select squadmates to reveal and invite into this room\n"
+                            f"• Click **`👻 Ghost`** anytime to toggle visibility back to public\n"
+                            f"• Use the buttons below to lock, rename, set limits, or kick members\n\n"
+                            f"*This room will automatically delete after {self.INACTIVITY_GRACE_SECONDS} seconds of inactivity once everyone leaves.*"
+                        )
+                    else:
+                        desc = (
                             f"Welcome to your private voice channel, {member.mention}!\n\n"
                             f"Use the buttons below to customize and secure your room:\n"
                             f"• 🔒 **Lock / 🔓 Unlock**: Control who can enter\n"
@@ -551,7 +582,11 @@ class VoiceHub(commands.Cog):
                             f"• ✉️ **Permit / Invite**: Pick members to reveal this hidden channel to\n"
                             f"• 🚫 **Revoke**: Remove access & hide room from members\n\n"
                             f"*This room will automatically delete after {self.INACTIVITY_GRACE_SECONDS} seconds of inactivity once everyone leaves.*"
-                        ),
+                        )
+
+                    embed = discord.Embed(
+                        title=f"🎛️ Voice Room Controls • {member.display_name}",
+                        description=desc,
                         color=config.COLOR_PRIMARY
                     )
                     embed.set_footer(text="RAI VIBES 💗 • Dynamic Voice Hub", icon_url=config.RAI_ICON_URL)
