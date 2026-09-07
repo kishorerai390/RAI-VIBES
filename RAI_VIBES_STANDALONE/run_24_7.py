@@ -22,17 +22,27 @@ logging.basicConfig(
 logger = logging.getLogger("DualRunner")
 
 async def run_vibes(token: str):
-    bot = create_bot(use_members=True, use_message_content=True)
-    async with bot:
-        await load_cogs(bot)
+    while True:
         try:
-            await bot.start(token)
-        except discord.errors.PrivilegedIntentsRequired:
-            logger.warning("[RAI VIBES] Falling back to basic intents.")
-            bot_fallback = create_bot(use_members=False, use_message_content=True)
-            async with bot_fallback:
-                await load_cogs(bot_fallback)
-                await bot_fallback.start(token)
+            bot = create_bot(use_members=True, use_message_content=True)
+            async with bot:
+                await load_cogs(bot)
+                try:
+                    await bot.start(token)
+                except discord.errors.PrivilegedIntentsRequired:
+                    logger.warning("[RAI VIBES] Privileged intents not enabled in portal. Falling back to basic intents.")
+                    bot_fallback = create_bot(use_members=False, use_message_content=False)
+                    async with bot_fallback:
+                        await load_cogs(bot_fallback)
+                        await bot_fallback.start(token)
+        except asyncio.CancelledError:
+            break
+        except discord.errors.LoginFailure:
+            logger.error("[RAI VIBES] Invalid token in DISCORD_BOT_TOKEN.")
+            await asyncio.sleep(60)
+        except Exception as e:
+            logger.error(f"[RAI VIBES] Runner error: {e}. Reconnecting in 5s...")
+            await asyncio.sleep(5)
 
 async def run_sentinel(token: str):
     security_extensions = [
@@ -40,34 +50,26 @@ async def run_sentinel(token: str):
         "cogs.tickets",
         "cogs.moderation",
     ]
-    try:
-        bot = create_security_bot(use_members=True, use_message_content=True)
-        async with bot:
-            for ext in security_extensions:
-                try:
-                    await bot.load_extension(ext)
-                    logger.info(f"[RAI SENTINEL] Loaded extension: {ext}")
-                except Exception as e:
-                    logger.error(f"Could not load {ext}: {e}")
-            await bot.start(token)
-    except discord.errors.LoginFailure:
-        logger.warning("[RAI SENTINEL] Invalid token in SECURITY_BOT_TOKEN. Skipping Sentinel until a valid token is provided.")
-    except discord.errors.PrivilegedIntentsRequired:
-        logger.warning("[RAI SENTINEL] Privileged Gateway Intents missing, falling back to basic.")
-        bot_fallback = create_security_bot(use_members=False, use_message_content=False)
-        async with bot_fallback:
-            for ext in security_extensions:
-                try:
-                    await bot_fallback.load_extension(ext)
-                    logger.info(f"[RAI SENTINEL] Loaded extension: {ext}")
-                except Exception as e:
-                    logger.error(f"Could not load {ext}: {e}")
-            try:
-                await bot_fallback.start(token)
-            except discord.errors.LoginFailure:
-                logger.warning("[RAI SENTINEL] Invalid token in SECURITY_BOT_TOKEN.")
-    except Exception as e:
-        logger.error(f"[RAI SENTINEL] Error: {e}")
+    while True:
+        try:
+            # Use basic intents directly to prevent Discord 4014 Disallowed Intent disconnects
+            bot = create_security_bot(use_members=False, use_message_content=False)
+            async with bot:
+                for ext in security_extensions:
+                    try:
+                        await bot.load_extension(ext)
+                        logger.info(f"[RAI SENTINEL] Loaded extension: {ext}")
+                    except Exception as e:
+                        logger.error(f"[RAI SENTINEL] Could not load {ext}: {e}")
+                await bot.start(token)
+        except asyncio.CancelledError:
+            break
+        except discord.errors.LoginFailure:
+            logger.warning("[RAI SENTINEL] Invalid token in SECURITY_BOT_TOKEN.")
+            await asyncio.sleep(60)
+        except Exception as e:
+            logger.error(f"[RAI SENTINEL] Error: {e}. Reconnecting in 5s...")
+            await asyncio.sleep(5)
 
 from aiohttp import web
 
@@ -256,15 +258,10 @@ async def main():
     # 2. Start Self-Ping Task for Render
     asyncio.create_task(keep_awake())
 
-    while True:
-        try:
-            tasks = [run_vibes(token_vibes)]
-            if token_sentinel and token_sentinel != "YOUR_DISCORD_BOT_TOKEN_HERE":
-                tasks.append(run_sentinel(token_sentinel))
-            await asyncio.gather(*tasks)
-        except Exception as e:
-            logger.error(f"Runner error: {e}. Reconnecting in 5s...")
-            await asyncio.sleep(5)
+    tasks = [run_vibes(token_vibes)]
+    if token_sentinel and token_sentinel != "YOUR_DISCORD_BOT_TOKEN_HERE":
+        tasks.append(run_sentinel(token_sentinel))
+    await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     try:
