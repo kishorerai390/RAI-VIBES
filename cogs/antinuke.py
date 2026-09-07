@@ -4,12 +4,26 @@ import logging
 from collections import defaultdict
 from typing import Dict, List, Optional
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import database
 import config
 
 logger = logging.getLogger("AntiNuke")
+
+TRUSTED_INTERNAL_BOT_IDS = {
+    1546239150775078922, # RAI VIBES
+    1546245134809571470, # RAI SENTINEL
+    235088799074484224,  # Rythm
+    1205557263738216559, # BeatSync
+    276060004262477825,  # Koya
+    678344927997853742,  # Sapphire
+    536991182035746816,  # Wick
+    720351927581278219,  # Invite Tracker
+    302050872383242240,  # DISBOARD
+}
+
+ALERT_AUTO_DELETE_SECONDS = 60 # Automatically delete alert spam after 60 seconds
 
 class AntiNuke(commands.Cog):
     """Real-Time Anti-Nuke System protecting server against mass deletion, mass bans, and malicious actions."""
@@ -17,6 +31,66 @@ class AntiNuke(commands.Cog):
         self.bot = bot
         # Action tracker: tracker[guild_id][user_id][action_type] = list of timestamps
         self.tracker: Dict[int, Dict[int, Dict[str, List[float]]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        self.cleanup_security_logs_task.start()
+
+    def cog_unload(self):
+        self.cleanup_security_logs_task.cancel()
+
+    def is_trusted_actor(self, guild: discord.Guild, actor: Optional[discord.User | discord.Member]) -> bool:
+        """Returns True if actor is a trusted bot, server owner, or immune administrator."""
+        if not actor:
+            return True
+        if actor.id == self.bot.user.id or actor.id == guild.owner_id:
+            return True
+        if actor.id in TRUSTED_INTERNAL_BOT_IDS:
+            return True
+        if getattr(actor, "bot", False):
+            return True
+        return False
+
+    @tasks.loop(seconds=30)
+    async def cleanup_security_logs_task(self):
+        """Periodically purges security alert messages older than 60s from security-logs channels."""
+        await self.bot.wait_until_ready()
+        now = discord.utils.utcnow()
+        for guild in self.bot.guilds:
+            channels_to_check = set()
+            try:
+                settings = await database.get_guild_settings(guild.id)
+                log_chan = await self.get_log_channel(guild, settings)
+                if log_chan:
+                    channels_to_check.add(log_chan)
+            except Exception:
+                pass
+            for name in ["security-logs", "mod-logs", "audit-logs", "staff-logs"]:
+                ch = discord.utils.get(guild.text_channels, name=name)
+                if ch:
+                    channels_to_check.add(ch)
+
+            for ch in channels_to_check:
+                try:
+                    async for msg in ch.history(limit=40):
+                        age = (now - msg.created_at).total_seconds()
+                        if age >= ALERT_AUTO_DELETE_SECONDS:
+                            is_alert = (
+                                msg.author.id == self.bot.user.id or
+                                "@everyone" in (msg.content or "") or
+                                (msg.embeds and any(
+                                    "ALERT" in (e.title or "") or 
+                                    "DEFENSE" in (e.title or "") or 
+                                    "Interception" in (e.title or "") or
+                                    "ANTI-NUKE" in (e.title or "") or
+                                    "Shield" in (e.title or "")
+                                    for e in msg.embeds
+                                ))
+                            )
+                            if is_alert:
+                                try:
+                                    await msg.delete()
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass
 
     def record_action(self, guild_id: int, user_id: int, action_type: str, time_window: int) -> int:
         now = time.time()
@@ -84,10 +158,14 @@ class AntiNuke(commands.Cog):
 
         if log_channel:
             try:
-                await log_channel.send(content="@everyone 🚨 **SERVER EMERGENCY DEFENSE ACTIVATED**", embed=embed)
+                await log_channel.send(
+                    content="@everyone 🚨 **SERVER EMERGENCY DEFENSE ACTIVATED**",
+                    embed=embed,
+                    delete_after=ALERT_AUTO_DELETE_SECONDS
+                )
             except Exception:
                 try:
-                    await log_channel.send(embed=embed)
+                    await log_channel.send(embed=embed, delete_after=ALERT_AUTO_DELETE_SECONDS)
                 except Exception:
                     pass
 
@@ -126,7 +204,7 @@ class AntiNuke(commands.Cog):
             async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.channel_delete):
                 if entry.target and entry.target.id == channel.id:
                     actor = entry.user
-                    if not actor or actor.id == self.bot.user.id or actor.id == guild.owner_id:
+                    if self.is_trusted_actor(guild, actor):
                         return
                     if await database.is_whitelisted(guild, actor):
                         return
@@ -192,7 +270,7 @@ class AntiNuke(commands.Cog):
             async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.channel_create):
                 if entry.target and entry.target.id == channel.id:
                     actor = entry.user
-                    if not actor or actor.id == self.bot.user.id or actor.id == guild.owner_id:
+                    if self.is_trusted_actor(guild, actor):
                         return
                     if await database.is_whitelisted(guild, actor):
                         return
@@ -229,7 +307,7 @@ class AntiNuke(commands.Cog):
             async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.role_delete):
                 if entry.target and entry.target.id == role.id:
                     actor = entry.user
-                    if not actor or actor.id == self.bot.user.id or actor.id == guild.owner_id:
+                    if self.is_trusted_actor(guild, actor):
                         return
                     if await database.is_whitelisted(guild, actor):
                         return
@@ -285,7 +363,7 @@ class AntiNuke(commands.Cog):
             async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.ban):
                 if entry.target and entry.target.id == user.id:
                     actor = entry.user
-                    if not actor or actor.id == self.bot.user.id or actor.id == guild.owner_id:
+                    if self.is_trusted_actor(guild, actor):
                         return
                     if await database.is_whitelisted(guild, actor):
                         return
@@ -315,7 +393,7 @@ class AntiNuke(commands.Cog):
             async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.kick):
                 if entry.target and entry.target.id == member.id:
                     actor = entry.user
-                    if not actor or actor.id == self.bot.user.id or actor.id == guild.owner_id:
+                    if self.is_trusted_actor(guild, actor):
                         return
                     if await database.is_whitelisted(guild, actor):
                         return
@@ -347,7 +425,7 @@ class AntiNuke(commands.Cog):
         try:
             async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.webhook_create):
                 actor = entry.user
-                if not actor or actor.id == self.bot.user.id or actor.id == guild.owner_id:
+                if self.is_trusted_actor(guild, actor):
                     return
                 if await database.is_whitelisted(guild, actor):
                     return

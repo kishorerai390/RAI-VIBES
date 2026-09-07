@@ -68,9 +68,12 @@ class AntiRaid(commands.Cog):
 
             if log_channel:
                 try:
-                    await log_channel.send(content="@everyone 🚨 **MASS RAID SHIELD ACTIVATED**", embed=embed)
+                    await log_channel.send(content="@everyone 🚨 **MASS RAID SHIELD ACTIVATED**", embed=embed, delete_after=60)
                 except Exception:
-                    pass
+                    try:
+                        await log_channel.send(embed=embed, delete_after=60)
+                    except Exception:
+                        pass
 
             await database.record_security_event(
                 guild.id,
