@@ -270,35 +270,62 @@ music_commands_payload = [
         "description": "Claim your daily coin reward and build your streak!"
     },
     {
-        "name": "coinflip",
-        "description": "Bet your coins on a 50/50 heads or tails coin toss!",
+        "name": "musicquiz",
+        "description": "Start a 15-second audio song guess trivia quiz in voice chat!",
         "options": [
             {
-                "name": "amount",
-                "description": "Amount of coins to bet",
-                "type": 4,
-                "required": True
-            },
-            {
-                "name": "choice",
-                "description": "Your guess (heads or tails)",
+                "name": "category",
+                "description": "Quiz music category",
                 "type": 3,
-                "required": True,
+                "required": False,
                 "choices": [
-                    {"name": "Heads 🪙", "value": "heads"},
-                    {"name": "Tails 🦅", "value": "tails"}
+                    {"name": "Tamil Hits 🎵", "value": "tamil"},
+                    {"name": "Bollywood Anthems 🇮🇳", "value": "bollywood"},
+                    {"name": "Global Billboard 🌍", "value": "global"},
+                    {"name": "Anime Soundtracks 🎌", "value": "anime"}
                 ]
             }
         ]
     },
     {
-        "name": "slots",
-        "description": "Spin the Lucky 7 Casino Slots for up to a 10x jackpot!",
+        "name": "tictactoe",
+        "description": "Challenge another member to an interactive Tic-Tac-Toe match!",
         "options": [
             {
-                "name": "amount",
-                "description": "Amount of coins to bet",
-                "type": 4,
+                "name": "opponent",
+                "description": "Member you want to challenge",
+                "type": 6,
+                "required": True
+            }
+        ]
+    },
+    {
+        "name": "trivia",
+        "description": "Answer a multiple-choice trivia question to win +50 Coins!",
+        "options": [
+            {
+                "name": "category",
+                "description": "Trivia question category",
+                "type": 3,
+                "required": False,
+                "choices": [
+                    {"name": "All Categories 🌟", "value": "all"},
+                    {"name": "Gaming 🎮", "value": "gaming"},
+                    {"name": "Anime 🎌", "value": "anime"},
+                    {"name": "Movies 🍿", "value": "movies"},
+                    {"name": "Technology 💻", "value": "tech"}
+                ]
+            }
+        ]
+    },
+    {
+        "name": "rep",
+        "description": "Award a reputation point (+1 Rep) to a helpful member once every 24h.",
+        "options": [
+            {
+                "name": "member",
+                "description": "Member to award reputation to",
+                "type": 6,
                 "required": True
             }
         ]

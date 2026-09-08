@@ -305,6 +305,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.server_stats",
         "cogs.leveling",
         "cogs.economy",
+        "cogs.music_quiz",
     ]
 
     for extension in initial_extensions:

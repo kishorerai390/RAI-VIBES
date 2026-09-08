@@ -44,6 +44,17 @@ def get_user_coins(member_id: int) -> int:
             pass
     return 0
 
+def get_user_rep(member_id: int) -> int:
+    """Retrieve user reputation points."""
+    if ECONOMY_FILE.exists():
+        try:
+            with open(ECONOMY_FILE, "r", encoding="utf-8") as f:
+                eco = json.load(f)
+                return eco.get(str(member_id), {}).get("rep", 0)
+        except Exception:
+            pass
+    return 0
+
 MILESTONE_ROLES = {
     5: "✦ 𝐑𝐢𝐬𝐢𝐧𝐠 𝐒𝐭𝐚𝐫",
     10: "✦ 𝐀𝐝𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐫",
@@ -125,6 +136,7 @@ class Leveling(commands.Cog):
             description=f"Congratulations {member.mention}! You just reached **Level {new_level}**! ✨{role_reward_text}",
             color=0x00FF88
         )
+        embed.set_thumbnail(url=member.display_avatar.url)
         embed.set_footer(text="Keep chatting & participating to earn more XP!")
         try:
             await channel.send(embed=embed)
@@ -171,6 +183,7 @@ class Leveling(commands.Cog):
         base_xp = data["current_level_base_xp"]
         next_xp = data["next_level_xp"]
         coins = get_user_coins(target.id)
+        rep = get_user_rep(target.id)
 
         xp_in_level = max(0, current_xp - base_xp)
         xp_needed = max(1, next_xp - base_xp)
@@ -185,13 +198,14 @@ class Leveling(commands.Cog):
         embed.add_field(name="🏆 Server Rank", value=f"**#{rank}**", inline=True)
         embed.add_field(name="⭐ Level", value=f"**Level {level}**", inline=True)
         embed.add_field(name="🪙 Coins", value=f"**{coins:,}**", inline=True)
+        embed.add_field(name="💖 Rep", value=f"**+{rep}**", inline=True)
         embed.add_field(name="💬 Messages", value=f"`{msg_count:,}`", inline=True)
         embed.add_field(
             name="📊 Level Progress",
             value=f"`{progress_bar}` **{percent}%**\n`{xp_in_level:,}` / `{xp_needed:,} XP` (Total: `{current_xp:,} XP`)",
             inline=False
         )
-        embed.set_footer(text=f"Requested by {interaction.user.display_name} • Active VC members earn +5 Coins every 2 min!", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(text=f"Requested by {interaction.user.display_name} • Give rep with /rep <user>!", icon_url=interaction.user.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
 
         await interaction.response.send_message(embed=embed)
