@@ -44,6 +44,16 @@ def award_welcome_bonus(user_id: str):
         logger.warning(f"Could not award levels XP to {user_id}: {e}")
 
 
+class VerifiedNextStepsView(View):
+    """Direct quick-action navigation buttons for verified members."""
+    def __init__(self, guild_id: int):
+        super().__init__(timeout=None)
+        self.add_item(Button(label="💬 Say Hello", url=f"https://discord.com/channels/{guild_id}/1545502730699808768", style=discord.ButtonStyle.link))
+        self.add_item(Button(label="🎭 Pick Roles", url=f"https://discord.com/channels/{guild_id}/1545502722739150898", style=discord.ButtonStyle.link))
+        self.add_item(Button(label="📜 Server Rules", url=f"https://discord.com/channels/{guild_id}/1545502710101704714", style=discord.ButtonStyle.link))
+        self.add_item(Button(label="🎵 Vibe Studio", url=f"https://discord.com/channels/{guild_id}/1545534637122527332", style=discord.ButtonStyle.link))
+
+
 class VerifyButtonView(View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -59,6 +69,7 @@ class VerifyButtonView(View):
 
         role_rai = discord.utils.get(guild.roles, id=1545494584203673740) or discord.utils.get(guild.roles, name="🌸 ✧ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘")
         role_ver = discord.utils.get(guild.roles, id=1546540194310782976) or discord.utils.get(guild.roles, name="Verified")
+        role_unver = discord.utils.get(guild.roles, id=1546540195724140574) or discord.utils.get(guild.roles, name="Unverified")
 
         member = interaction.user
         if isinstance(member, discord.User):
@@ -72,31 +83,41 @@ class VerifyButtonView(View):
 
         # 3. Check if already verified
         if not roles_to_add and (role_rai in member.roles or role_ver in member.roles):
+            view = VerifiedNextStepsView(guild.id)
             return await interaction.followup.send(
-                "✨ **You are already verified!** All community channels & voice lounges are open to you. 🌸 Enjoy your stay!",
+                "✨ **You are already verified!** All community channels & voice lounges are open to you. 🌸 Enjoy your stay!\n\n"
+                "Use the quick buttons below to jump into the community:",
+                view=view,
                 ephemeral=True
             )
 
         if roles_to_add:
             try:
                 await member.add_roles(*roles_to_add, reason="Passed Verification Gate")
+                if role_unver and role_unver in member.roles:
+                    try:
+                        await member.remove_roles(role_unver, reason="Passed Verification Gate")
+                    except Exception:
+                        pass
+
                 award_welcome_bonus(str(interaction.user.id))
 
                 embed = discord.Embed(
                     title="🎉 VERIFICATION SUCCESSFUL!",
                     description=(
                         f"Welcome to **{guild.name}**, {interaction.user.mention}! 💗\n\n"
-                        f"✅ Roles Granted: {', '.join(r.mention for r in roles_to_add)}\n"
-                        f"🎁 Starter Bonus: **+100 Coins** & **+50 XP**\n"
+                        f"✅ **Roles Granted:** {', '.join(r.mention for r in roles_to_add)}\n"
+                        f"🎁 **Starter Bonus:** `+100 Coins` & `+50 XP` credited to your profile!\n"
                         f"🔓 **All server channels & voice lounges are now unlocked!**\n\n"
-                        f"Head over to <#1545502730699808768> (General Chat) and say hello! 🌸"
+                        f"👉 *Click the buttons below to pick your self-roles and join the conversation!*"
                     ),
-                    color=0x2ECC71 # Bright Emerald Green
+                    color=0x2ECC71  # Bright Emerald Green
                 )
                 embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
-                embed.set_footer(text="RAI FAM 💗 • Verified Member", icon_url=guild.icon.url if guild.icon else None)
+                embed.set_footer(text="RAI FAM 💗 • Verified Member Guide", icon_url=guild.icon.url if guild.icon else None)
 
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                view = VerifiedNextStepsView(guild.id)
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
                 logger.info(f"Verified {interaction.user.name} ({interaction.user.id}) and granted {[r.name for r in roles_to_add]}")
             except Exception as e:
                 logger.error(f"Error granting role to {interaction.user.id}: {e}")
