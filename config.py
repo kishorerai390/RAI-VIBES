@@ -34,7 +34,8 @@ COLOR_ERROR = 0xE74C3C       # Crimson Red
 COLOR_DARK = 0x18191C        # Midnight Dark
 
 # Assets & Icons
-RAI_ICON_URL = "https://cdn.discordapp.com/avatars/1545479610550980709/4176f6e6e76161728a4314c87c41fdd7.png?size=512"
+RAI_ICON_URL = "https://cdn.discordapp.com/avatars/1546239150775078922/a_296e933a181d5342f239885193c8c2a1.gif?size=1024"
+SENTINEL_ICON_URL = "https://cdn.discordapp.com/avatars/1546245134809571470/a_1e1806461d62b13ffe27de2f853f0b86.gif?size=1024"
 YOUTUBE_ICON_URL = "https://cdn-icons-png.flaticon.com/512/1384/1384060.png"
 SPOTIFY_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2111/2111624.png"
-MUSIC_ICON_URL = "https://cdn.discordapp.com/avatars/1545479610550980709/4176f6e6e76161728a4314c87c41fdd7.png?size=512"
+MUSIC_ICON_URL = "https://cdn.discordapp.com/avatars/1546239150775078922/a_296e933a181d5342f239885193c8c2a1.gif?size=1024"
