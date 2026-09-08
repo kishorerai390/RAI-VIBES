@@ -24,21 +24,20 @@ from utils.filters import get_filter_string
 yt_dlp.utils.bug_reports_message = lambda *args, **kargs: ""
 
 YTDL_OPTIONS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio[ext=m4a]/bestaudio/best",
     "noplaylist": True,
     "nocheckcertificate": True,
-    "ignoreerrors": True,
+    "ignoreerrors": False,
     "logtostderr": False,
     "quiet": True,
     "no_warnings": True,
     "default_search": "ytsearch",
-    "source_address": "0.0.0.0",
     "skip_download": True,
     "socket_timeout": 15,
     "retries": 3,
     "extractor_args": {
         "youtube": {
-            "player_client": ["android", "ios"]
+            "player_client": ["android_vr", "android"]
         }
     }
 }
