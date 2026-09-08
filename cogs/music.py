@@ -38,7 +38,7 @@ YTDL_OPTIONS = {
     "retries": 3,
     "extractor_args": {
         "youtube": {
-            "player_client": ["ios", "web", "mweb"]
+            "player_client": ["android", "ios"]
         }
     }
 }
