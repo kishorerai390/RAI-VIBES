@@ -53,6 +53,50 @@ class Starboard(commands.Cog):
             embed.set_footer(text=f"⭐ {reaction.count} | Hall of Fame", icon_url=config.RAI_ICON_URL)
             await starboard_chan.send(content=f"⭐ **{reaction.count}** {channel.mention}", embed=embed)
 
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Auto-creates discussion threads on media uploads to keep the gallery channel tidy and engaging."""
+        if message.author.bot or not message.guild:
+            return
+
+        # Check if channel is media gallery (ID 1546097792915873842 or name matches)
+        ch_name = message.channel.name.lower()
+        is_media_channel = (
+            message.channel.id == 1546097792915873842 or
+            "media" in ch_name or "clip" in ch_name or "gallery" in ch_name or "art" in ch_name
+        )
+        if not is_media_channel:
+            return
+
+        has_media = bool(
+            message.attachments or
+            any(k in message.content.lower() for k in ["http://", "https://", "youtube.com", "youtu.be", "tiktok.com", "imgur.com", "x.com", "twitter.com"])
+        )
+
+        if has_media:
+            # 1. Add quick engagement reactions
+            for emoji in ["❤️", "🔥"]:
+                try:
+                    await message.add_reaction(emoji)
+                except Exception:
+                    pass
+
+            # 2. Automatically spawn a public discussion thread
+            try:
+                thread_title = f"💬 {message.author.display_name} • Media Thread"[:95]
+                thread = await message.create_thread(
+                    name=thread_title,
+                    auto_archive_duration=1440
+                )
+                intro_embed = discord.Embed(
+                    description=f"👋 **Leave your thoughts and feedback on {message.author.mention}'s upload here!**\nKeeping comments inside threads keeps the media feed organized.",
+                    color=config.COLOR_PRIMARY
+                )
+                intro_embed.set_footer(text="RAI VIBES 💗 Community Automation", icon_url=config.RAI_ICON_URL)
+                await thread.send(embed=intro_embed)
+            except Exception:
+                pass
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Starboard(bot))

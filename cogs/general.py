@@ -4,29 +4,6 @@ import discord
 from discord.ext import commands
 import config
 
-class General(commands.Cog):
-    """General & Information commands for RAI VIBES 💗 Bot."""
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.start_time = time.time()
-
-    @commands.hybrid_command(name="ping", description="Check RAI VIBES 💗 response latency.")
-    async def ping(self, ctx: commands.Context):
-        start = time.monotonic()
-        msg = await ctx.send("⚡ Calculating Asgardian latency...")
-        end = time.monotonic()
-        ws_ping = round(self.bot.latency * 1000)
-        api_ping = round((end - start) * 1000)
-
-        embed = discord.Embed(
-            title="⚡ RAI VIBES 💗 • Latency Telemetry",
-            color=config.COLOR_PRIMARY
-        )
-        embed.add_field(name="📶 WebSocket Latency", value=f"`{ws_ping}ms`", inline=True)
-        embed.add_field(name="⚡ REST API Latency", value=f"`{api_ping}ms`", inline=True)
-        embed.set_footer(text="RAI VIBES 💗 • Command The Power", icon_url=config.RAI_ICON_URL)
-        await msg.edit(content=None, embed=embed)
-
 class CommandCategorySelect(discord.ui.Select):
     def __init__(self):
         options = [

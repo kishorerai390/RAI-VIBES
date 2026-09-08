@@ -318,6 +318,7 @@ class GuildMusicPlayer:
         self.active_filters: List[str] = []
         self.custom_speed: float = 1.0
         self.mode_247: bool = True
+        self.autoplay: bool = True
 
         self.play_next_song = asyncio.Event()
         self.audio_task: Optional[asyncio.Task] = None
@@ -572,6 +573,41 @@ class GuildMusicPlayer:
                     self.queue.append(self.current)
 
                 if not self.queue:
+                    # Smart Autoplay / Endless Radio
+                    last_song = self.current or (self.history[-1] if self.history else None)
+                    if self.autoplay and self.is_connected and last_song and last_song.title:
+                        try:
+                            # Search related tracks
+                            query_ref = f"{last_song.uploader} official music" if last_song.uploader and "RAI VIBES" not in last_song.uploader else f"{last_song.title} mix"
+                            extract_fn = functools.partial(ytdl.extract_info, f"ytsearch5:{query_ref}", download=False, process=True)
+                            rec_data = await self.bot.loop.run_in_executor(None, extract_fn)
+                            entries = rec_data.get("entries") if rec_data else None
+                            if entries:
+                                played_titles = {h.title.lower() for h in self.history}
+                                if last_song:
+                                    played_titles.add(last_song.title.lower())
+
+                                candidate = None
+                                for ent in entries:
+                                    if ent and ent.get("title") and ent.get("title").lower() not in played_titles:
+                                        candidate = ent
+                                        break
+
+                                if candidate:
+                                    rec_song = Song(candidate, requester=self.bot.user, source_type="autoplay")
+                                    self.queue.append(rec_song)
+                                    if self.text_channel:
+                                        auto_embed = discord.Embed(
+                                            title="📻 Smart Autoplay • Seamless Continuity",
+                                            description=f"Queue was empty. Next up: **[{rec_song.title}]({rec_song.webpage_url})**\n*(Selected based on `{last_song.title[:45]}`)*",
+                                            color=config.COLOR_PRIMARY
+                                        )
+                                        auto_embed.set_footer(text="RAI VIBES 💗 • Intelligent Radio | Toggle with /autoplay", icon_url=config.RAI_ICON_URL)
+                                        await self.text_channel.send(embed=auto_embed)
+                        except Exception as e:
+                            print(f"[Autoplay Error] {e}")
+
+                if not self.queue:
                     self.current = None
                     # Wait for inactivity timeout or new songs
                     try:
@@ -597,6 +633,7 @@ class GuildMusicPlayer:
 
                 song = self.queue.popleft()
                 self.current = song
+                self.history.append(song)
 
             if not song.url:
                 try:
@@ -1300,7 +1337,38 @@ class Music(commands.Cog):
         seek_str = time.strftime('%M:%S', time.gmtime(seconds))
         await ctx.send(f"⏩ **Seeked to:** `{seek_str}`")
 
+    # =========================================================================
+    # COMMAND: AUTOPLAY / SMART RADIO
+    # =========================================================================
+    @commands.hybrid_command(name="autoplay", description="Toggle smart endless autoplay when the queue runs out.")
+    @app_commands.describe(status="Choose whether to enable or disable autoplay ('on' or 'off')")
+    async def autoplay(self, ctx: commands.Context, status: Optional[str] = None):
+        player = self.get_player(ctx.guild.id)
+        if not player:
+            return await ctx.send("❌ Player not initialized.", ephemeral=True)
+
+        if status:
+            val = status.lower().strip() in ["on", "enable", "true", "yes", "1"]
+            player.autoplay = val
+        else:
+            player.autoplay = not player.autoplay
+
+        state_str = "ENABLED 📻" if player.autoplay else "DISABLED ⏹️"
+        color = config.COLOR_PRIMARY if player.autoplay else config.COLOR_DARK
+        embed = discord.Embed(
+            title=f"📻 Autoplay / Smart Radio: {state_str}",
+            description=(
+                "When your queue is empty, RAI VIBES will automatically queue recommended tracks based on your taste!"
+                if player.autoplay else
+                "Autoplay disabled. Music will pause when the queue finishes."
+            ),
+            color=color
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Intelligent Music Engine", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Music(bot))
+
 

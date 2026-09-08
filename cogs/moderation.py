@@ -75,6 +75,24 @@ def save_frozen_members(data: Dict[str, Dict]):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+MODNOTES_FILE = DATA_DIR / "modnotes.json"
+
+def load_modnotes() -> Dict[str, List[dict]]:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if MODNOTES_FILE.exists():
+        try:
+            with open(MODNOTES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_modnotes(data: Dict[str, List[dict]]):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MODNOTES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
 class FreezeActionView(discord.ui.View):
     """Interactive Staff Quick-Action button to unfreeze an isolated member."""
     def __init__(self, target_id: int, target_name: str, bot: commands.Bot):
@@ -1105,7 +1123,139 @@ class Moderation(commands.Cog):
                     reason="🚨 [AUTOMOD] Extreme Voice Noise / Mic Spamming / Rapid Channel Hopping"
                 )
 
+    # =========================================================================
+    # GHOST-PING DETECTOR
+    # =========================================================================
+    @commands.Cog.listener()
+    async def on_message_delete(self, message: discord.Message):
+        """Surveillance detector for deleted messages that pinged members or roles."""
+        if not message.guild or message.author.bot:
+            return
+
+        has_mentions = bool(message.mentions or message.role_mentions or message.mention_everyone)
+        if not has_mentions:
+            return
+
+        targets = []
+        if message.mention_everyone:
+            targets.append("@everyone/@here")
+        for m in message.mentions:
+            if not m.bot and m.id != message.author.id:
+                targets.append(m.mention)
+        for r in message.role_mentions:
+            targets.append(r.name)
+
+        if not targets:
+            return
+
+        embed = discord.Embed(
+            title="👻 Ghost-Ping Surveillance Alert",
+            description=(
+                f"**Author:** {message.author.mention} (`{message.author.id}`)\n"
+                f"**Channel:** {message.channel.mention}\n"
+                f"**Pinged Targets:** {', '.join(targets[:10])}\n\n"
+                f"**Deleted Content:**\n```{message.content[:1500] or '[Attachment or Embed]'}```"
+            ),
+            color=0xFF4500,
+            timestamp=datetime.datetime.now(datetime.timezone.utc)
+        )
+        embed.set_footer(text="RAI SENTINEL 🛡️ Ghost-Ping Surveillance", icon_url=config.RAI_ICON_URL)
+
+        log_channel = (
+            discord.utils.get(message.guild.text_channels, name="audit-logs") or
+            discord.utils.get(message.guild.text_channels, name="security-logs") or
+            message.guild.get_channel(1546540192343523399) or
+            message.guild.get_channel(1546593526073135107)
+        )
+        if log_channel:
+            try:
+                await log_channel.send(embed=embed)
+            except Exception:
+                pass
+
+    # =========================================================================
+    # STAFF MOD NOTES SYSTEM
+    # =========================================================================
+    @commands.hybrid_group(name="modnote", aliases=["note"], description="Manage confidential staff notes on members.")
+    @commands.has_permissions(moderate_members=True)
+    async def modnote(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send(
+                "🛡️ **Mod Note Commands:**\n"
+                "• `/modnote add <user> <note>` - Add an internal record on a member\n"
+                "• `/modnote view <user>` - View all staff notes for a member\n"
+                "• `/modnote clear <user>` - Clear all staff notes for a member",
+                ephemeral=True
+            )
+
+    @modnote.command(name="add", description="Add an internal staff note for a member.")
+    @app_commands.describe(user="The member to add a note for", note="The confidential staff note")
+    @commands.has_permissions(moderate_members=True)
+    async def modnote_add(self, ctx: commands.Context, user: discord.User, note: str):
+        u_key = str(user.id)
+        data = load_modnotes()
+        if u_key not in data:
+            data[u_key] = []
+
+        entry = {
+            "id": len(data[u_key]) + 1,
+            "mod_id": ctx.author.id,
+            "mod_name": ctx.author.display_name,
+            "note": note.strip(),
+            "created_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        }
+        data[u_key].append(entry)
+        save_modnotes(data)
+
+        embed = discord.Embed(
+            title="📝 Staff Note Recorded",
+            description=f"Recorded note for **{user.mention}** (`{user.id}`).",
+            color=0x5865F2
+        )
+        embed.add_field(name="Note Content", value=f"\"{note}\"", inline=False)
+        embed.set_footer(text=f"Logged by {ctx.author.display_name} • Total Notes: {len(data[u_key])}", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, ephemeral=True)
+
+    @modnote.command(name="view", description="View all internal staff notes for a member.")
+    @app_commands.describe(user="The member whose notes to inspect")
+    @commands.has_permissions(moderate_members=True)
+    async def modnote_view(self, ctx: commands.Context, user: discord.User):
+        u_key = str(user.id)
+        data = load_modnotes()
+        notes = data.get(u_key, [])
+
+        if not notes:
+            return await ctx.send(f"📋 No staff notes on file for **{user.mention}**.", ephemeral=True)
+
+        embed = discord.Embed(
+            title=f"📋 Staff Notes • {user.display_name}",
+            description=f"Showing **{len(notes)}** confidential staff note(s) for `{user.id}`:",
+            color=0x5865F2
+        )
+        for item in notes[-10:]:
+            embed.add_field(
+                name=f"Note #{item['id']} • {item['created_at']} by {item['mod_name']}",
+                value=item["note"],
+                inline=False
+            )
+        embed.set_footer(text="RAI SENTINEL 🛡️ Staff Intelligence", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, ephemeral=True)
+
+    @modnote.command(name="clear", description="Clear all staff notes on a member.")
+    @app_commands.describe(user="The member whose notes to clear")
+    @commands.has_permissions(administrator=True)
+    async def modnote_clear(self, ctx: commands.Context, user: discord.User):
+        u_key = str(user.id)
+        data = load_modnotes()
+        if u_key in data:
+            del data[u_key]
+            save_modnotes(data)
+            await ctx.send(f"🗑️ Cleared all staff notes for **{user.mention}**.", ephemeral=True)
+        else:
+            await ctx.send(f"No notes existed for **{user.mention}**.", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
+
 
