@@ -12,10 +12,13 @@ logger = logging.getLogger("AntiLink")
 INVITE_REGEX = re.compile(r"(?:https?://)?(?:www\.)?(?:discord\.(?:gg|io|me|li|com/invite)/[a-zA-Z0-9]+)")
 URL_REGEX = re.compile(r"https?://(?:www\.)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?:/[^\s]*)?")
 
+import datetime
+
 KNOWN_SCAM_PATTERNS = [
     "discorcl", "dlscord", "discrod", "discord-nitro", "free-nitro", "nitro-gift",
     "steamcommuniity", "steamcomminuty", "gift-discord", "discordapp.biz", "discord-app.me",
-    "airdrop-nitro", "claim-nitro", "steam-gift", "discordgift", "t.me/airdrop"
+    "airdrop-nitro", "claim-nitro", "steam-gift", "discordgift", "t.me/airdrop",
+    "discord-claim", "nitro-drop", "free-steam", "discord-boost", "get-nitro", "gift-nitro.click"
 ]
 
 class AntiLink(commands.Cog):
@@ -24,13 +27,16 @@ class AntiLink(commands.Cog):
         self.bot = bot
 
     async def get_log_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
+        chan = guild.get_channel(1546593526073135107) or guild.get_channel(1546540192343523399)
+        if chan and isinstance(chan, discord.TextChannel):
+            return chan
         settings = await database.get_guild_settings(guild.id)
         log_id = settings.get("log_channel_id")
         if log_id:
             channel = guild.get_channel(log_id)
             if channel and isinstance(channel, discord.TextChannel):
                 return channel
-        for name in ["security-logs", "mod-logs"]:
+        for name in ["・𝘀𝗲𝗰𝘂𝗿𝗶𝘁𝘆-𝗹𝗼𝗴𝘀・", "・𝗮𝘂𝗱𝗶𝘁-𝗹𝗼𝗴𝘀・", "security-logs", "mod-logs"]:
             channel = discord.utils.get(guild.text_channels, name=name)
             if channel:
                 return channel
@@ -74,10 +80,19 @@ class AntiLink(commands.Cog):
                 pass
 
             reason = "Unauthorized Discord Invite" if has_invite else ("Phishing / Scam Link" if has_scam else "Blacklisted Domain Link")
+            timeout_note = ""
+
+            # Automatic timeout protection for verified phishing / scam links
+            if has_scam and not member.guild_permissions.manage_messages:
+                try:
+                    await member.timeout(datetime.timedelta(minutes=10), reason="Automated Shield: Phishing / Scam link detected")
+                    timeout_note = " • Member placed on 10m Timeout"
+                except Exception:
+                    pass
 
             try:
                 await message.channel.send(
-                    f"🛡️ {member.mention}, links are restricted in this channel. *({reason})*",
+                    f"🛡️ {member.mention}, links are restricted in this channel. *({reason}{timeout_note})*",
                     delete_after=6
                 )
             except Exception:
@@ -88,10 +103,16 @@ class AntiLink(commands.Cog):
             if log_channel:
                 embed = discord.Embed(
                     title="🛡️ Malicious Link Intercepted",
-                    description=f"**User:** {member.mention} (`{member.name}` • ID: `{member.id}`)\n**Type:** {reason}\n**Action Taken:** Message Deleted & User Warned",
-                    color=0xFF5500
+                    description=(
+                        f"**User:** {member.mention} (`{member.name}` • ID: `{member.id}`)\n"
+                        f"**Type:** `{reason}`\n"
+                        f"**Action Taken:** Message Deleted & Warning Issued{timeout_note}\n"
+                        f"**Origin Channel:** {message.channel.mention}"
+                    ),
+                    color=0xFF0033 if has_scam else 0xFF5500
                 )
-                embed.set_footer(text=f"Channel: #{message.channel.name}")
+                embed.set_thumbnail(url=member.display_avatar.url)
+                embed.set_footer(text="RAI SENTINEL 🛡️ Autonomous Defense", icon_url=self.bot.user.display_avatar.url)
                 embed.timestamp = discord.utils.utcnow()
                 try:
                     await log_channel.send(embed=embed)

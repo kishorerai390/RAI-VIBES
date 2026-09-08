@@ -266,6 +266,66 @@ music_commands_payload = [
         "description": "View the Top 10 most active members on the server."
     },
     {
+        "name": "daily",
+        "description": "Claim your daily coin reward and build your streak!"
+    },
+    {
+        "name": "coinflip",
+        "description": "Bet your coins on a 50/50 heads or tails coin toss!",
+        "options": [
+            {
+                "name": "amount",
+                "description": "Amount of coins to bet",
+                "type": 4,
+                "required": True
+            },
+            {
+                "name": "choice",
+                "description": "Your guess (heads or tails)",
+                "type": 3,
+                "required": True,
+                "choices": [
+                    {"name": "Heads 🪙", "value": "heads"},
+                    {"name": "Tails 🦅", "value": "tails"}
+                ]
+            }
+        ]
+    },
+    {
+        "name": "slots",
+        "description": "Spin the Lucky 7 Casino Slots for up to a 10x jackpot!",
+        "options": [
+            {
+                "name": "amount",
+                "description": "Amount of coins to bet",
+                "type": 4,
+                "required": True
+            }
+        ]
+    },
+    {
+        "name": "pay",
+        "description": "Send coins directly to another server member.",
+        "options": [
+            {
+                "name": "member",
+                "description": "Member to transfer coins to",
+                "type": 6,
+                "required": True
+            },
+            {
+                "name": "amount",
+                "description": "Amount of coins to send",
+                "type": 4,
+                "required": True
+            }
+        ]
+    },
+    {
+        "name": "shop",
+        "description": "Open the Server Perks Store to buy roles, VIP, and badges."
+    },
+    {
         "name": "c",
         "description": "Browse all RAI VIBES commands in an interactive Rythm-style directory."
     },
