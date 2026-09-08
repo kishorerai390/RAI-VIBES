@@ -34,9 +34,11 @@ YTDL_OPTIONS = {
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
     "skip_download": True,
+    "socket_timeout": 15,
+    "retries": 3,
     "extractor_args": {
         "youtube": {
-            "player_client": ["android", "ios", "web_embedded", "mweb", "tv_embedded"]
+            "player_client": ["ios", "web", "mweb"]
         }
     }
 }
@@ -81,8 +83,9 @@ class Song:
             sanitized = re.sub(r'[^\w\s\-\.\'\,\(\)]', ' ', cleaned_search)
             sanitized = re.sub(r'\s+', ' ', sanitized).strip()
             query_str = sanitized if sanitized else cleaned_search
-            to_search = f"ytsearch5:{query_str}"
+            to_search = f"ytsearch1:{query_str}"
 
+        data = None
         try:
             partial_extract = functools.partial(
                 ytdl.extract_info,
@@ -91,20 +94,36 @@ class Song:
                 process=True
             )
             data = await loop.run_in_executor(None, partial_extract)
-        except Exception as e:
-            # Fallback to SoundCloud if YouTube blocks search
-            if not is_url:
-                try:
-                    sc_extract = functools.partial(
+        except Exception:
+            data = None
+
+        # Fallback 1: If search failed and not a direct URL, try clean keywords
+        if not data and not is_url:
+            try:
+                simplified = re.sub(r'[\(\[][^()]*?[\)\]]', '', query_str)
+                simplified = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', simplified)).strip()
+                if simplified and simplified != query_str:
+                    fb_extract = functools.partial(
                         ytdl.extract_info,
-                        f"scsearch5:{query_str}",
+                        f"ytsearch1:{simplified}",
                         download=False,
                         process=True
                     )
-                    data = await loop.run_in_executor(None, sc_extract)
-                except Exception:
-                    data = None
-            else:
+                    data = await loop.run_in_executor(None, fb_extract)
+            except Exception:
+                data = None
+
+        # Fallback 2: SoundCloud search
+        if not data and not is_url:
+            try:
+                sc_extract = functools.partial(
+                    ytdl.extract_info,
+                    f"scsearch1:{query_str}",
+                    download=False,
+                    process=True
+                )
+                data = await loop.run_in_executor(None, sc_extract)
+            except Exception:
                 data = None
 
         if data is None:
@@ -581,10 +600,21 @@ class GuildMusicPlayer:
 
             if not song.url:
                 try:
-                    resolved_song = await Song.create_source(song.data.get("search_query", song.title), song.requester, self.bot.loop)
+                    q_cand = song.data.get("search_query") or song.title
+                    resolved_song = await Song.create_source(q_cand, song.requester, self.bot.loop)
+                    if not resolved_song:
+                        # Fallback attempt: clean title
+                        clean_t = re.sub(r'[\(\[][^()]*?[\)\]]', '', song.title).strip()
+                        if ' - ' in clean_t:
+                            clean_t = clean_t.split(' - ')[0].strip()
+                        if clean_t and clean_t != q_cand:
+                            await asyncio.sleep(0.3)
+                            resolved_song = await Song.create_source(clean_t, song.requester, self.bot.loop)
+
                     if not resolved_song:
                         if self.text_channel:
                             await self.text_channel.send(f"⚠️ Could not stream `{song.title}`. Skipping.")
+                        await asyncio.sleep(1.0)
                         continue
                     song.url = resolved_song.url
                     song.webpage_url = resolved_song.webpage_url
@@ -594,6 +624,7 @@ class GuildMusicPlayer:
                 except Exception as e:
                     if self.text_channel:
                         await self.text_channel.send(f"⚠️ Error loading audio for `{song.title}`: {e}")
+                    await asyncio.sleep(1.0)
                     continue
 
             def after_playing(err):
@@ -611,9 +642,9 @@ class GuildMusicPlayer:
                 continue
 
             try:
-                # Ensure fresh streaming URL
+                # Ensure stream URL exists
                 stream_url = song.url
-                if not stream_url or "googlevideo.com" in stream_url:
+                if not stream_url:
                     try:
                         fresh_info = await self.bot.loop.run_in_executor(None, functools.partial(ytdl.extract_info, song.webpage_url, download=False, process=True))
                         if fresh_info:
@@ -756,9 +787,18 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: PLAY / P
     # =========================================================================
-    @commands.hybrid_command(name="play", aliases=["p"], description="Play music from YouTube or Spotify (link or search name).")
-    @app_commands.describe(query="The song name, YouTube URL, or Spotify link to play")
-    async def play(self, ctx: commands.Context, *, query: str):
+    @commands.hybrid_command(name="play", aliases=["p"], description="Play music or enqueue tracks from YouTube or Spotify.")
+    @app_commands.describe(
+        song="The song name, artist, or YouTube/Spotify song link to play",
+        queue="Playlist URL, album link, or tracks to add directly to playback queue"
+    )
+    async def play(
+        self,
+        ctx: commands.Context,
+        song: Optional[str] = None,
+        *,
+        queue: Optional[str] = None
+    ):
         if ctx.interaction:
             try:
                 await ctx.defer()
@@ -772,6 +812,73 @@ class Music(commands.Cog):
         player = self.get_or_create_player(ctx.guild)
         player.voice_client = voice_client
         player.text_channel = ctx.channel
+
+        # Handle prefix compatibility & distinguish song vs queue modes
+        is_queue_mode = False
+        query = None
+
+        if not ctx.interaction:
+            # Invoked via message prefix (e.g. !play or !p)
+            if song and queue:
+                if song.lower() in ("queue", "q", "playlist", "pl"):
+                    query = queue
+                    is_queue_mode = True
+                elif song.lower() in ("song", "track", "s"):
+                    query = queue
+                    is_queue_mode = False
+                else:
+                    # Multi-word title like: !play kannitheevu ponna
+                    query = f"{song} {queue}".strip()
+                    is_queue_mode = False
+            elif song:
+                query = song
+                is_queue_mode = False
+            elif queue:
+                query = queue
+                is_queue_mode = True
+        else:
+            # Invoked via slash command (/play)
+            if song:
+                query = song
+                is_queue_mode = False
+            elif queue:
+                query = queue
+                is_queue_mode = True
+
+        # If user ran /play with neither option provided
+        if not query:
+            if player.voice_client and player.voice_client.is_paused():
+                player.voice_client.resume()
+                embed = discord.Embed(
+                    description="▶️ **Resumed music playback!**",
+                    color=config.COLOR_SUCCESS
+                )
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send(embed=embed)
+                return await ctx.send(embed=embed)
+            elif player.queue and not (player.voice_client and player.voice_client.is_playing()):
+                self.play_next(ctx.guild)
+                embed = discord.Embed(
+                    description="▶️ **Resumed playing queue!**",
+                    color=config.COLOR_PRIMARY
+                )
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send(embed=embed)
+                return await ctx.send(embed=embed)
+            else:
+                embed = discord.Embed(
+                    title="🎵 How to use /play",
+                    description=(
+                        "Choose one of the options:\n\n"
+                        "• **`/play song: [name/link]`** — Search and play an individual song or track\n"
+                        "• **`/play queue: [link/name]`** — Enqueue a playlist, album, or tracks directly to the queue"
+                    ),
+                    color=config.COLOR_PRIMARY
+                )
+                embed.set_footer(text="RAI VIBES 💗 Music Engine", icon_url=config.RAI_ICON_URL)
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send(embed=embed)
+                return await ctx.send(embed=embed)
 
         # Check queue limit
         if len(player.queue) >= config.MAX_QUEUE_SIZE:
@@ -790,16 +897,16 @@ class Music(commands.Cog):
 
             if len(spotify_tracks) == 1:
                 t = spotify_tracks[0]
-                song = await Song.create_source(t["search_query"], ctx.author, self.bot.loop)
-                if not song:
+                song_obj = await Song.create_source(t["search_query"], ctx.author, self.bot.loop)
+                if not song_obj:
                     if ctx.interaction:
                         return await ctx.interaction.followup.send(f"❌ Could not find audio for Spotify track: `{t['title']}`", ephemeral=True)
                     return await ctx.send(f"❌ Could not find audio for Spotify track: `{t['title']}`")
                 if t.get("thumbnail"):
-                    song.thumbnail = t["thumbnail"]
+                    song_obj.thumbnail = t["thumbnail"]
                 
                 is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
-                player.queue.append(song)
+                player.queue.append(song_obj)
 
                 if is_currently_playing:
                     # Calculate estimated time until playing
@@ -810,14 +917,15 @@ class Music(commands.Cog):
                     for q_song in list(player.queue)[:-1]:
                         est_sec += max(0, q_song.duration)
                     est_str = time.strftime("%M:%S", time.gmtime(est_sec)) if est_sec > 0 else "Playing Next"
-                    dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
+                    dur_str = time.strftime("%M:%S", time.gmtime(song_obj.duration)) if song_obj.duration > 0 else "Live"
 
+                    card_title = "📥 Enqueued to Playback Queue" if is_queue_mode else "🎵 Song Added to Queue"
                     embed = discord.Embed(
-                        title="🎵 Added to queue",
-                        description=f"**[{song.title}]({song.webpage_url})**",
+                        title=card_title,
+                        description=f"**[{song_obj.title}]({song_obj.webpage_url})**",
                         color=config.COLOR_PRIMARY
                     )
-                    embed.set_thumbnail(url=song.thumbnail or config.RAI_ICON_URL)
+                    embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
                     embed.add_field(name="⏱️ Track Duration", value=f"`{dur_str}`", inline=True)
                     embed.add_field(name="📍 Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
                     embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)
@@ -867,14 +975,14 @@ class Music(commands.Cog):
 
         # Direct YouTube / Keyword Search
         try:
-            song = await Song.create_source(query, ctx.author, self.bot.loop)
-            if not song:
+            song_obj = await Song.create_source(query, ctx.author, self.bot.loop)
+            if not song_obj:
                 if ctx.interaction:
-                    return await ctx.interaction.followup.send(f"❌ No results found for query: `{query}`", ephemeral=True)
-                return await ctx.send(f"❌ No results found for query: `{query}`")
+                    return await ctx.interaction.followup.send(f"❌ No results found for: `{query}`", ephemeral=True)
+                return await ctx.send(f"❌ No results found for: `{query}`")
 
             is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
-            player.queue.append(song)
+            player.queue.append(song_obj)
 
             if is_currently_playing:
                 # Calculate estimated time until playing (Rythm Style)
@@ -886,14 +994,15 @@ class Music(commands.Cog):
                     est_sec += max(0, q_song.duration)
 
                 est_str = time.strftime("%M:%S", time.gmtime(est_sec)) if est_sec > 0 else "Playing Next"
-                dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
+                dur_str = time.strftime("%M:%S", time.gmtime(song_obj.duration)) if song_obj.duration > 0 else "Live"
 
+                card_title = "📥 Enqueued to Playback Queue" if is_queue_mode else "🎵 Song Added to Queue"
                 embed = discord.Embed(
-                    title="🎵 Added to queue",
-                    description=f"**[{song.title}]({song.webpage_url})**",
+                    title=card_title,
+                    description=f"**[{song_obj.title}]({song_obj.webpage_url})**",
                     color=config.COLOR_PRIMARY
                 )
-                embed.set_thumbnail(url=song.thumbnail or config.RAI_ICON_URL)
+                embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
                 embed.add_field(name="⏱️ Track Duration", value=f"`{dur_str}`", inline=True)
                 embed.add_field(name="📍 Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
                 embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)

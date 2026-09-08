@@ -45,6 +45,28 @@ def parse_spotify_url(query: str) -> Optional[tuple[str, str]]:
         return match.group(1), match.group(2)
     return None
 
+def clean_spotify_search_query(title: str, artist: str) -> str:
+    """Builds a clean, high-precision search query for YouTube matching."""
+    # 1. Strip soundtrack markers, remaster tags, parentheticals like (From "3"), etc.
+    clean_t = re.sub(
+        r'[\(\[][^()]*?(?:From|Soundtrack|OST|Remaster|Remix|Cover|Video|Official|Audio|Bonus|Deluxe|The Kiss)[^()]*?[\)\]]',
+        '',
+        title,
+        flags=re.I
+    ).strip()
+    if ' - ' in clean_t:
+        # e.g. "Kannazhaga - The Kiss of Love" -> "Kannazhaga"
+        clean_t = clean_t.split(' - ')[0].strip()
+    
+    # 2. Main artist (first 1 or 2 artists max to prevent query bloat)
+    art_list = [a.strip() for a in re.split(r'[,/&]', artist) if a.strip()]
+    main_art = art_list[0] if art_list else ""
+    
+    clean_t = re.sub(r'\s+', ' ', clean_t).strip()
+    main_art = re.sub(r'\s+', ' ', main_art).strip()
+    query = f"{clean_t} {main_art}".strip() if main_art else clean_t
+    return query or title
+
 async def resolve_spotify(query: str) -> List[Dict[str, str]]:
     """
     Extracts track queries from Spotify URLs.
@@ -70,7 +92,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                 tracks.append({
                     "title": title,
                     "artist": artist_name,
-                    "search_query": f"{title} {artist_name} audio",
+                    "search_query": clean_spotify_search_query(title, artist_name),
                     "thumbnail": thumbnail,
                     "duration": dur,
                     "source": "spotify"
@@ -85,7 +107,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                     tracks.append({
                         "title": title,
                         "artist": artist_name,
-                        "search_query": f"{title} {artist_name} audio",
+                        "search_query": clean_spotify_search_query(title, artist_name),
                         "thumbnail": album_thumb,
                         "duration": dur,
                         "source": "spotify"
@@ -112,7 +134,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                     tracks.append({
                         "title": title,
                         "artist": artist_name,
-                        "search_query": f"{title} {artist_name} audio",
+                        "search_query": clean_spotify_search_query(title, artist_name),
                         "thumbnail": thumbnail,
                         "duration": dur,
                         "source": "spotify"
@@ -150,7 +172,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                                     tracks.append({
                                         "title": title,
                                         "artist": artist,
-                                        "search_query": f"{title} {artist} audio",
+                                        "search_query": clean_spotify_search_query(title, artist),
                                         "thumbnail": cover_url,
                                         "duration": dur,
                                         "source": "spotify"
@@ -165,7 +187,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                                         tracks.append({
                                             "title": t_title,
                                             "artist": t_artist,
-                                            "search_query": f"{t_title} {t_artist} audio",
+                                            "search_query": clean_spotify_search_query(t_title, t_artist),
                                             "thumbnail": cover_url,
                                             "duration": t_dur,
                                             "source": "spotify"
@@ -192,7 +214,7 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
                         tracks.append({
                             "title": title,
                             "artist": "Spotify",
-                            "search_query": f"{title} audio",
+                            "search_query": clean_spotify_search_query(title, ""),
                             "thumbnail": thumbnail,
                             "duration": 0,
                             "source": "spotify"

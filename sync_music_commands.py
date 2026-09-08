@@ -20,13 +20,19 @@ music_commands_payload = [
     # 1. Core Playback
     {
         "name": "play",
-        "description": "Play music from YouTube or Spotify (link or search name).",
+        "description": "Play music or enqueue tracks from YouTube or Spotify.",
         "options": [
             {
-                "name": "query",
-                "description": "Song name, artist, or YouTube/Spotify URL",
+                "name": "song",
+                "description": "Song name, artist, or YouTube/Spotify song link to play",
                 "type": 3,
-                "required": True
+                "required": False
+            },
+            {
+                "name": "queue",
+                "description": "Playlist URL, album link, or tracks to add directly to playback queue",
+                "type": 3,
+                "required": False
             }
         ]
     },
@@ -260,9 +266,24 @@ put_res = requests.put(
     json=music_commands_payload
 )
 
-print(f"Sync Status Code: {put_res.status_code}")
+print(f"Global Sync Status Code: {put_res.status_code}")
 if put_res.status_code in (200, 201):
     result = put_res.json()
     print(f"✨ Successfully synchronized {len(result)} pure Music & Audio slash commands globally!")
 else:
-    print(f"❌ Error syncing commands: {put_res.text}")
+    print(f"❌ Error syncing global commands: {put_res.text}")
+
+guild_id = os.getenv("GUILD_ID", "1457382179981099090")
+print(f"\nSyncing commands directly to Guild {guild_id} (Instant reflection in Discord)...")
+guild_put_res = requests.put(
+    f"https://discord.com/api/v10/applications/{app_id}/guilds/{guild_id}/commands",
+    headers=headers,
+    json=music_commands_payload
+)
+print(f"Guild Sync Status Code: {guild_put_res.status_code}")
+if guild_put_res.status_code in (200, 201):
+    g_result = guild_put_res.json()
+    print(f"⚡ Successfully synchronized {len(g_result)} slash commands directly to Guild for INSTANT availability!")
+else:
+    print(f"⚠️ Error syncing guild commands: {guild_put_res.text}")
+
