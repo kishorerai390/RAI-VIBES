@@ -7,6 +7,7 @@ RUN apt-get update && \
         libopus0 \
         libopus-dev \
         ca-certificates \
+        nodejs \
         git && \
     rm -rf /var/lib/apt/lists/*
 

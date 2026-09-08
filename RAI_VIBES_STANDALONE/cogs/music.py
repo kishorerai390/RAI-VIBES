@@ -58,6 +58,15 @@ class Song:
         self.thumbnail = data.get("thumbnail") or config.RAI_ICON_URL
         self.uploader = data.get("uploader") or data.get("artist") or "RAI VIBES 💗 Sound"
 
+    @staticmethod
+    def _is_valid_result(res: Optional[dict]) -> bool:
+        if not res or not isinstance(res, dict):
+            return False
+        if "entries" in res:
+            valid_entries = [e for e in res["entries"] if e is not None and (e.get("url") or e.get("webpage_url") or e.get("id"))]
+            return len(valid_entries) > 0
+        return bool(res.get("url") or res.get("webpage_url") or res.get("id"))
+
     @classmethod
     async def create_source(cls, search: str, requester: discord.Member, loop: asyncio.AbstractEventLoop = None):
         """Extracts streamable info using yt-dlp asynchronously with smart single-track preference and fallback."""
@@ -93,11 +102,12 @@ class Song:
                 process=True
             )
             data = await loop.run_in_executor(None, partial_extract)
-        except Exception:
+        except Exception as e:
+            print(f"[YTDL Primary Error] {to_search}: {e}")
             data = None
 
         # Fallback 1: If search failed and not a direct URL, try clean keywords
-        if not data and not is_url:
+        if not cls._is_valid_result(data) and not is_url:
             try:
                 simplified = re.sub(r'[\(\[][^()]*?[\)\]]', '', query_str)
                 simplified = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', simplified)).strip()
@@ -109,23 +119,29 @@ class Song:
                         process=True
                     )
                     data = await loop.run_in_executor(None, fb_extract)
-            except Exception:
+            except Exception as e:
+                print(f"[YTDL Fallback 1 Error] {simplified}: {e}")
                 data = None
 
         # Fallback 2: SoundCloud search
-        if not data and not is_url:
+        if not cls._is_valid_result(data) and not is_url:
             try:
+                clean_sc = re.sub(r'[\(\[][^()]*?[\)\]]', '', query_str).strip()
+                if ' - ' in clean_sc:
+                    clean_sc = clean_sc.split(' - ')[0].strip()
+                print(f"[Audio Fallback] Attempting SoundCloud search for: '{clean_sc}'")
                 sc_extract = functools.partial(
                     ytdl.extract_info,
-                    f"scsearch1:{query_str}",
+                    f"scsearch1:{clean_sc}",
                     download=False,
                     process=True
                 )
                 data = await loop.run_in_executor(None, sc_extract)
-            except Exception:
+            except Exception as e:
+                print(f"[YTDL SoundCloud Error] {clean_sc}: {e}")
                 data = None
 
-        if data is None:
+        if not cls._is_valid_result(data):
             return None
 
         if "entries" in data:
