@@ -761,7 +761,11 @@ class Music(commands.Cog):
             player = GuildMusicPlayer(self, guild)
             self.players[guild.id] = player
             player.audio_task = self.bot.loop.create_task(player.player_loop())
-        return self.players[guild.id]
+        else:
+            player = self.players[guild.id]
+            if not player.audio_task or player.audio_task.done():
+                player.audio_task = self.bot.loop.create_task(player.player_loop())
+        return player
 
     async def ensure_voice(self, ctx_or_interaction) -> Optional[discord.VoiceClient]:
         """Ensures the bot connects to or moves to the user's active voice channel."""
@@ -772,21 +776,46 @@ class Music(commands.Cog):
         voice_client = guild.voice_client
 
         author = getattr(ctx_or_interaction, "author", None) or getattr(ctx_or_interaction, "user", None)
-        user_vc = getattr(getattr(author, "voice", None), "channel", None)
-        
+        user_vc = None
+
+        if author:
+            # 1. Check direct author.voice.channel
+            user_vc = getattr(getattr(author, "voice", None), "channel", None)
+
+            # 2. Member lookup from guild if author was User or cache missing
+            if not user_vc and hasattr(author, "id"):
+                member = guild.get_member(author.id)
+                if member and member.voice:
+                    user_vc = member.voice.channel
+
+            # 3. Direct channel member scan across guild voice and stage channels
+            if not user_vc and hasattr(author, "id"):
+                for ch in guild.voice_channels + guild.stage_channels:
+                    if any(m.id == author.id for m in ch.members):
+                        user_vc = ch
+                        break
+
         # Target VC must be the user's voice channel or the bot's current active voice channel
         target_vc = user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None)
 
-
         if not target_vc:
+            embed = discord.Embed(
+                title="🎧 Voice Channel Required",
+                description=(
+                    "❌ **You must be in a voice channel to play music!**\n\n"
+                    "👉 Please join a voice channel (e.g. **・𝗹𝗼-𝗳𝗶・** or **・𝗿𝗮𝗶-𝗳𝗮𝗺-𝗹𝗼𝘂𝗻𝗴𝗲・**) and send your command again!"
+                ),
+                color=config.COLOR_DANGER
+            )
+            embed.set_footer(text="RAI VIBES 💗 • Rythm Sound Engine", icon_url=config.RAI_ICON_URL)
             try:
                 if hasattr(ctx_or_interaction, "send"):
-                    await ctx_or_interaction.send("❌ Please join a voice channel first!", ephemeral=True)
+                    await ctx_or_interaction.send(embed=embed)
                 elif hasattr(ctx_or_interaction, "response"):
                     if not ctx_or_interaction.response.is_done():
-                        await ctx_or_interaction.response.send_message("❌ Please join a voice channel first!", ephemeral=True)
+                        await ctx_or_interaction.response.send_message(embed=embed, ephemeral=True)
                     else:
-                        await ctx_or_interaction.followup.send("❌ Please join a voice channel first!", ephemeral=True)
+                        await ctx_or_interaction.followup.send(embed=embed, ephemeral=True)
             except Exception:
                 pass
             return None
@@ -802,6 +831,7 @@ class Music(commands.Cog):
         if not voice_client or not voice_client.is_connected():
             try:
                 voice_client = await target_vc.connect(timeout=25.0, reconnect=True, self_deaf=False)
+                print(f"[Voice Connect] Successfully connected to '{target_vc.name}' in '{guild.name}'")
             except discord.ClientException:
                 voice_client = guild.voice_client
                 if user_vc and voice_client and voice_client.channel != user_vc:
@@ -852,35 +882,44 @@ class Music(commands.Cog):
 
         # Handle prefix compatibility & distinguish song vs queue modes
         is_queue_mode = False
-        query = None
+        effective_query = None
 
         if not ctx.interaction:
-            # Invoked via message prefix (e.g. !play or !p)
+            # Invoked via message prefix (e.g. !play, !p, or mention)
+            effective_query = song or queue
             if song and queue:
                 if song.lower() in ("queue", "q", "playlist", "pl"):
-                    query = queue
+                    effective_query = queue
                     is_queue_mode = True
                 elif song.lower() in ("song", "track", "s"):
-                    query = queue
+                    effective_query = queue
                     is_queue_mode = False
                 else:
                     # Multi-word title like: !play kannitheevu ponna
-                    query = f"{song} {queue}".strip()
+                    effective_query = f"{song} {queue}".strip()
                     is_queue_mode = False
-            elif song:
-                query = song
-                is_queue_mode = False
             elif queue:
-                query = queue
+                effective_query = queue
                 is_queue_mode = True
+            elif effective_query:
+                # If query is a Spotify playlist or album, treat as queue mode
+                if is_spotify_url(effective_query) and any(x in effective_query for x in ["playlist", "album"]):
+                    is_queue_mode = True
+                else:
+                    is_queue_mode = False
         else:
             # Invoked via slash command (/play)
             if song:
-                query = song
+                effective_query = song
                 is_queue_mode = False
             elif queue:
-                query = queue
+                effective_query = queue
                 is_queue_mode = True
+            else:
+                effective_query = None
+                is_queue_mode = False
+
+        query = effective_query
 
         # If user ran /play with neither option provided
         if not query:

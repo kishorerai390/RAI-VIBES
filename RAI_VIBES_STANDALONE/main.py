@@ -167,7 +167,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                     pass
                 music_cog = b.get_cog("Music")
                 if music_cog:
-                    return await music_cog.play(ctx, query=content)
+                    return await music_cog.play(ctx, song=content)
 
         # 2. Check if bot is mentioned (e.g. @RAI VIBES /play song, @RAI VIBES 💗/play song, @RAI VIBES song)
         if b.user in message.mentions and not message.mention_everyone:
@@ -221,7 +221,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                         break
 
             if query and music_cog:
-                return await music_cog.play(ctx, query=query)
+                return await music_cog.play(ctx, song=query)
 
         # 3. Direct Prefix Triggers: !play, !p
         play_prefixes = ["!play ", "!p "]
@@ -233,7 +233,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                 ctx = await b.get_context(message)
                 music_cog = b.get_cog("Music")
                 if music_cog:
-                    return await music_cog.play(ctx, query=query)
+                    return await music_cog.play(ctx, song=query)
 
         # 4. Direct Simple Commands: !skip, !pause, !resume, !stop, !queue, !np
         simple_cmds = {
