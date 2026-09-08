@@ -563,20 +563,19 @@ async def start_web_server():
     logger.info(f"🌐 [Render Health Server] Listening on 0.0.0.0:{port} (200 OK endpoint ready!)")
 
 async def keep_awake():
-    url = os.getenv("RENDER_EXTERNAL_URL")
-    if not url:
-        return
-    logger.info(f"🔄 [Render Keep-Awake] Monitoring active for: {url}")
+    url = os.getenv("RENDER_EXTERNAL_URL", "https://rai-vibes.onrender.com").rstrip("/")
+    ping_url = f"{url}/ping"
+    logger.info(f"🔄 [Render Keep-Awake] Monitoring active for: {ping_url}")
     import aiohttp
-    await asyncio.sleep(60)
-    async with aiohttp.ClientSession() as session:
-        while True:
-            try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    logger.debug(f"[Render Keep-Awake] Pinged {url} -> Status {resp.status}")
-            except Exception as e:
-                logger.debug(f"[Render Keep-Awake] Ping notice: {e}")
-            await asyncio.sleep(600)  # Ping every 10 minutes
+    await asyncio.sleep(20)
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(ping_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    logger.info(f"💓 [Keep-Awake Pulse] Pinged {ping_url} -> Status {resp.status} (Keeping container 100% warm)")
+        except Exception as e:
+            logger.debug(f"[Keep-Awake Pulse Notice] {e}")
+        await asyncio.sleep(180)  # Ping every 3 minutes (Render sleeps at 15 mins)
 
 async def main():
     token_vibes = os.getenv("DISCORD_BOT_TOKEN")

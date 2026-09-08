@@ -28,6 +28,7 @@ def update_render_env_vars(vibes_token: str, sentinel_token: str):
         {"key": "PORT", "value": "10000"},
         {"key": "DISCORD_BOT_TOKEN", "value": vibes_token.strip()},
         {"key": "SECURITY_BOT_TOKEN", "value": sentinel_token.strip()},
+        {"key": "RENDER_EXTERNAL_URL", "value": "https://rai-vibes.onrender.com"},
     ]
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
