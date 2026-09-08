@@ -272,6 +272,92 @@ class MusicPlayerView(View):
         except Exception as e:
             await self.send_msg(interaction, f"❌ Error displaying lyrics: {e}")
 
+    async def toggle_filter(self, interaction: discord.Interaction, filter_name: str, display_name: str):
+        player = await self.get_player(interaction)
+        if not player or not player.current:
+            return await self.send_msg(interaction, "❌ RAI VIBES must be playing audio to apply filters.")
+
+        if filter_name in player.active_filters:
+            player.active_filters.remove(filter_name)
+            await player.restart_current_with_filters()
+            await self.send_msg(interaction, f"➡️ **Audio filter disabled:** `{display_name}`")
+        else:
+            if filter_name.startswith("bassboost_"):
+                player.active_filters = [f for f in player.active_filters if not f.startswith("bassboost_")]
+            player.active_filters.append(filter_name)
+            await player.restart_current_with_filters()
+            await self.send_msg(interaction, f"⚡ **Audio filter activated:** `{display_name}`!")
+
+        if player.now_playing_message:
+            try:
+                await player.now_playing_message.edit(embed=player.build_now_playing_embed(), view=self)
+            except Exception:
+                pass
+
+    @button(label="Nightcore", style=discord.ButtonStyle.secondary, emoji="⚡", row=2, custom_id="music_btn_nc")
+    async def nightcore_button(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "nightcore", "Nightcore")
+
+    @button(label="Bass Boost", style=discord.ButtonStyle.secondary, emoji="🔊", row=2, custom_id="music_btn_bb")
+    async def bass_button(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "bassboost_medium", "Bass Boost [Medium]")
+
+    @button(label="8D Audio", style=discord.ButtonStyle.secondary, emoji="🌌", row=2, custom_id="music_btn_8d")
+    async def spatial_button(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "8d", "8D Spatial 360")
+
+    @button(label="Lo-Fi Chill", style=discord.ButtonStyle.secondary, emoji="☕", row=2, custom_id="music_btn_slow")
+    async def lofi_button(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "slowed", "Lo-Fi Slowed + Reverb")
+
+    @button(label="More FX", style=discord.ButtonStyle.primary, emoji="🎛️", row=2, custom_id="music_btn_fx")
+    async def fx_menu_button(self, interaction: discord.Interaction, button: Button):
+        player = await self.get_player(interaction)
+        if not player or not player.current:
+            return await self.send_msg(interaction, "❌ No song is currently streaming.")
+        view = AudioEffectsControlView(player, self)
+        await self.send_msg(interaction, "🎛️ **Audio Studio & FX Console** — Select an enhancement below:", view=view)
+
+
+class AudioEffectsControlView(View):
+    """Interactive popup to manage advanced audio effects and speed."""
+    def __init__(self, player, parent_view):
+        super().__init__(timeout=60)
+        self.player = player
+        self.parent_view = parent_view
+
+    @button(label="Karaoke (Vocal Cut)", style=discord.ButtonStyle.secondary, emoji="🎤", row=0)
+    async def karaoke_btn(self, interaction: discord.Interaction, button: Button):
+        await self.parent_view.toggle_filter(interaction, "karaoke", "Karaoke (Vocal Cut)")
+
+    @button(label="Vaporwave", style=discord.ButtonStyle.secondary, emoji="📼", row=0)
+    async def vaporwave_btn(self, interaction: discord.Interaction, button: Button):
+        await self.parent_view.toggle_filter(interaction, "vaporwave", "Vaporwave Retro")
+
+    @button(label="Speed 1.25x", style=discord.ButtonStyle.secondary, emoji="⏩", row=0)
+    async def speed_fast_btn(self, interaction: discord.Interaction, button: Button):
+        self.player.custom_speed = 1.25 if self.player.custom_speed != 1.25 else 1.0
+        await self.player.restart_current_with_filters()
+        await interaction.response.send_message(f"⏩ **Playback Speed:** `{self.player.custom_speed}x`", ephemeral=True)
+
+    @button(label="Speed 0.85x", style=discord.ButtonStyle.secondary, emoji="⏪", row=1)
+    async def speed_slow_btn(self, interaction: discord.Interaction, button: Button):
+        self.player.custom_speed = 0.85 if self.player.custom_speed != 0.85 else 1.0
+        await self.player.restart_current_with_filters()
+        await interaction.response.send_message(f"⏪ **Playback Speed:** `{self.player.custom_speed}x`", ephemeral=True)
+
+    @button(label="Reset All Audio FX", style=discord.ButtonStyle.danger, emoji="🔄", row=1)
+    async def reset_fx_btn(self, interaction: discord.Interaction, button: Button):
+        self.player.active_filters.clear()
+        self.player.custom_speed = 1.0
+        await self.player.restart_current_with_filters()
+        await interaction.response.send_message("✨ **All audio filters reset to Natural Sound!**", ephemeral=True)
+        if self.player.now_playing_message:
+            try:
+                await self.player.now_playing_message.edit(embed=self.player.build_now_playing_embed(), view=self.parent_view)
+            except Exception:
+                pass
+
 
 class QueuePaginationView(View):
     """Pagination buttons for viewing large song queues."""

@@ -144,6 +144,10 @@ class TicketCloseView(View):
 class IdentityRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
+        self.add_item(SelfRoleButton("Male", "Male", "👦", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Female", "Female", "👧", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("18+ Adult", "18+ Adult", "🔞", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Under 18", "Under 18", "🎒", discord.ButtonStyle.secondary, row=0))
 
 
 class VerifyButtonView(View):

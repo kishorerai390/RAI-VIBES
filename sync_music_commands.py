@@ -236,7 +236,35 @@ music_commands_payload = [
         "description": "Reset and remove all active audio filters."
     },
 
-    # 4. Utilities & Info
+    # 4. Community, Leveling & Info
+    {
+        "name": "rank",
+        "description": "View your current level, XP, coins, and server ranking card.",
+        "options": [
+            {
+                "name": "member",
+                "description": "Member whose rank card you want to inspect (defaults to you)",
+                "type": 6,
+                "required": False
+            }
+        ]
+    },
+    {
+        "name": "coins",
+        "description": "Check your current coin balance and economy status.",
+        "options": [
+            {
+                "name": "member",
+                "description": "Member to inspect (defaults to you)",
+                "type": 6,
+                "required": False
+            }
+        ]
+    },
+    {
+        "name": "leaderboard",
+        "description": "View the Top 10 most active members on the server."
+    },
     {
         "name": "c",
         "description": "Browse all RAI VIBES commands in an interactive Rythm-style directory."
