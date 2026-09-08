@@ -352,14 +352,18 @@ class VoiceHub(commands.Cog):
         self.temp_channels = {}  # channel_id: owner_id
         self.temp_db_path = os.path.join("data", "temp_vcs.json")
         self.deletion_tasks: Dict[int, asyncio.Task] = {}
+        self.deaf_tracker: Dict[int, float] = {}
         self._load_temp_channels()
 
     async def cog_load(self):
         if not self.cleanup_temp_channels_task.is_running():
             self.cleanup_temp_channels_task.start()
+        if not self.afk_mover_task.is_running():
+            self.afk_mover_task.start()
 
     def cog_unload(self):
         self.cleanup_temp_channels_task.cancel()
+        self.afk_mover_task.cancel()
         for task in self.deletion_tasks.values():
             task.cancel()
         self.deletion_tasks.clear()
@@ -453,6 +457,41 @@ class VoiceHub(commands.Cog):
     @cleanup_temp_channels_task.before_loop
     async def before_cleanup_task(self):
         import asyncio
+        while not self.bot.is_ready():
+            await asyncio.sleep(1)
+
+    @tasks.loop(minutes=2)
+    async def afk_mover_task(self):
+        """Voice Butler: Automatically moves members who remain deafened/idle for 15+ minutes to the AFK channel."""
+        await self.bot.wait_until_ready()
+        now = time.time()
+        for guild in self.bot.guilds:
+            afk_ch = guild.afk_channel or guild.get_channel(1545502813889499136)
+            if not afk_ch:
+                continue
+
+            for vc in guild.voice_channels:
+                if vc.id == afk_ch.id:
+                    continue
+                for member in vc.members:
+                    if member.bot:
+                        continue
+                    
+                    if member.voice and (member.voice.self_deaf or member.voice.deaf):
+                        if member.id not in self.deaf_tracker:
+                            self.deaf_tracker[member.id] = now
+                        elif now - self.deaf_tracker[member.id] >= 900:  # 15 minutes (900 seconds)
+                            try:
+                                await member.move_to(afk_ch, reason="AFK Voice Butler: Idle & deafened for over 15 minutes")
+                                self.deaf_tracker.pop(member.id, None)
+                                logger.info(f"Moved {member.name} to AFK channel after 15 minutes of idle/deafened status.")
+                            except Exception as e:
+                                logger.debug(f"Could not move {member.name} to AFK: {e}")
+                    else:
+                        self.deaf_tracker.pop(member.id, None)
+
+    @afk_mover_task.before_loop
+    async def before_afk_mover(self):
         while not self.bot.is_ready():
             await asyncio.sleep(1)
 

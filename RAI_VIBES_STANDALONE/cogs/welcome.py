@@ -345,21 +345,28 @@ class Welcome(commands.Cog):
 
         # 6. Welcome DM disabled to avoid spamming member inboxes
 
-        # 7. Anti-Alt Account Check
+        # 7. Anti-Alt & Young Account Surveillance
         now_dt = discord.utils.utcnow()
         account_age = (now_dt - member.created_at).days
-        if account_age < 3:
-            log_chan = discord.utils.get(guild.text_channels, name="📋・mod-logs")
+        if account_age < 7:
+            log_chan = (
+                guild.get_channel(1546593526073135107) or
+                guild.get_channel(1546540192343523399) or
+                next((c for c in guild.text_channels if "security" in c.name.lower() or "audit" in c.name.lower()), None)
+            )
             if log_chan:
                 alt_embed = discord.Embed(
-                    title="⚠️ [SECURITY ALERT] New / Alt Account Joined",
+                    title="⚠️ [SECURITY ALERT] Young / Potential Alt Account Joined",
                     description=(
-                        f"**User:** {member.mention} (`{member.id}`)\n"
+                        f"**Member:** {member.mention} (`{member.name}` • ID: `{member.id}`)\n"
                         f"**Account Age:** `{account_age} day(s) old` (Created <t:{int(member.created_at.timestamp())}:R>)\n"
-                        f"**Notice:** Monitored for suspicious raid activity."
+                        f"**Risk Level:** `{'HIGH' if account_age < 2 else 'ELEVATED'}`\n"
+                        f"**Status:** Under automated surveillance by RAI SENTINEL."
                     ),
                     color=config.COLOR_WARNING
                 )
+                alt_embed.set_thumbnail(url=member.display_avatar.url)
+                alt_embed.set_footer(text="RAI SENTINEL 🛡️ Autonomous Defense Matrix", icon_url=config.RAI_ICON_URL)
                 try:
                     await log_chan.send(embed=alt_embed)
                 except Exception:
@@ -427,13 +434,18 @@ class Welcome(commands.Cog):
         # 3. Public Goodbye channel spam disabled to keep chat clean
 
         # 4. Mod Log Record
-        log_chan = discord.utils.get(guild.text_channels, name="📋・mod-logs")
+        log_chan = (
+            guild.get_channel(1546540192343523399) or
+            guild.get_channel(1546122222329008199) or
+            next((c for c in guild.text_channels if "audit" in c.name.lower() or "goodbye" in c.name.lower()), None)
+        )
         if log_chan:
             log_embed = discord.Embed(
                 title="👋 Member Left",
                 description=f"**{member.name}** (`{member.id}`) has departed. Member count is now **{member_count}**.",
                 color=config.COLOR_SECONDARY
             )
+            log_embed.timestamp = discord.utils.utcnow()
             try:
                 await log_chan.send(embed=log_embed)
             except Exception:

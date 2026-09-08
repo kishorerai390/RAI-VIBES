@@ -24,18 +24,23 @@ class AntiSpam(commands.Cog):
         self.msg_history: Dict[int, deque] = defaultdict(lambda: deque(maxlen=5))
         # User violation strike tracker: guild_id -> user_id -> count
         self.violations: Dict[int, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
+        # Channel burst velocity tracker
+        self.channel_rates: Dict[int, deque] = defaultdict(lambda: deque(maxlen=30))
+        self.active_slowmodes = set()
 
     async def get_log_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
+        chan = guild.get_channel(1546593526073135107) or guild.get_channel(1546540192343523399)
+        if chan and isinstance(chan, discord.TextChannel):
+            return chan
         settings = await database.get_guild_settings(guild.id)
         log_id = settings.get("log_channel_id")
         if log_id:
             channel = guild.get_channel(log_id)
             if channel and isinstance(channel, discord.TextChannel):
                 return channel
-        for name in ["security-logs", "mod-logs"]:
-            channel = discord.utils.get(guild.text_channels, name=name)
-            if channel:
-                return channel
+        for ch in guild.text_channels:
+            if "security" in ch.name.lower() or "audit" in ch.name.lower():
+                return ch
         return None
 
     async def handle_violation(self, message: discord.Message, reason: str):
@@ -128,6 +133,34 @@ class AntiSpam(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
             return
+
+        # Dynamic Chat Slowmode Scaler: Temporary burst defense
+        ch = message.channel
+        if isinstance(ch, discord.TextChannel):
+            now_ts = time.time()
+            self.channel_rates[ch.id].append(now_ts)
+            burst_msgs = [t for t in self.channel_rates[ch.id] if now_ts - t <= 3.0]
+            if len(burst_msgs) >= 7 and ch.id not in self.active_slowmodes and not ch.slowmode_delay:
+                self.active_slowmodes.add(ch.id)
+                try:
+                    await ch.edit(slowmode_delay=3, reason="[Sentinel Dynamic Automod] Rapid chat burst detected")
+                    notice = await ch.send("🌊 **Dynamic Slowmode Activated (3s):** High message velocity detected. Speed will restore automatically once calm.")
+                    
+                    async def _restore():
+                        import asyncio
+                        await asyncio.sleep(20)
+                        try:
+                            await ch.edit(slowmode_delay=0, reason="[Sentinel Dynamic Automod] Chat velocity stabilized")
+                            await notice.delete()
+                        except Exception:
+                            pass
+                        finally:
+                            self.active_slowmodes.discard(ch.id)
+                            
+                    import asyncio
+                    asyncio.create_task(_restore())
+                except Exception:
+                    self.active_slowmodes.discard(ch.id)
 
         member = message.author
         if not isinstance(member, discord.Member):
