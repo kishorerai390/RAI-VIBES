@@ -1,4 +1,6 @@
+import io
 import json
+import time
 from pathlib import Path
 import discord
 from discord.ext import commands
@@ -173,6 +175,8 @@ class Favorites(commands.Cog):
                 "• `/playlist play <name>` - Enqueue an entire playlist\n"
                 "• `/playlist list` - View your custom playlists\n"
                 "• `/playlist view <name>` - Inspect songs in a playlist\n"
+                "• `/playlist export <name>` - Export a playlist as a JSON backup file\n"
+                "• `/playlist import_file <name>` - Import a playlist from a JSON backup file\n"
                 "• `/playlist delete <name>` - Delete a playlist",
                 ephemeral=True
             )
@@ -424,6 +428,98 @@ class Favorites(commands.Cog):
         save_playlists(data)
 
         await ctx.send(f"🗑️ Successfully deleted playlist **`{matched_name}`**.", ephemeral=True)
+
+    @playlist.command(name="export", description="Export a playlist as a downloadable JSON backup file.")
+    @app_commands.describe(name="Name of the playlist to export")
+    async def pl_export(self, ctx: commands.Context, name: str):
+        user_id = str(ctx.author.id)
+        data = load_playlists()
+        user_pls = data.get(user_id, {})
+
+        matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
+        if not matched_name or not user_pls[matched_name]:
+            return await ctx.send(f"❌ Playlist `{name}` not found or contains no songs.", ephemeral=True)
+
+        tracks = user_pls[matched_name]
+        export_payload = {
+            "version": "1.0",
+            "bot": "RAI VIBES 💗",
+            "exported_by": ctx.author.display_name,
+            "playlist_name": matched_name,
+            "track_count": len(tracks),
+            "tracks": tracks
+        }
+        json_bytes = json.dumps(export_payload, indent=2, ensure_ascii=False).encode("utf-8")
+        safe_filename = "".join(c for c in matched_name if c.isalnum() or c in ("-", "_")).strip() or "playlist"
+        discord_file = discord.File(io.BytesIO(json_bytes), filename=f"{safe_filename}_backup.json")
+
+        embed = discord.Embed(
+            title=f"📦 Exported Playlist • {matched_name}",
+            description=(
+                f"✅ Successfully exported **{len(tracks)} tracks** from **`{matched_name}`**!\n\n"
+                f"📎 Download the `.json` file below. You can restore or share this playlist anytime using `/playlist import_file`."
+            ),
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, file=discord_file)
+
+    @playlist.command(name="import_file", description="Import a playlist from a JSON backup file.")
+    @app_commands.describe(name="New or existing playlist name", attachment="The .json backup file to import")
+    async def pl_import_file(self, ctx: commands.Context, name: str, attachment: discord.Attachment):
+        if not attachment.filename.lower().endswith(".json"):
+            return await ctx.send("❌ Please attach a valid `.json` playlist backup file.", ephemeral=True)
+
+        if attachment.size > 2 * 1024 * 1024:
+            return await ctx.send("❌ File is too large. Maximum backup file size is 2 MB.", ephemeral=True)
+
+        try:
+            content = await attachment.read()
+            payload = json.loads(content.decode("utf-8"))
+        except Exception as e:
+            return await ctx.send(f"❌ Failed to read backup file: `{e}`", ephemeral=True)
+
+        tracks = payload.get("tracks") if isinstance(payload, dict) else payload
+        if not isinstance(tracks, list) or not tracks:
+            return await ctx.send("❌ Backup file does not contain any valid tracks.", ephemeral=True)
+
+        user_id = str(ctx.author.id)
+        data = load_playlists()
+        if user_id not in data:
+            data[user_id] = {}
+
+        clean_name = name.strip()
+        matched_name = next((k for k in data[user_id].keys() if k.lower() == clean_name.lower()), clean_name)
+        if matched_name not in data[user_id]:
+            data[user_id][matched_name] = []
+
+        existing_titles = {item.get("title") for item in data[user_id][matched_name]}
+        added_count = 0
+        for t in tracks:
+            if isinstance(t, dict) and t.get("title") and t.get("title") not in existing_titles:
+                data[user_id][matched_name].append({
+                    "title": t.get("title"),
+                    "url": t.get("url") or "",
+                    "duration": t.get("duration", 0),
+                    "thumbnail": t.get("thumbnail"),
+                    "uploader": t.get("uploader", "Unknown Artist")
+                })
+                existing_titles.add(t.get("title"))
+                added_count += 1
+
+        save_playlists(data)
+
+        embed = discord.Embed(
+            title=f"📥 Playlist Imported • {matched_name}",
+            description=(
+                f"✅ Successfully imported **{added_count} new tracks** into **`{matched_name}`**!\n"
+                f"Total tracks in playlist: `{len(data[user_id][matched_name])}`\n\n"
+                f"Play anytime with `/playlist play {matched_name}`"
+            ),
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):

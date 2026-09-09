@@ -701,6 +701,27 @@ class GuildMusicPlayer:
                     except Exception:
                         pass
 
+                # Fallback: recover via SoundCloud if stream_url is missing
+                if not stream_url:
+                    try:
+                        clean_query = re.sub(r'[\(\[][^()]*?[\)\]]', '', song.title).strip()
+                        if ' - ' in clean_query:
+                            clean_query = clean_query.split(' - ')[0].strip()
+                        sc_song = await Song.create_source(f"scsearch1:{clean_query}", song.requester, self.bot.loop)
+                        if sc_song and sc_song.url:
+                            stream_url = sc_song.url
+                            song.url = sc_song.url
+                            song.webpage_url = sc_song.webpage_url
+                            song.source_type = "soundcloud"
+                    except Exception:
+                        pass
+
+                if not stream_url:
+                    if self.text_channel:
+                        await self.text_channel.send(f"⚠️ Audio source unavailable for `{song.title}`. Skipping to next track.")
+                    self.play_next_song.set()
+                    continue
+
                 filter_args = get_filter_string(self.active_filters, self.custom_speed)
                 ffmpeg_opt = f"-vn -bufsize 4096k -threads 2 {filter_args}".strip()
 
