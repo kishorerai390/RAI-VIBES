@@ -599,10 +599,22 @@ async def main():
     # 2. Start Self-Ping Task for Render
     asyncio.create_task(keep_awake())
 
-    tasks = [run_vibes(token_vibes)]
+    # Render does not route UDP packets required for Discord Voice connections.
+    # Therefore, RAI SENTINEL (security/moderation) runs 24/7 on Render cloud,
+    # while RAI VIBES (music streaming) runs locally with full UDP audio support.
+    enable_cloud_music = os.getenv("ENABLE_CLOUD_MUSIC", "false").lower() == "true"
+    tasks = []
+    if enable_cloud_music and token_vibes:
+        tasks.append(run_vibes(token_vibes))
     if token_sentinel and token_sentinel != "YOUR_DISCORD_BOT_TOKEN_HERE":
         tasks.append(run_sentinel(token_sentinel))
-    await asyncio.gather(*tasks)
+    
+    if not tasks:
+        logger.warning("No bots selected to run. Standing by with health web server.")
+        while True:
+            await asyncio.sleep(3600)
+    else:
+        await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     try:
