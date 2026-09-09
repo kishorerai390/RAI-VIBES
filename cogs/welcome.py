@@ -337,13 +337,35 @@ class Welcome(commands.Cog):
                 except Exception:
                     pass
 
-        # 4. Default Welcome Image (Image 1 - The Office Celebration GIF)
-        DEFAULT_WELCOME_IMAGE_URL = "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"
-
-        # 5. Public Welcome Announcement disabled so Koya handles Welcome & Goodbye exclusively
-        # (Auto-role, XP bonus, and stats updates remain active in background)
-
-        # 6. Welcome DM disabled to avoid spamming member inboxes
+        # 5. Public Welcome Announcement with real-time auto-updating Member Count
+        welcome_chan = guild.get_channel(1545502705643167876) # #・𝘄𝗲𝗹𝗰𝗼𝗺𝗲・
+        if welcome_chan:
+            DIVIDER = "<a:w_welc1:1547271923891707915><:w_dash:1547271874981920868><:w_dash:1547271874981920868><:w_dash:1547271874981920868><:w_dash:1547271874981920868><a:w_welc2:1547271930699190424>"
+            embed = discord.Embed(
+                title="<a:sparkle_love:1547271978883350568> ✦ WELCOME TO RAI FAM 💗 ✦ <a:sparkle_love:1547271978883350568>",
+                description=(
+                    f"{DIVIDER}\n\n"
+                    f"Hey {member.mention}, welcome to **RAI FAM 💗**! ✨\n"
+                    f"We are thrilled to have you here in our sanctuary!\n\n"
+                    f"<:badge_1:1547271940279107665> **Get Verified:** <#1545502700840427702>\n"
+                    f"<:badge_2:1547271946645934122> **Server Rules:** <#1545502710101704714>\n"
+                    f"<:badge_3:1547271951297413281> **Pick Roles:** <#1545502722739150898>\n"
+                    f"💬 **General Chat:** <#1545502730699808768>\n\n"
+                    f"{DIVIDER}\n"
+                    f"👑 **Member #{member_count}** • Enjoy your stay! 🍿"
+                ),
+                color=0xFF2A85
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text=f"Member #{member_count} • RAI FAM 💗", icon_url=guild.icon.url if guild.icon else None)
+            try:
+                await welcome_chan.send(
+                    content=f"🎉 Welcome {member.mention} to **RAI FAM 💗**! 🚀",
+                    embed=embed,
+                    view=WelcomeQuickActionsView(member)
+                )
+            except Exception as e:
+                logger.error(f"Error sending welcome embed: {e}")
 
         # 7. Anti-Alt & Young Account Surveillance
         now_dt = discord.utils.utcnow()

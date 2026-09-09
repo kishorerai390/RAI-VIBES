@@ -24,7 +24,7 @@ from utils.filters import get_filter_string
 yt_dlp.utils.bug_reports_message = lambda *args, **kargs: ""
 
 YTDL_OPTIONS = {
-    "format": "bestaudio[ext=m4a]/bestaudio/best",
+    "format": "bestaudio/best",
     "noplaylist": True,
     "nocheckcertificate": True,
     "ignoreerrors": False,
@@ -35,11 +35,6 @@ YTDL_OPTIONS = {
     "skip_download": True,
     "socket_timeout": 15,
     "retries": 3,
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["android_vr", "android"]
-        }
-    }
 }
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
@@ -165,7 +160,9 @@ class Song:
                         break
             data = selected_entry
 
-        return cls(data, requester=requester, source_type="youtube")
+        extractor = str(data.get("extractor", "")).lower()
+        src_type = "soundcloud" if "soundcloud" in extractor else "youtube"
+        return cls(data, requester=requester, source_type=src_type)
 
     @classmethod
     async def search_multiple(cls, query: str, limit: int = 5, loop: asyncio.AbstractEventLoop = None) -> List[dict]:
@@ -745,6 +742,29 @@ class GuildMusicPlayer:
 
             await self.play_next_song.wait()
 
+            # Automatic Failover: If YouTube track exited prematurely (< 3.0s), seamlessly recover via SoundCloud
+            played_duration = (time.time() - self.start_time) if self.start_time else 0
+            if (
+                played_duration < 3.0
+                and song
+                and getattr(song, "source_type", "youtube") == "youtube"
+                and not self.is_restarting_for_filters
+            ):
+                print(f"[Audio Failover] Track '{song.title}' exited prematurely ({played_duration:.1f}s). Attempting SoundCloud failover...")
+                try:
+                    clean_query = re.sub(r'[\(\[][^()]*?[\)\]]', '', song.title).strip()
+                    if " - " in clean_query:
+                        clean_query = clean_query.split(" - ")[0].strip()
+                    sc_song = await Song.create_source(f"scsearch1:{clean_query}", song.requester, self.bot.loop)
+                    if sc_song and sc_song.url:
+                        sc_song.source_type = "soundcloud"
+                        print(f"[Audio Failover] Successfully recovered '{song.title}' via SoundCloud: {sc_song.title}")
+                        self.queue.appendleft(sc_song)
+                        if self.text_channel:
+                            await self.text_channel.send(f"🔄 **Recovered audio stream via high-speed backup:** [{sc_song.title}]({sc_song.webpage_url})")
+                except Exception as sc_err:
+                    print(f"[Audio Failover Error] {sc_err}")
+
     async def wait_for_song(self):
         while not self.queue:
             await asyncio.sleep(1)
@@ -812,6 +832,12 @@ class Music(commands.Cog):
 
         # Target VC must be the user's voice channel or the bot's current active voice channel
         target_vc = user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None)
+
+        # If user ran command directly inside a voice channel's text chat, target that voice channel
+        if not target_vc:
+            ch_obj = getattr(ctx_or_interaction, "channel", None)
+            if ch_obj and isinstance(ch_obj, (discord.VoiceChannel, discord.StageChannel)):
+                target_vc = ch_obj
 
         if not target_vc:
             embed = discord.Embed(
@@ -1066,14 +1092,32 @@ class Music(commands.Cog):
 
         # Direct YouTube / Keyword Search
         try:
+            status_msg = None
+            if not ctx.interaction:
+                try:
+                    status_msg = await ctx.send(f"🔍 **Searching & buffering:** `{query[:60]}`...")
+                except Exception:
+                    pass
+
             song_obj = await Song.create_source(query, ctx.author, self.bot.loop)
             if not song_obj:
+                if status_msg:
+                    try:
+                        await status_msg.delete()
+                    except Exception:
+                        pass
                 if ctx.interaction:
                     return await ctx.interaction.followup.send(f"❌ No results found for: `{query}`", ephemeral=True)
                 return await ctx.send(f"❌ No results found for: `{query}`")
 
             is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
             player.queue.append(song_obj)
+
+            if status_msg and not is_currently_playing:
+                try:
+                    await status_msg.delete()
+                except Exception:
+                    pass
 
             if is_currently_playing:
                 # Calculate estimated time until playing (Rythm Style)
@@ -1099,6 +1143,12 @@ class Music(commands.Cog):
                 embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)
                 embed.set_footer(text=f"Requested by {ctx.author.display_name} • RAI VIBES 💗", icon_url=ctx.author.display_avatar.url)
                 
+                if status_msg:
+                    try:
+                        await status_msg.delete()
+                    except Exception:
+                        pass
+
                 if ctx.interaction:
                     await ctx.interaction.followup.send(embed=embed)
                 else:

@@ -4,16 +4,16 @@ from discord.ui import View, Button, button
 
 ROLE_ID_MAP = {
     # Gaming Squads
-    "Free Fire": 1545516397034078269,
-    "BGMI": 1545516399663779871,
-    "GTA RP": 1546062595293978694,
-    "Roblox": 1545516402188881991,
+    "Free Fire": 1547274142414409798,
+    "BGMI": 1547274144809361428,
+    "Roblox": 1547274147040722964,
+    "PC Gaming": 1547274149414567937,
 
     # Notifications & Pings
     "Announcements": 1546088542885642324,
-    "Giveaways": 1546088546555924534,
+    "Giveaways": 1547274154380759110,
     "Tournaments": 1546088548913119323,
-    "Movie Nights": 1546062599253135420,
+    "Movie Nights": 1547274151944003716,
 
     # Member Identification
     "Male": 1546095934935531520,

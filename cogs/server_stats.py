@@ -77,7 +77,17 @@ class ServerStats(commands.Cog):
         except Exception as e:
             logger.error(f"Unexpected stats error: {e}")
 
-    @tasks.loop(minutes=15)
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member):
+        if member.guild.id == GUILD_ID:
+            await self.update_stats()
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member):
+        if member.guild.id == GUILD_ID:
+            await self.update_stats()
+
+    @tasks.loop(minutes=5)
     async def stats_loop(self):
         await self.update_stats()
 
