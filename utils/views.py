@@ -274,8 +274,34 @@ class MusicPlayerView(View):
 
     async def toggle_filter(self, interaction: discord.Interaction, filter_name: str, display_name: str):
         player = await self.get_player(interaction)
-        if not player or not player.current:
-            return await self.send_msg(interaction, "❌ RAI VIBES must be playing audio to apply filters.")
+        if not player:
+            return await self.send_msg(interaction, "❌ Music player is not active.")
+
+        # If current track is missing but voice client is actively playing (e.g. 24/7 radio stream)
+        if not player.current and player.voice_client and player.voice_client.is_playing():
+            radio_cog = interaction.client.get_cog("Radio")
+            st_key = getattr(radio_cog, "_last_streamed_station", "lofi") if radio_cog else "lofi"
+            try:
+                from cogs.radio import RADIO_STATIONS
+                from cogs.music import Song
+                st_data = RADIO_STATIONS.get(st_key, RADIO_STATIONS["lofi"])
+                player.current = Song(
+                    data={
+                        "title": f"📻 {st_data['name']}",
+                        "url": st_data["url"],
+                        "webpage_url": st_data["url"],
+                        "duration": 0,
+                        "thumbnail": st_data["thumb"],
+                        "uploader": "24/7 Continuous Music Engine"
+                    },
+                    requester=interaction.guild.me,
+                    source_type="radio"
+                )
+            except Exception:
+                pass
+
+        if not player.current:
+            return await self.send_msg(interaction, "❌ No track is currently streaming. Use `/play <song>` to start music first!")
 
         if filter_name in player.active_filters:
             player.active_filters.remove(filter_name)

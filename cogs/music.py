@@ -186,12 +186,14 @@ class Song:
 
 
 class SearchSelectView(View):
-    """Dropdown selector for /search results."""
-    def __init__(self, music_cog, ctx, results: List[dict]):
-        super().__init__(timeout=45)
+    """Interactive Dropdown & Button selector for multiple matching search results."""
+    def __init__(self, music_cog, ctx, results: List[dict], is_queue_mode: bool = False):
+        super().__init__(timeout=60)
         self.music_cog = music_cog
         self.ctx = ctx
         self.results = results
+        self.is_queue_mode = is_queue_mode
+        self.message: Optional[discord.Message] = None
 
         options = []
         for i, item in enumerate(results):
@@ -199,21 +201,56 @@ class SearchSelectView(View):
             title = item.get("title", f"Track {i+1}")[:80]
             options.append(discord.SelectOption(
                 label=f"{i+1}. {title[:50]}",
-                description=f"Duration: {dur} • {item.get('uploader', 'Artist')[:35]}",
+                description=f"⏱️ {dur} • 👤 {item.get('uploader', 'Artist')[:35]}",
                 value=str(i)
             ))
 
-        select = Select(placeholder="⚡ Select a track to play...", options=options)
+        select = Select(placeholder="⚡ Choose which track to play...", options=options, row=0)
         select.callback = self.select_callback
         self.add_item(select)
 
+        # Quick 1-tap numbered buttons for mobile users
+        btn_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+        for i in range(min(len(results), 5)):
+            btn = Button(label=f"Track {i+1}", emoji=btn_emojis[i], style=discord.ButtonStyle.secondary, row=1 if i < 3 else 2)
+            btn.callback = self.make_button_callback(i)
+            self.add_item(btn)
+
+        cancel_btn = Button(label="Cancel", emoji="❌", style=discord.ButtonStyle.danger, row=2)
+        cancel_btn.callback = self.cancel_callback
+        self.add_item(cancel_btn)
+
+    def _get_author_id(self) -> Optional[int]:
+        return getattr(getattr(self.ctx, "author", None), "id", None) or getattr(getattr(self.ctx, "user", None), "id", None)
+
+    def make_button_callback(self, idx: int):
+        async def btn_callback(interaction: discord.Interaction):
+            await self.process_selection(interaction, idx)
+        return btn_callback
+
     async def select_callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.ctx.author.id:
+        selected_idx = int(interaction.data["values"][0])
+        await self.process_selection(interaction, selected_idx)
+
+    async def cancel_callback(self, interaction: discord.Interaction):
+        author_id = self._get_author_id()
+        if author_id and interaction.user.id != author_id:
+            return await interaction.response.send_message("❌ This search menu belongs to another user.", ephemeral=True)
+        await interaction.response.edit_message(content="✨ Song selection canceled.", embed=None, view=None)
+        await asyncio.sleep(3)
+        try:
+            target_msg = self.message or interaction.message
+            if target_msg:
+                await target_msg.delete()
+        except Exception:
+            pass
+
+    async def process_selection(self, interaction: discord.Interaction, selected_idx: int):
+        author_id = self._get_author_id()
+        if author_id and interaction.user.id != author_id:
             return await interaction.response.send_message("❌ This search menu belongs to another user.", ephemeral=True)
 
-        selected_idx = int(interaction.data["values"][0])
         selected_data = self.results[selected_idx]
-
         voice_client = await self.music_cog.ensure_voice(interaction)
         if not voice_client:
             return
@@ -223,20 +260,38 @@ class SearchSelectView(View):
         player.text_channel = interaction.channel
 
         song = Song(selected_data, requester=interaction.user, source_type="youtube")
-        is_queued = player.enqueue_track(song)
+        is_queued = player.enqueue_track(song, is_queue_mode=self.is_queue_mode)
 
-        title = "📥 Enqueued to Playback Queue" if is_queued else "🎶 Now Playing..."
-        embed = discord.Embed(
-            title=title,
-            description=f"[{song.title}]({song.webpage_url})",
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_thumbnail(url=song.thumbnail)
-        embed.add_field(name="Playback Status", value=f"`Position #{len(player.queue)}`" if is_queued else "`Streaming Now`", inline=True)
-        embed.add_field(name="Requested By", value=interaction.user.mention, inline=True)
-        embed.set_footer(text="RAI VIBES 💗 Music Engine", icon_url=config.RAI_ICON_URL)
+        if is_queued:
+            est_sec = 0
+            if player.current:
+                cur_elapsed = int(time.time() - player.start_time) if player.start_time else 0
+                est_sec += max(0, player.current.duration - cur_elapsed)
+            for q_song in list(player.queue)[:-1]:
+                est_sec += max(0, q_song.duration)
+            est_str = time.strftime("%M:%S", time.gmtime(est_sec)) if est_sec > 0 else "Playing Next"
+            dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
 
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
+            card_title = "📥 Enqueued to Playback Queue" if self.is_queue_mode else "🎵 Song Added to Queue"
+            embed = discord.Embed(
+                title=card_title,
+                description=f"**[{song.title}]({song.webpage_url})**",
+                color=config.COLOR_PRIMARY
+            )
+            embed.set_thumbnail(url=song.thumbnail)
+            embed.add_field(name="⏱️ Track Duration", value=f"`{dur_str}`", inline=True)
+            embed.add_field(name="📍 Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
+            embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)
+            embed.set_footer(text=f"Requested by {interaction.user.display_name} • RAI VIBES 💗", icon_url=interaction.user.display_avatar.url)
+            await interaction.response.edit_message(content=None, embed=embed, view=None)
+            asyncio.create_task(self.music_cog._auto_delete(interaction.message, 10))
+        else:
+            embed = discord.Embed(
+                description=f"🎶 **Starting playback:** [{song.title}]({song.webpage_url})",
+                color=config.COLOR_PRIMARY
+            )
+            await interaction.response.edit_message(content=None, embed=embed, view=None)
+            asyncio.create_task(self.music_cog._auto_delete(interaction.message, 3))
 
 
 class ResumePlaybackView(View):
@@ -571,7 +626,8 @@ class GuildMusicPlayer:
             except Exception:
                 pass
 
-        before_opt = f"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -ss {elapsed} -nostdin"
+        seek_opt = f"-ss {elapsed} " if (getattr(self.current, "duration", 0) > 0 and elapsed > 0) else ""
+        before_opt = f"-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 {seek_opt}-nostdin".strip()
         ffmpeg_opt = f"-vn -bufsize 4096k -threads 2 {filter_args}".strip()
 
         def after_playing(err):
@@ -1189,6 +1245,50 @@ class Music(commands.Cog):
                     status_msg = await ctx.send(f"🔍 **Searching & buffering:** `{query[:60]}`...")
                 except Exception:
                     pass
+
+            is_direct_url = query.startswith("http://") or query.startswith("https://")
+
+            # If searching by name and multiple tracks exist, ask the user which one they want to play:
+            if not is_direct_url:
+                results = await Song.search_multiple(query, limit=5, loop=self.bot.loop)
+                if not results:
+                    if status_msg:
+                        try:
+                            await status_msg.delete()
+                        except Exception:
+                            pass
+                    if ctx.interaction:
+                        return await ctx.interaction.followup.send(f"❌ No results found for: `{query}`", ephemeral=True)
+                    return await ctx.send(f"❌ No results found for: `{query}`")
+
+                if len(results) > 1:
+                    if status_msg:
+                        try:
+                            await status_msg.delete()
+                        except Exception:
+                            pass
+
+                    embed = discord.Embed(
+                        title=f"⚡ Multiple Matches Found: \"{query[:40]}\"",
+                        description="Select which version you want to play using the **dropdown** or **number buttons** below:",
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_thumbnail(url=results[0].get("thumbnail") or config.RAI_ICON_URL)
+                    for i, item in enumerate(results, 1):
+                        dur = time.strftime("%M:%S", time.gmtime(item.get("duration", 0)))
+                        embed.add_field(
+                            name=f"`{i}.` {item.get('title', 'Track')[:45]}",
+                            value=f"⏱️ `{dur}` • 👤 `{item.get('uploader', 'Artist')[:28]}`",
+                            inline=False
+                        )
+                    embed.set_footer(text="Tap Track 1-5 or choose from dropdown • RAI VIBES 💗", icon_url=config.RAI_ICON_URL)
+
+                    view = SearchSelectView(self, ctx, results, is_queue_mode=is_queue_mode)
+                    if ctx.interaction:
+                        view.message = await ctx.interaction.followup.send(embed=embed, view=view)
+                    else:
+                        view.message = await ctx.send(embed=embed, view=view)
+                    return
 
             song_obj = await Song.create_source(query, ctx.author, self.bot.loop)
             if not song_obj:

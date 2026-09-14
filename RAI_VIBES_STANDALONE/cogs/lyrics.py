@@ -19,9 +19,10 @@ class Lyrics(commands.Cog):
         t = raw_title.replace("@", "")
 
         junk_patterns = [
-            r"\([^)]*(?:music|official|video|audio|lyric|lyrics|lyrical|song|hd|4k|remastered|visualizer|prod|prod\.|feat|feat\.|ft|ft\.|full)[^)]*\)",
-            r"\[[^\]]*(?:music|official|video|audio|lyric|lyrics|lyrical|song|hd|4k|remastered|visualizer|prod|prod\.|feat|feat\.|ft|ft\.|full)[^\]]*\]",
-            r"(?:official\s+music\s+video|official\s+video|music\s+video|official\s+audio|lyric\s+video|lyrical\s+video|full\s+song|full\s+video)"
+            r"\([^)]*(?:music|official|video|audio|lyric|lyrics|lyrical|song|hd|4k|remastered|visualizer|prod|prod\.|feat|feat\.|ft|ft\.|full|remix|dj|mashup|slowed|reverb|lo-fi|lofi|bassboost|speed|sped|mix|cover)[^)]*\)",
+            r"\[[^\]]*(?:music|official|video|audio|lyric|lyrics|lyrical|song|hd|4k|remastered|visualizer|prod|prod\.|feat|feat\.|ft|ft\.|full|remix|dj|mashup|slowed|reverb|lo-fi|lofi|bassboost|speed|sped|mix|cover)[^\]]*\]",
+            r"(?:official\s+music\s+video|official\s+video|music\s+video|official\s+audio|lyric\s+video|lyrical\s+video|full\s+song|full\s+video|slowed\s*\+\s*reverb|slowed\s+reverb|dj\s+z\s+remix|remix|mashup)",
+            r"\b(?:feat\.|feat|ft\.|ft)\b.*$"
         ]
         cleaned = t
         for p in junk_patterns:
@@ -32,7 +33,7 @@ class Lyrics(commands.Cog):
         # Split by common metadata separators
         parts = [p.strip() for p in re.split(r"[\-\|\/:]", cleaned) if p.strip()]
 
-        # 1. Individual segments (e.g., 'Radhimaa', 'SaiAbhyankkar')
+        # 1. Individual segments (e.g., 'Radhimaa', 'SaiAbhyankkar', 'Kalyani')
         for p in parts:
             p_clean = re.sub(r"[^\w\s\']", " ", p).strip()
             p_clean = re.sub(r"\s+", " ", p_clean)
@@ -53,6 +54,17 @@ class Lyrics(commands.Cog):
         overall = re.sub(r"\s+", " ", overall)
         if overall and overall not in candidates:
             candidates.append(overall)
+
+        # 4. First 1-2 words fallback (e.g., 'Kalyani')
+        words = overall.split()
+        if len(words) >= 1:
+            base_word = words[0]
+            if len(base_word) > 2 and base_word not in candidates:
+                candidates.append(base_word)
+            if len(words) >= 2:
+                two_words = f"{words[0]} {words[1]}"
+                if two_words not in candidates:
+                    candidates.append(two_words)
 
         return [c for c in candidates if len(c) > 1]
 
