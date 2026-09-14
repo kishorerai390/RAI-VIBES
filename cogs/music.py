@@ -406,47 +406,38 @@ class GuildMusicPlayer:
             vc.stop()
 
     def is_radio_playing(self) -> bool:
-        """Returns True if the current audio stream is 24/7 radio or idle lo-fi broadcast."""
+        """Returns True ONLY if the current audio stream is the 24/7 background radio station."""
         if not self.current:
             return False
-        return (
-            getattr(self.current, "source_type", None) in ("radio", "autoplay")
-            or getattr(self.current, "duration", 1) == 0
-            or "radio" in str(getattr(self.current, "title", "")).lower()
-            or "lo-fi" in str(getattr(self.current, "title", "")).lower()
-            or "fm" in str(getattr(self.current, "title", "")).lower()
-            or "24/7" in str(getattr(self.current, "uploader", ""))
-        )
+        return getattr(self.current, "source_type", None) == "radio"
 
     def enqueue_track(self, song: Song, is_queue_mode: bool = False) -> bool:
         """
         Enqueues a song:
-        - If 24/7 radio/lo-fi is streaming, user track interrupts radio and starts playing immediately!
-        - If another user track is actively playing, song is appended to queue and returns True.
-        - If idle, song is added and playback starts immediately.
-        Returns True if queued behind an active user track, False if playing now.
+        - If 24/7 background radio is streaming, user track interrupts radio and starts playing immediately.
+        - If ANY user song or track is actively playing/paused, the new song is appended to the queue and returns True.
+        - If completely idle, song is added and playback starts immediately.
+        Returns True if queued behind an active track, False if playing right now.
         """
+        vc = self.guild.voice_client
+        is_playing = bool(vc and (vc.is_playing() or vc.is_paused()))
         is_radio = self.is_radio_playing()
-        user_song_active = bool(
-            (self.current is not None and not is_radio)
-            or (self.voice_client and (self.voice_client.is_playing() or self.voice_client.is_paused()) and not is_radio)
-        )
 
+        # 1. Interrupt 24/7 background radio so the user's song begins immediately
         if is_radio:
-            if is_queue_mode and len(self.queue) > 0:
-                self.queue.append(song)
-            else:
-                self.queue.appendleft(song)
-            self.skip()  # Stop the infinite radio stream immediately so user track plays right now!
+            self.queue.appendleft(song)
+            self.skip()  # Stop the infinite radio stream immediately so user track plays right now
             return False
 
-        if user_song_active:
+        # 2. If a track is actively playing or paused, ALWAYS queue behind it!
+        if self.current is not None or is_playing:
             self.queue.append(song)
             return True
-        else:
-            self.queue.append(song)
-            self.play_next_song.set()
-            return False
+
+        # 3. Completely idle: start playback
+        self.queue.append(song)
+        self.play_next_song.set()
+        return False
 
     def shuffle(self):
         temp = list(self.queue)
@@ -853,6 +844,17 @@ class Music(commands.Cog):
         self.bot = bot
         self.players: Dict[int, GuildMusicPlayer] = {}
 
+    @staticmethod
+    async def _auto_delete(msg: Any, delay: int = 15):
+        """Silently deletes temporary enqueue or feedback cards after delay to prevent channel spam."""
+        if not msg:
+            return
+        try:
+            await asyncio.sleep(delay)
+            await msg.delete()
+        except Exception:
+            pass
+
     def get_player(self, guild_id: int) -> Optional[GuildMusicPlayer]:
         if guild_id in self.players:
             return self.players[guild_id]
@@ -1118,21 +1120,32 @@ class Music(commands.Cog):
                     embed.set_footer(text=f"Requested by {ctx.author.display_name} • RAI VIBES 💗", icon_url=ctx.author.display_avatar.url)
                     
                     if ctx.interaction:
-                        await ctx.interaction.followup.send(embed=embed)
+                        sent = await ctx.interaction.followup.send(embed=embed)
+                        if sent:
+                            asyncio.create_task(self._auto_delete(sent, 15))
                     else:
-                        await ctx.send(embed=embed)
+                        sent = await ctx.send(embed=embed)
+                        if sent:
+                            asyncio.create_task(self._auto_delete(sent, 15))
                 else:
-                    embed = discord.Embed(
-                        title="🎶 Now Playing...",
-                        description=f"▶️ Streaming **[{song_obj.title}]({song_obj.webpage_url})** in `{player.voice_client.channel.name if player.voice_client and player.voice_client.channel else 'Voice Channel'}`!",
-                        color=config.COLOR_PRIMARY
-                    )
-                    embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
-                    embed.set_footer(text=f"Requested by {ctx.author.display_name} • High-Fidelity Audio", icon_url=ctx.author.display_avatar.url)
                     if ctx.interaction:
-                        await ctx.interaction.followup.send(embed=embed)
+                        sent = await ctx.interaction.followup.send(
+                            embed=discord.Embed(
+                                description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
+                                color=config.COLOR_PRIMARY
+                            )
+                        )
+                        if sent:
+                            asyncio.create_task(self._auto_delete(sent, 6))
                     else:
-                        await ctx.send(embed=embed)
+                        sent = await ctx.send(
+                            embed=discord.Embed(
+                                description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
+                                color=config.COLOR_PRIMARY
+                            )
+                        )
+                        if sent:
+                            asyncio.create_task(self._auto_delete(sent, 6))
             else:
                 remaining_space = max(0, config.MAX_QUEUE_SIZE - len(player.queue))
                 added_tracks = spotify_tracks[:remaining_space]
@@ -1166,9 +1179,13 @@ class Music(commands.Cog):
                 embed.set_footer(text="RAI VIBES 💗 Music Engine", icon_url=config.RAI_ICON_URL)
                 
                 if ctx.interaction:
-                    await ctx.interaction.followup.send(embed=embed)
+                    sent = await ctx.interaction.followup.send(embed=embed)
+                    if sent:
+                        asyncio.create_task(self._auto_delete(sent, 15))
                 else:
-                    await ctx.send(embed=embed)
+                    sent = await ctx.send(embed=embed)
+                    if sent:
+                        asyncio.create_task(self._auto_delete(sent, 15))
             return
 
         # Direct YouTube / Keyword Search
@@ -1230,26 +1247,37 @@ class Music(commands.Cog):
                         pass
 
                 if ctx.interaction:
-                    await ctx.interaction.followup.send(embed=embed)
+                    sent = await ctx.interaction.followup.send(embed=embed)
+                    if sent:
+                        asyncio.create_task(self._auto_delete(sent, 15))
                 else:
-                    await ctx.send(embed=embed)
+                    sent = await ctx.send(embed=embed)
+                    if sent:
+                        asyncio.create_task(self._auto_delete(sent, 15))
             else:
                 if status_msg:
                     try:
                         await status_msg.delete()
                     except Exception:
                         pass
-                embed = discord.Embed(
-                    title="🎶 Now Playing...",
-                    description=f"▶️ Streaming **[{song_obj.title}]({song_obj.webpage_url})** in `{player.voice_client.channel.name if player.voice_client and player.voice_client.channel else 'Voice Channel'}`!",
-                    color=config.COLOR_PRIMARY
-                )
-                embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
-                embed.set_footer(text=f"Requested by {ctx.author.display_name} • High-Fidelity Audio", icon_url=ctx.author.display_avatar.url)
                 if ctx.interaction:
-                    await ctx.interaction.followup.send(embed=embed)
+                    sent = await ctx.interaction.followup.send(
+                        embed=discord.Embed(
+                            description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
+                            color=config.COLOR_PRIMARY
+                        )
+                    )
+                    if sent:
+                        asyncio.create_task(self._auto_delete(sent, 6))
                 else:
-                    await ctx.send(embed=embed)
+                    sent = await ctx.send(
+                        embed=discord.Embed(
+                            description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
+                            color=config.COLOR_PRIMARY
+                        )
+                    )
+                    if sent:
+                        asyncio.create_task(self._auto_delete(sent, 6))
 
         except Exception as e:
             if ctx.interaction:
