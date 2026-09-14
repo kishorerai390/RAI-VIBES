@@ -414,7 +414,7 @@ HTML_STATUS_PAGE = """<!DOCTYPE html>
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Total Guild Members</div>
-                <div class="stat-value">27</div>
+                <div class="stat-value">32</div>
                 <div class="stat-subtext">Community Protected</div>
             </div>
             <div class="stat-card">
@@ -430,44 +430,44 @@ HTML_STATUS_PAGE = """<!DOCTYPE html>
             <div class="stat-card">
                 <div class="stat-label">Cloud Availability</div>
                 <div class="stat-value">99.9%</div>
-                <div class="stat-subtext">Render + Bot-Hosting</div>
+                <div class="stat-subtext">Render 24/7 Cloud</div>
             </div>
         </div>
 
         <!-- Bot Ecosystem Cards -->
         <div class="bots-grid">
-            <!-- RAI VIBES -->
+            <!-- AURA ✦ -->
             <div class="bot-card primary">
                 <div>
                     <div class="bot-header">
                         <span class="bot-badge badge-pink">MUSIC CORE</span>
-                        <span style="font-size: 12px; color: var(--cyan-accent); font-weight: 600;">● LIVE</span>
+                        <span style="font-size: 12px; color: var(--cyan-accent); font-weight: 600;">● LIVE 24/7</span>
                     </div>
-                    <div class="bot-title">RAI VIBES 💗</div>
-                    <p class="bot-desc">Premium 24/7 audio powerhouse delivering lossless sound, queue persistence, soundboard, and dynamic voice hubs.</p>
+                    <div class="bot-title">AURA ✦</div>
+                    <p class="bot-desc">Celestial 24/7 audio powerhouse delivering lossless sound, continuous lo-fi ambient streaming, and dynamic voice hubs.</p>
                     <ul class="features-list">
+                        <li><span>✔</span> Continuous 24/7 Streaming in 🌧️ Lo-Fi Zone</li>
                         <li><span>✔</span> Lossless Audio Playback & Auto-DJ</li>
-                        <li><span>✔</span> 24/7 Lo-Fi & Aesthetic Ambient Radio</li>
-                        <li><span>✔</span> 30+ Real-Time DSP Audio Filters</li>
-                        <li><span>✔</span> Dynamic Voice Lounge Creator Hub</li>
+                        <li><span>✔</span> DAVE E2EE High-Security Voice Protocol</li>
+                        <li><span>✔</span> Dynamic Voice Hub & Room Controls</li>
                     </ul>
                 </div>
             </div>
 
-            <!-- RAI SENTINEL -->
+            <!-- AEGIS 🛡️ -->
             <div class="bot-card security">
                 <div>
                     <div class="bot-header">
                         <span class="bot-badge badge-cyan">SECURITY CORE</span>
                         <span style="font-size: 12px; color: var(--cyan-accent); font-weight: 600;">● ARMED</span>
                     </div>
-                    <div class="bot-title">RAI SENTINEL 🛡️</div>
+                    <div class="bot-title">AEGIS 🛡️</div>
                     <p class="bot-desc">Autonomous server protection engine actively monitoring raid storms, destructive actions, phishing, and spam.</p>
                     <ul class="features-list">
                         <li><span>✔</span> Precision Anti-Nuke Disaster Recovery</li>
                         <li><span>✔</span> Real-Time SQLite Structure Snapshots</li>
                         <li><span>✔</span> Anti-Raid Join Velocity Rate Limiting</li>
-                        <li><span>✔</span> 15-Min Threat Cooldown Auto-Unlock</li>
+                        <li><span>✔</span> Automated Threat Cooldown & Quarantines</li>
                     </ul>
                 </div>
             </div>

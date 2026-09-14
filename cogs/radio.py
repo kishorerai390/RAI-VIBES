@@ -68,8 +68,19 @@ class Radio(commands.Cog):
     """24/7 Live Radio Stations, Tamil Nadu FM & Voice Channel Stay Mode."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._last_streamed_station = "lofi"
+        self.auto_stay_247_task.start()
 
-    async def start_radio_in_channel(self, channel: discord.VoiceChannel, station_key: str = "tamilnadu_fm", requester: Optional[discord.Member] = None):
+    def cog_unload(self):
+        self.auto_stay_247_task.cancel()
+
+    async def start_radio_in_channel(
+        self,
+        channel: discord.VoiceChannel,
+        station_key: str = "tamilnadu_fm",
+        requester: Optional[discord.Member] = None,
+        notify: bool = True
+    ):
         """Connects to a voice channel and starts streaming radio continuously."""
         music_cog = self.bot.get_cog("Music")
         if not music_cog:
@@ -90,7 +101,7 @@ class Radio(commands.Cog):
         player.mode_247 = True
 
         from cogs.music import Song
-        st_data = RADIO_STATIONS.get(station_key, RADIO_STATIONS["tamilnadu_fm"])
+        st_data = RADIO_STATIONS.get(station_key, RADIO_STATIONS["lofi"])
         radio_song = Song(
             data={
                 "title": f"📻 {st_data['name']}",
@@ -98,7 +109,7 @@ class Radio(commands.Cog):
                 "webpage_url": st_data["url"],
                 "duration": 0,
                 "thumbnail": st_data["thumb"],
-                "uploader": "Tamil Nadu Live Radio 24/7"
+                "uploader": "24/7 Continuous Music Engine"
             },
             requester=requester or guild.me,
             source_type="radio"
@@ -111,25 +122,66 @@ class Radio(commands.Cog):
         else:
             player.play_next_song.set()
 
-        text_channel = (
-            discord.utils.get(guild.text_channels, name="song-requests")
-            or discord.utils.get(guild.text_channels, name="🎵・song-requests")
-            or discord.utils.get(guild.text_channels, name="general-chat")
-            or discord.utils.get(guild.text_channels, name="💬・general-chat")
-        )
-        if text_channel:
-            player.text_channel = text_channel
-            embed = discord.Embed(
-                title="📻 Tamil Nadu FM 24/7 Live Broadcast!",
-                description=f"Now streaming continuously in **{channel.name}**:\n### **{st_data['name']}**\n*{st_data['desc']}*",
-                color=config.COLOR_PRIMARY
+        if notify:
+            text_channel = (
+                discord.utils.get(guild.text_channels, name="song-requests")
+                or discord.utils.get(guild.text_channels, name="🎵・song-requests")
+                or discord.utils.get(guild.text_channels, name="general-chat")
+                or discord.utils.get(guild.text_channels, name="💬・general-chat")
             )
-            embed.set_thumbnail(url=st_data["thumb"])
-            embed.set_footer(text="RAI VIBES 💗 • Non-Stop Tamil Nadu FM Engine", icon_url=config.RAI_ICON_URL)
-            try:
-                await text_channel.send(embed=embed)
-            except Exception:
-                pass
+            if text_channel:
+                player.text_channel = text_channel
+                embed = discord.Embed(
+                    title=f"📻 24/7 Live Broadcast Started!",
+                    description=f"Now streaming continuously in **{channel.name}**:\n### **{st_data['name']}**\n*{st_data['desc']}*",
+                    color=config.COLOR_PRIMARY
+                )
+                embed.set_thumbnail(url=st_data["thumb"])
+                embed.set_footer(text="AURA ✦ • Continuous 24/7 Music Engine", icon_url=config.RAI_ICON_URL)
+                try:
+                    await text_channel.send(embed=embed)
+                except Exception:
+                    pass
+
+    @tasks.loop(seconds=15)
+    async def auto_stay_247_task(self):
+        """Autonomous supervisor ensuring AURA streams music 24/7 non-stop in the server."""
+        try:
+            guild = self.bot.get_guild(1457382179981099090)
+            if not guild:
+                return
+
+            # Target 24/7 Channel: 🌧️  | ʟᴏ-ꜰɪ ᴢᴏɴᴇ (1545781986193309789) or 🎧  | ʀᴀɪ ᴢᴏɴᴇ (1545502782268772453)
+            target_vc = (
+                guild.get_channel(1545781986193309789)
+                or guild.get_channel(1545502782268772453)
+                or discord.utils.get(guild.voice_channels, name="🌧️  | ʟᴏ-ꜰɪ ᴢᴏɴᴇ")
+                or discord.utils.get(guild.voice_channels, name="🎧  | ʀᴀɪ ᴢᴏɴᴇ")
+            )
+            if not target_vc:
+                return
+
+            vc = guild.voice_client
+            # 1. Connect if disconnected
+            if not vc or not vc.is_connected():
+                await self.start_radio_in_channel(target_vc, station_key=self._last_streamed_station, notify=False)
+                return
+
+            # 2. Lock 24/7 mode & resume continuous stream if idle
+            music_cog = self.bot.get_cog("Music")
+            if music_cog:
+                player = music_cog.get_player(guild.id)
+                if player:
+                    player.mode_247 = True
+                    # If not playing anything, not paused, and queue empty -> start 24/7 stream
+                    if not vc.is_playing() and not vc.is_paused() and not player.current and not player.queue:
+                        await self.start_radio_in_channel(vc.channel, station_key=self._last_streamed_station, notify=False)
+        except Exception:
+            pass
+
+    @auto_stay_247_task.before_loop
+    async def before_auto_stay(self):
+        await self.bot.wait_until_ready()
 
     @commands.hybrid_command(name="tamilnadufm", description="Stream 24/7 Live Tamil Nadu FM Radio non-stop!")
     async def tamilnadufm(self, ctx: commands.Context):

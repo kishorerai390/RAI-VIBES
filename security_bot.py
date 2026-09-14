@@ -16,16 +16,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("RaiSentinel")
 
-BOT_NAME = "RAI SENTINEL 🛡️"
+BOT_NAME = "AEGIS 🛡️"
 
 BANNER = """
-  ██████╗  █████╗ ██╗    ███████╗███████╗███╗   ██╗████████╗██╗███╗   ██╗███████╗██╗     
-  ██╔══██╗██╔══██╗██║    ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██║████╗  ██║██╔════╝██║     
-  ██████╔╝███████║██║    ███████╗█████╗  ██╔██╗ ██║   ██║   ██║██╔██╗ ██║█████╗  ██║     
-  ██╔══██╗██╔══██║██║    ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██║╚██╗██║██╔══╝  ██║     
-  ██║  ██║██║  ██║██║    ███████║███████╗██║ ╚████║   ██║   ██║██║ ╚████║███████╗███████╗
-  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝    ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
-           🛡️ AUTOMATED WELCOME • VERIFICATION • TICKETS • SERVER SENTINEL 🛡️
+  █████╗ ███████╗ ██████╗ ██╗███████╗
+ ██╔══██╗██╔════╝██╔════╝ ██║██╔════╝
+ ███████║█████╗  ██║  ███╗██║███████╗
+ ██╔══██║██╔══╝  ██║   ██║██║╚════██║
+ ██║  ██║███████╗╚██████╔╝██║███████║
+ ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝
+           🛡️ AEGIS DEFENSE • VERIFICATION • TICKETS • SENTINEL 🛡️
 """
 
 def create_security_bot(use_members: bool = True, use_message_content: bool = True) -> commands.Bot:
@@ -46,7 +46,7 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
 
         activity = discord.Activity(
             type=discord.ActivityType.watching,
-            name="RAI FAM Security • Welcome • Tickets 🛡️"
+            name="AEGIS Defense • Security • Welcome 🛡️"
         )
         await bot.change_presence(status=discord.Status.dnd, activity=activity)
         

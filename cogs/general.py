@@ -576,10 +576,139 @@ class General(commands.Cog):
         embed.set_footer(text=f"Rolled by {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="poll", description="Create an interactive community poll with live voting buttons.")
+    @discord.app_commands.describe(
+        question="The question to poll",
+        option1="First option",
+        option2="Second option",
+        option3="Third option (optional)",
+        option4="Fourth option (optional)"
+    )
+    async def poll(self, ctx: commands.Context, question: str, option1: str, option2: str, option3: str = None, option4: str = None):
+        opts = [o for o in [option1, option2, option3, option4] if o]
+        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
+        desc = f"**{question}**\n\n"
+        for i, opt in enumerate(opts):
+            desc += f"{emojis[i]} **{opt}**\n`░░░░░░░░░░` **0.0%** (0 votes)\n\n"
+        desc += "📊 *Total Votes: 0*"
 
+        embed = discord.Embed(title="📊 Community Poll", description=desc, color=0x2B2D31)
+        embed.set_footer(text=f"Poll created by {ctx.author.name} • Vote below!", icon_url=ctx.author.display_avatar.url)
+        view = PollView(question, opts)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="afk", description="Set an AFK status so the bot notifies members who ping you.")
+    @discord.app_commands.describe(reason="Reason for being AFK (default: AFK)")
+    async def afk(self, ctx: commands.Context, reason: str = "AFK"):
+        user_id = ctx.author.id
+        if not hasattr(self.bot, "afk_users"):
+            self.bot.afk_users = {}
+        self.bot.afk_users[user_id] = {
+            "reason": reason,
+            "time": time.time(),
+            "orig_nick": ctx.author.nick
+        }
+        
+        nick_note = ""
+        try:
+            current_name = ctx.author.display_name
+            if not current_name.startswith("[AFK]"):
+                new_nick = f"[AFK] {current_name}"[:32]
+                await ctx.author.edit(nick=new_nick, reason="Member enabled AFK status")
+                nick_note = " • Updated nickname to `[AFK]`"
+        except Exception:
+            pass
+
+        embed = discord.Embed(
+            title="💤 AFK Status Enabled",
+            description=f"> You are now AFK: **{reason}**{nick_note}\n> I will notify anyone who mentions you and automatically remove your AFK when you chat.",
+            color=0x2B2D31
+        )
+        embed.set_footer(text=f"{ctx.author.name} is away", icon_url=ctx.author.display_avatar.url)
+        await ctx.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if not message.guild or message.author.bot:
+            return
+
+        if not hasattr(self.bot, "afk_users"):
+            self.bot.afk_users = {}
+
+        # 1. Check if the sender was AFK -> Remove AFK
+        if message.author.id in self.bot.afk_users:
+            data = self.bot.afk_users.pop(message.author.id)
+            try:
+                if message.author.display_name.startswith("[AFK]"):
+                    orig = data.get("orig_nick")
+                    await message.author.edit(nick=orig, reason="Member returned from AFK")
+            except Exception:
+                pass
+            welcome_back = await message.channel.send(
+                f"👋 Welcome back {message.author.mention}! I have cleared your AFK status.",
+                delete_after=6
+            )
+
+        # 2. Check if any mentioned users are AFK -> Notify sender
+        if message.mentions:
+            for mentioned in message.mentions:
+                if mentioned.id in self.bot.afk_users and mentioned.id != message.author.id:
+                    m_data = self.bot.afk_users[mentioned.id]
+                    elapsed_sec = int(time.time() - m_data["time"])
+                    minutes, seconds = divmod(elapsed_sec, 60)
+                    hours, minutes = divmod(minutes, 60)
+                    time_ago = f"{hours}h {minutes}m ago" if hours else f"{minutes}m ago" if minutes else f"{seconds}s ago"
+                    
+                    afk_reply = discord.Embed(
+                        description=f"💤 **{mentioned.display_name}** is currently AFK: *{m_data['reason']}* ({time_ago})",
+                        color=0x2B2D31
+                    )
+                    await message.channel.send(embed=afk_reply, delete_after=10)
+                    break
+
+
+
+
+
+class PollView(discord.ui.View):
+    def __init__(self, question: str, options: list):
+        super().__init__(timeout=86400)
+        self.question = question
+        self.options = options
+        self.votes = {i: set() for i in range(len(options))}
+
+        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
+        for i, opt in enumerate(options):
+            btn = discord.ui.Button(label=f"{opt[:40]}", emoji=emojis[i], custom_id=f"poll_opt_{i}", style=discord.ButtonStyle.secondary)
+            btn.callback = self.make_callback(i)
+            self.add_item(btn)
+
+    def make_callback(self, opt_idx: int):
+        async def callback(interaction: discord.Interaction):
+            user_id = interaction.user.id
+            for voters in self.votes.values():
+                voters.discard(user_id)
+            self.votes[opt_idx].add(user_id)
+
+            total_votes = sum(len(v) for v in self.votes.values())
+            desc = f"**{self.question}**\n\n"
+            emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
+            for i, opt in enumerate(self.options):
+                count = len(self.votes[i])
+                pct = (count / total_votes * 100) if total_votes > 0 else 0
+                bar_len = int(pct / 10)
+                bar = "█" * bar_len + "░" * (10 - bar_len)
+                desc += f"{emojis[i]} **{opt}**\n`{bar}` **{pct:.1f}%** ({count} votes)\n\n"
+            desc += f"📊 *Total Votes: {total_votes}*"
+
+            embed = interaction.message.embeds[0]
+            embed.description = desc
+            await interaction.response.edit_message(embed=embed, view=self)
+        return callback
 
 
 class ServerInfoButtonsView(discord.ui.View):
+
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=180)
         self.guild = guild

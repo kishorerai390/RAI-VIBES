@@ -291,7 +291,7 @@ class Welcome(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         guild = member.guild
-        member_count = len(guild.members)
+        member_count = guild.member_count or len(guild.members)
 
         # 1. Automatic Role Assignment for Bots (Exit immediately, never spam welcome for bots!)
         if member.bot:
@@ -338,36 +338,62 @@ class Welcome(commands.Cog):
                     pass
 
         # 5. Public Welcome Announcement with real-time auto-updating Member Count
-        welcome_chan = guild.get_channel(1545502705643167876) # #・𝘄𝗲𝗹𝗰𝗼𝗺𝗲・
+        welcome_chan = guild.get_channel(1545502705643167876) # #🌸・welcome
         if welcome_chan:
-            DIVIDER = "<a:w_welc1:1547271923891707915><:w_dash:1547271874981920868><:w_dash:1547271874981920868><:w_dash:1547271874981920868><:w_dash:1547271874981920868><a:w_welc2:1547271930699190424>"
             embed = discord.Embed(
-                title="<a:sparkle_love:1547271978883350568> ✦ WELCOME TO RAI FAM 💗 ✦ <a:sparkle_love:1547271978883350568>",
+                title=f"🌸 {guild.name} !",
                 description=(
-                    f"{DIVIDER}\n\n"
-                    f"Hey {member.mention}, welcome to **RAI FAM 💗**! ✨\n"
-                    f"We are thrilled to have you here in our sanctuary!\n\n"
-                    f"<:badge_1:1547271940279107665> **Get Verified:** <#1545502700840427702>\n"
-                    f"<:badge_2:1547271946645934122> **Server Rules:** <#1545502710101704714>\n"
-                    f"<:badge_3:1547271951297413281> **Pick Roles:** <#1545502722739150898>\n"
-                    f"💬 **General Chat:** <#1545502730699808768>\n\n"
-                    f"{DIVIDER}\n"
-                    f"👑 **Member #{member_count}** • Enjoy your stay! 🍿"
+                    f"**HEY BUDDY!** {member.mention}\n\n"
+                    f"**Welcome To {guild.name} !**\n"
+                    f"**Get started with below:** <#1545502710101704714>\n\n"
+                    f"**Follow The Server Guidelines:** <#1545502710101704714>\n\n"
+                    f"**Verify For Full Access:** <#1545502700840427702>\n\n"
+                    f"**Claim Your Roles:** <#1545502722739150898>\n\n"
+                    f"**Share Media & Fun:** <#1546097792915873842>\n\n"
+                    f"**Gaming Zone:** <#1545803554550190212>\n\n"
+                    f"**24/7 Lo-Fi & Beats:** <#1545781986193309789>\n\n"
+                    f"**Join And Chill With Us!:** <#1545502730699808768>\n\n"
+                    f"**Thanks For Joining. Hope You Have A Great Time Here!**"
                 ),
-                color=0xFF2A85
+                color=0xFF69B4
             )
             embed.set_thumbnail(url=member.display_avatar.url)
-            embed.set_footer(text=f"Member #{member_count} • RAI FAM 💗", icon_url=guild.icon.url if guild.icon else None)
+            embed.set_footer(
+                text=f"Member #{member_count} • RAI FAM Luxury Community 💗",
+                icon_url=guild.icon.url if guild.icon else None
+            )
             try:
                 await welcome_chan.send(
-                    content=f"🎉 Welcome {member.mention} to **RAI FAM 💗**! 🚀",
+                    content=f"🎉 Welcome {member.mention} to **{guild.name}**! 🚀",
                     embed=embed,
                     view=WelcomeQuickActionsView(member)
                 )
             except Exception as e:
                 logger.error(f"Error sending welcome embed: {e}")
 
+        # 6. Automated Direct Message (DM) Onboarding
+        try:
+            dm_embed = discord.Embed(
+                title=f"🌸 Welcome to {guild.name}!",
+                description=(
+                    f"Hey **{member.name}**! Welcome to our sanctuary! ✨\n\n"
+                    f"**Quick Start Guide:**\n"
+                    f"> 1️⃣ **Get Verified:** Click the button in <#1545502700840427702> to unlock all channels.\n"
+                    f"> 2️⃣ **Pick Roles:** Head over to <#1545502722739150898> to pick colors & game pings.\n"
+                    f"> 3️⃣ **Read Rules:** Review our community guidelines in <#1545502710101704714>.\n\n"
+                    f"💬 Say hi in <#1545502730699808768> or hop into a voice channel! Enjoy your stay! 💗"
+                ),
+                color=0x2B2D31
+            )
+            if guild.icon:
+                dm_embed.set_thumbnail(url=guild.icon.url)
+            dm_embed.set_footer(text=f"{guild.name} • Official Member Greeting", icon_url=guild.icon.url if guild.icon else None)
+            await member.send(embed=dm_embed)
+        except Exception:
+            pass
+
         # 7. Anti-Alt & Young Account Surveillance
+
         now_dt = discord.utils.utcnow()
         account_age = (now_dt - member.created_at).days
         if account_age < 7:
