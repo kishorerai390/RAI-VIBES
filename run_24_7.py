@@ -602,7 +602,7 @@ async def main():
     # Render does not route UDP packets required for Discord Voice connections.
     # Therefore, RAI SENTINEL (security/moderation) runs 24/7 on Render cloud,
     # while RAI VIBES (music streaming) runs locally with full UDP audio support.
-    enable_cloud_music = os.getenv("ENABLE_CLOUD_MUSIC", "false").lower() == "true"
+    enable_cloud_music = os.getenv("ENABLE_CLOUD_MUSIC", "true").lower() == "true"
     tasks = []
     if enable_cloud_music and token_vibes:
         tasks.append(run_vibes(token_vibes))

@@ -8,3 +8,4 @@ aiohttp
 colorama
 Pillow
 aiosqlite>=0.20.0
+audioop-lts

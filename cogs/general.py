@@ -313,6 +313,367 @@ class General(commands.Cog):
                     pass
         await ctx.send(f"✅ Cleaned RF tags from **{cleaned}** member(s)!")
 
+    @commands.hybrid_command(name="serverinfo", aliases=["sinfo", "server", "guildinfo", "guild"], description="Display detailed server information (Everglow style).")
+    async def serverinfo(self, ctx: commands.Context):
+        guild = ctx.guild
+        if not guild:
+            return await ctx.send("❌ This command can only be used inside a server.")
+
+        # Gather data
+        total_members = guild.member_count or len(guild.members)
+        bot_members = len([m for m in guild.members if m.bot])
+        human_members = total_members - bot_members
+
+        text_channels = len(guild.text_channels)
+        voice_channels = len(guild.voice_channels)
+        afk_ch = guild.afk_channel.mention if guild.afk_channel else "None"
+
+        roles_count = len(guild.roles)
+        emojis_count = len(guild.emojis)
+        stickers_count = len(guild.stickers)
+
+        boost_level = guild.premium_tier
+        boost_count = guild.premium_subscription_count or 0
+        booster_role = guild.premium_subscriber_role
+        booster_role_str = booster_role.mention if booster_role else "None"
+
+        # Verification Level
+        verification_map = {
+            discord.VerificationLevel.none: "None",
+            discord.VerificationLevel.low: "Low",
+            discord.VerificationLevel.medium: "Medium",
+            discord.VerificationLevel.high: "High",
+            discord.VerificationLevel.highest: "Highest",
+        }
+        verification_str = verification_map.get(guild.verification_level, str(guild.verification_level).capitalize())
+
+        # Content Filter
+        filter_map = {
+            discord.ContentFilter.disabled: "Disabled",
+            discord.ContentFilter.no_role: "Members Without Roles",
+            discord.ContentFilter.all_members: "All Members",
+        }
+        filter_str = filter_map.get(guild.explicit_content_filter, "All Members")
+
+        # 2FA
+        mfa_str = "Enabled" if guild.mfa_level else "Disabled"
+
+        # System channels
+        rules_str = guild.rules_channel.mention if guild.rules_channel else "None"
+        updates_str = guild.public_updates_channel.mention if guild.public_updates_channel else "None"
+        system_str = guild.system_channel.mention if guild.system_channel else "No"
+
+        # Format creation time like: Monday, 6 July, 2026 07:39 AM
+        created_str = guild.created_at.strftime("%A, %d %B, %Y %I:%M %p")
+        vanity_str = guild.vanity_url_code or "None"
+
+        # Dark aesthetic embed color
+        embed = discord.Embed(color=0x2B2D31)
+        
+        # Author: Server Name + Icon
+        icon_url = guild.icon.url if guild.icon else None
+        embed.set_author(name=f"{guild.name}", icon_url=icon_url)
+        if icon_url:
+            embed.set_thumbnail(url=icon_url)
+
+        # General Field
+        general_val = (
+            f"> **ID:** {guild.id}\n"
+            f"> **Owner:** <@{guild.owner_id}>\n"
+            f"> **Created:** {created_str}\n"
+            f"> **Region:** Auto\n"
+            f"> **Vanity URL:** {vanity_str}"
+        )
+        embed.add_field(name="General", value=general_val, inline=False)
+
+        # Members
+        members_val = (
+            f"> **Total:** {total_members}\n"
+            f"> **Humans:** {human_members}\n"
+            f"> **Bots:** {bot_members}"
+        )
+        embed.add_field(name="Members", value=members_val, inline=True)
+
+        # Channels
+        channels_val = (
+            f"> **AFK:** {afk_ch}\n"
+            f"> **Text:** {text_channels}\n"
+            f"> **Voice:** {voice_channels}"
+        )
+        embed.add_field(name="Channels", value=channels_val, inline=True)
+
+        # Roles & Media
+        roles_media_val = (
+            f"> **Roles:** {roles_count}\n"
+            f"> **Emojis:** {emojis_count}\n"
+            f"> **Stickers:** {stickers_count}"
+        )
+        embed.add_field(name="Roles & Media", value=roles_media_val, inline=True)
+
+        # Boosting
+        boosting_val = (
+            f"> **Level:** {boost_level}\n"
+            f"> **Boosts:** {boost_count}\n"
+            f"> **Booster Role:** {booster_role_str}"
+        )
+        embed.add_field(name="Boosting", value=boosting_val, inline=True)
+
+        # Security
+        security_val = (
+            f"> **Verification:** {verification_str}\n"
+            f"> **Content Filter:** {filter_str}\n"
+            f"> **2FA Requirement:** {mfa_str}"
+        )
+        embed.add_field(name="Security", value=security_val, inline=True)
+
+        # System Channels
+        system_val = (
+            f"> **Rules:** {rules_str}\n"
+            f"> **Updates:** {updates_str}\n"
+            f"> **System Msgs:** {system_str}"
+        )
+        embed.add_field(name="System Channels", value=system_val, inline=True)
+
+        # Footer
+        author_user = ctx.author
+        author_avatar = author_user.display_avatar.url if author_user else None
+        curr_time = discord.utils.utcnow().strftime("%I:%M %p")
+        embed.set_footer(text=f"Requested By {author_user.name} • Today at {curr_time}", icon_url=author_avatar)
+
+        view = ServerInfoButtonsView(guild)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="userinfo", aliases=["ui", "whois", "user"], description="Display detailed member profile & badge information (Everglow style).")
+    @discord.app_commands.describe(member="The member to view (defaults to yourself)")
+    async def userinfo(self, ctx: commands.Context, member: discord.Member = None):
+        member = member or ctx.author
+        created_str = member.created_at.strftime("%A, %d %B, %Y %I:%M %p")
+        joined_str = member.joined_at.strftime("%A, %d %B, %Y %I:%M %p") if member.joined_at else "Unknown"
+
+        embed = discord.Embed(color=0x2B2D31)
+        avatar_url = member.display_avatar.url
+        embed.set_author(name=f"{member.name} ({member.display_name})", icon_url=avatar_url)
+        embed.set_thumbnail(url=avatar_url)
+
+        # General Identity
+        general_val = (
+            f"> **Username:** {member.name}\n"
+            f"> **Nickname:** {member.nick or 'None'}\n"
+            f"> **ID:** {member.id}\n"
+            f"> **Created:** {created_str}\n"
+            f"> **Bot:** {'Yes' if member.bot else 'No'}"
+        )
+        embed.add_field(name="Identity", value=general_val, inline=False)
+
+        # Membership
+        role_count = max(0, len(member.roles) - 1)
+        top_role = member.top_role.mention if member.top_role else "None"
+        timeout_status = "Yes" if getattr(member, "is_timed_out", lambda: False)() else "No"
+        membership_val = (
+            f"> **Joined Server:** {joined_str}\n"
+            f"> **Top Role:** {top_role}\n"
+            f"> **Roles:** {role_count}\n"
+            f"> **Timed Out:** {timeout_status}"
+        )
+        embed.add_field(name="Membership", value=membership_val, inline=True)
+
+        # Presence & Badges
+        booster_status = f"Since {member.premium_since.strftime('%b %d, %Y')}" if member.premium_since else "Not Boosting"
+        status_str = str(getattr(member, "status", "offline")).capitalize()
+        activity_str = member.activity.name if member.activity else "None"
+        presence_val = (
+            f"> **Status:** {status_str}\n"
+            f"> **Activity:** {activity_str}\n"
+            f"> **Booster:** {booster_status}"
+        )
+        embed.add_field(name="Presence & Badges", value=presence_val, inline=True)
+
+        # Footer
+        curr_time = discord.utils.utcnow().strftime("%I:%M %p")
+        embed.set_footer(text=f"Requested By {ctx.author.name} • Today at {curr_time}", icon_url=ctx.author.display_avatar.url)
+
+        view = UserInfoButtonsView(member, self.bot)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="avatar", aliases=["av", "pfp"], description="Display member avatar in full resolution.")
+    @discord.app_commands.describe(member="The member whose avatar you want to view (defaults to yourself)")
+    async def avatar(self, ctx: commands.Context, member: discord.Member = None):
+        member = member or ctx.author
+        avatar_url = member.display_avatar.url
+        embed = discord.Embed(title=f"🖼️ {member.display_name}'s Avatar", color=0x2B2D31)
+        embed.set_image(url=avatar_url)
+        embed.description = f"[Open High-Res Avatar]({avatar_url})"
+        embed.set_footer(text=f"Requested By {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
+        
+        view = discord.ui.View(timeout=120)
+        view.add_item(discord.ui.Button(label="Download", url=avatar_url, style=discord.ButtonStyle.link))
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="banner", aliases=["ubanner"], description="Display member's custom profile banner in full resolution.")
+    @discord.app_commands.describe(member="The member whose banner you want to view (defaults to yourself)")
+    async def banner(self, ctx: commands.Context, member: discord.Member = None):
+        member = member or ctx.author
+        user = await self.bot.fetch_user(member.id)
+        if not user.banner:
+            return await ctx.send(f"❌ **{member.display_name}** does not have a custom profile banner.")
+        
+        banner_url = user.banner.url
+        embed = discord.Embed(title=f"🎨 {member.display_name}'s Profile Banner", color=0x2B2D31)
+        embed.set_image(url=banner_url)
+        embed.description = f"[Open High-Res Banner]({banner_url})"
+        embed.set_footer(text=f"Requested By {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
+        
+        view = discord.ui.View(timeout=120)
+        view.add_item(discord.ui.Button(label="Download", url=banner_url, style=discord.ButtonStyle.link))
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="membercount", aliases=["mc", "stats"], description="Display detailed server headcount telemetry.")
+    async def membercount(self, ctx: commands.Context):
+        guild = ctx.guild
+        total = guild.member_count or len(guild.members)
+        bots = len([m for m in guild.members if m.bot])
+        humans = total - bots
+        online = len([m for m in guild.members if m.status != discord.Status.offline])
+        
+        embed = discord.Embed(title=f"👥 {guild.name} • Member Statistics", color=0x2B2D31)
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url)
+        embed.description = (
+            f"> 👥 **Total Headcount:** `{total:,}`\n"
+            f"> 👤 **Human Members:** `{humans:,}`\n"
+            f"> 🤖 **Bot Integrations:** `{bots:,}`\n"
+            f"> 🟢 **Online Activity:** `{online:,}` members\n"
+            f"> 🚀 **Server Boosters:** `{guild.premium_subscription_count} boosts` (Tier {guild.premium_tier})\n"
+            f"> 🎭 **Roles Created:** `{len(guild.roles)}`"
+        )
+        embed.set_footer(text="RAI FAM 💗 • Real-Time Census Telemetry", icon_url=guild.icon.url if guild.icon else None)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="coinflip", aliases=["flip", "coin"], description="Flip a coin (Heads or Tails).")
+    async def coinflip(self, ctx: commands.Context):
+        import random
+        result = random.choice(["Heads 🪙", "Tails 🪙"])
+        embed = discord.Embed(
+            title="🪙 Coin Flip Result",
+            description=f"> Result: **{result}**",
+            color=0x2B2D31
+        )
+        embed.set_footer(text=f"Flipped by {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="roll", aliases=["dice"], description="Roll a dice (default 1-6).")
+    @discord.app_commands.describe(sides="Number of sides on the dice (default: 6)")
+    async def roll(self, ctx: commands.Context, sides: int = 6):
+        import random
+        if sides < 2 or sides > 1000:
+            return await ctx.send("❌ Dice sides must be between 2 and 1,000.")
+        val = random.randint(1, sides)
+        embed = discord.Embed(
+            title="🎲 Dice Roll Result",
+            description=f"> Rolled a **D{sides}**: **`{val}`** 🎲",
+            color=0x2B2D31
+        )
+        embed.set_footer(text=f"Rolled by {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
+        await ctx.send(embed=embed)
+
+
+
+
+class ServerInfoButtonsView(discord.ui.View):
+    def __init__(self, guild: discord.Guild):
+        super().__init__(timeout=180)
+        self.guild = guild
+
+    @discord.ui.button(label="Server Icon", style=discord.ButtonStyle.secondary)
+    async def server_icon(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.guild.icon:
+            return await interaction.response.send_message("❌ This server does not have an icon.", ephemeral=True)
+        embed = discord.Embed(title=f"🖼️ Icon • {self.guild.name}", color=0x2B2D31)
+        embed.set_image(url=self.guild.icon.url)
+        embed.description = f"[Download Icon]({self.guild.icon.url})"
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Server Banner", style=discord.ButtonStyle.secondary)
+    async def server_banner(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.guild.banner:
+            return await interaction.response.send_message("❌ This server does not have a server banner.", ephemeral=True)
+        embed = discord.Embed(title=f"🎨 Banner • {self.guild.name}", color=0x2B2D31)
+        embed.set_image(url=self.guild.banner.url)
+        embed.description = f"[Download Banner]({self.guild.banner.url})"
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Splash", style=discord.ButtonStyle.secondary)
+    async def server_splash(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.guild.splash:
+            return await interaction.response.send_message("❌ This server does not have an invite splash background.", ephemeral=True)
+        embed = discord.Embed(title=f"✨ Splash • {self.guild.name}", color=0x2B2D31)
+        embed.set_image(url=self.guild.splash.url)
+        embed.description = f"[Download Splash]({self.guild.splash.url})"
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Features", style=discord.ButtonStyle.secondary)
+    async def server_features(self, interaction: discord.Interaction, button: discord.ui.Button):
+        features = self.guild.features
+        if not features:
+            desc = "> No special features enabled."
+        else:
+            desc = "\n".join(f"> • `{feat.replace('_', ' ').title()}`" for feat in sorted(features))
+        embed = discord.Embed(title=f"🌟 Features • {self.guild.name}", description=desc, color=0x2B2D31)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class UserInfoButtonsView(discord.ui.View):
+    def __init__(self, member: discord.Member, bot: commands.Bot):
+        super().__init__(timeout=180)
+        self.member = member
+        self.bot = bot
+
+    @discord.ui.button(label="Avatar", style=discord.ButtonStyle.secondary)
+    async def view_avatar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        avatar_url = self.member.display_avatar.url
+        embed = discord.Embed(title=f"🖼️ Avatar • {self.member.name}", color=0x2B2D31)
+        embed.set_image(url=avatar_url)
+        embed.description = f"[Download Avatar]({avatar_url})"
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Banner", style=discord.ButtonStyle.secondary)
+    async def view_banner(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            user = await self.bot.fetch_user(self.member.id)
+            if not user.banner:
+                return await interaction.response.send_message("❌ This user does not have a custom profile banner.", ephemeral=True)
+            embed = discord.Embed(title=f"🎨 Banner • {self.member.name}", color=0x2B2D31)
+            embed.set_image(url=user.banner.url)
+            embed.description = f"[Download Banner]({user.banner.url})"
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Could not fetch banner: {e}", ephemeral=True)
+
+    @discord.ui.button(label="Roles", style=discord.ButtonStyle.secondary)
+    async def view_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
+        roles = [r.mention for r in reversed(self.member.roles) if not r.is_default()]
+        roles_str = " ".join(roles) if roles else "No custom roles assigned."
+        embed = discord.Embed(
+            title=f"🎭 Roles ({len(roles)}) • {self.member.name}",
+            description=roles_str[:4000],
+            color=0x2B2D31
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Permissions", style=discord.ButtonStyle.secondary)
+    async def view_perms(self, interaction: discord.Interaction, button: discord.ui.Button):
+        perms = [p[0].replace("_", " ").title() for p in self.member.guild_permissions if p[1]]
+        desc = "\n".join(f"> • `{p}`" for p in perms[:25])
+        embed = discord.Embed(
+            title=f"🛡️ Key Permissions • {self.member.name}",
+            description=desc or "> Standard Member Permissions",
+            color=0x2B2D31
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(General(bot))
+
 
