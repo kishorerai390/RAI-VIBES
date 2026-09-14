@@ -9,4 +9,4 @@ aiohttp
 colorama
 Pillow
 aiosqlite>=0.20.0
-audioop-lts
+audioop-lts; python_version >= '3.13'
