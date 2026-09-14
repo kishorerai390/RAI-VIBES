@@ -31,10 +31,9 @@ class AntiNuke(commands.Cog):
         self.bot = bot
         # Action tracker: tracker[guild_id][user_id][action_type] = list of timestamps
         self.tracker: Dict[int, Dict[int, Dict[str, List[float]]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        self.cleanup_security_logs_task.start()
 
     def cog_unload(self):
-        self.cleanup_security_logs_task.cancel()
+        pass
 
     def is_trusted_actor(self, guild: discord.Guild, actor: Optional[discord.User | discord.Member]) -> bool:
         """Returns True if actor is a trusted bot, server owner, or immune administrator."""
@@ -47,50 +46,6 @@ class AntiNuke(commands.Cog):
         if getattr(actor, "bot", False):
             return True
         return False
-
-    @tasks.loop(seconds=30)
-    async def cleanup_security_logs_task(self):
-        """Periodically purges security alert messages older than 60s from security-logs channels."""
-        await self.bot.wait_until_ready()
-        now = discord.utils.utcnow()
-        for guild in self.bot.guilds:
-            channels_to_check = set()
-            try:
-                settings = await database.get_guild_settings(guild.id)
-                log_chan = await self.get_log_channel(guild, settings)
-                if log_chan:
-                    channels_to_check.add(log_chan)
-            except Exception:
-                pass
-            for name in ["security-logs", "mod-logs", "audit-logs", "staff-logs"]:
-                ch = discord.utils.get(guild.text_channels, name=name)
-                if ch:
-                    channels_to_check.add(ch)
-
-            for ch in channels_to_check:
-                try:
-                    async for msg in ch.history(limit=40):
-                        age = (now - msg.created_at).total_seconds()
-                        if age >= ALERT_AUTO_DELETE_SECONDS:
-                            is_alert = (
-                                msg.author.id == self.bot.user.id or
-                                "@everyone" in (msg.content or "") or
-                                (msg.embeds and any(
-                                    "ALERT" in (e.title or "") or 
-                                    "DEFENSE" in (e.title or "") or 
-                                    "Interception" in (e.title or "") or
-                                    "ANTI-NUKE" in (e.title or "") or
-                                    "Shield" in (e.title or "")
-                                    for e in msg.embeds
-                                ))
-                            )
-                            if is_alert:
-                                try:
-                                    await msg.delete()
-                                except Exception:
-                                    pass
-                except Exception:
-                    pass
 
     def record_action(self, guild_id: int, user_id: int, action_type: str, time_window: int) -> int:
         now = time.time()
