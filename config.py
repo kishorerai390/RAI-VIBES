@@ -9,8 +9,8 @@ load_dotenv(BASE_DIR / ".env")
 # Discord Configuration
 DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
-BOT_NAME = "AURA ✦"
-BOT_TAGLINE = "Celestial Soundscapes • High-Fidelity Music • Cosmic Vibes"
+BOT_NAME = "RAI VIBES 💗"
+BOT_TAGLINE = "High-Fidelity Music • 24/7 Lo-Fi Sanctuary • Community Vibes"
 
 # Spotify Configuration (Optional - works even without API keys via public meta resolver)
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
