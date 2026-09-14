@@ -414,29 +414,31 @@ class GuildMusicPlayer:
     def enqueue_track(self, song: Song, is_queue_mode: bool = False) -> bool:
         """
         Enqueues a song:
-        - If 24/7 background radio is streaming, user track interrupts radio and starts playing immediately.
-        - If ANY user song or track is actively playing/paused, the new song is appended to the queue and returns True.
-        - If completely idle, song is added and playback starts immediately.
-        Returns True if queued behind an active track, False if playing right now.
+        - If an actual USER track is actively playing, the new song is appended to the queue and returns True (queued).
+        - If idle, or if 24/7 background radio is streaming, the user song starts playing immediately and returns False (playing now).
         """
         vc = self.guild.voice_client
         is_playing = bool(vc and (vc.is_playing() or vc.is_paused()))
-        is_radio = self.is_radio_playing()
 
-        # 1. Interrupt 24/7 background radio so the user's song begins immediately
-        if is_radio:
-            self.queue.appendleft(song)
-            self.skip()  # Stop the infinite radio stream immediately so user track plays right now
-            return False
+        # An active user track is playing if current track exists, is not 24/7 radio, and VC is playing
+        user_song_active = bool(
+            self.current is not None
+            and getattr(self.current, "source_type", None) != "radio"
+            and is_playing
+        )
 
-        # 2. If a track is actively playing or paused, ALWAYS queue behind it!
-        if self.current is not None or is_playing:
+        if user_song_active:
             self.queue.append(song)
             return True
 
-        # 3. Completely idle: start playback
-        self.queue.append(song)
-        self.play_next_song.set()
+        # If idle or 24/7 background radio is streaming, start user track immediately!
+        if self.is_radio_playing():
+            self.queue.appendleft(song)
+            self.skip()  # Stop the infinite radio stream immediately so user track plays right now
+        else:
+            self.queue.append(song)
+            self.play_next_song.set()
+
         return False
 
     def shuffle(self):
@@ -1122,30 +1124,21 @@ class Music(commands.Cog):
                     if ctx.interaction:
                         sent = await ctx.interaction.followup.send(embed=embed)
                         if sent:
-                            asyncio.create_task(self._auto_delete(sent, 15))
+                            asyncio.create_task(self._auto_delete(sent, 10))
                     else:
                         sent = await ctx.send(embed=embed)
                         if sent:
-                            asyncio.create_task(self._auto_delete(sent, 15))
+                            asyncio.create_task(self._auto_delete(sent, 10))
                 else:
                     if ctx.interaction:
                         sent = await ctx.interaction.followup.send(
                             embed=discord.Embed(
-                                description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
+                                description=f"🎶 **Starting playback:** [{song_obj.title}]({song_obj.webpage_url})",
                                 color=config.COLOR_PRIMARY
                             )
                         )
                         if sent:
-                            asyncio.create_task(self._auto_delete(sent, 6))
-                    else:
-                        sent = await ctx.send(
-                            embed=discord.Embed(
-                                description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
-                                color=config.COLOR_PRIMARY
-                            )
-                        )
-                        if sent:
-                            asyncio.create_task(self._auto_delete(sent, 6))
+                            asyncio.create_task(self._auto_delete(sent, 3))
             else:
                 remaining_space = max(0, config.MAX_QUEUE_SIZE - len(player.queue))
                 added_tracks = spotify_tracks[:remaining_space]
@@ -1249,11 +1242,11 @@ class Music(commands.Cog):
                 if ctx.interaction:
                     sent = await ctx.interaction.followup.send(embed=embed)
                     if sent:
-                        asyncio.create_task(self._auto_delete(sent, 15))
+                        asyncio.create_task(self._auto_delete(sent, 10))
                 else:
                     sent = await ctx.send(embed=embed)
                     if sent:
-                        asyncio.create_task(self._auto_delete(sent, 15))
+                        asyncio.create_task(self._auto_delete(sent, 10))
             else:
                 if status_msg:
                     try:
@@ -1263,21 +1256,12 @@ class Music(commands.Cog):
                 if ctx.interaction:
                     sent = await ctx.interaction.followup.send(
                         embed=discord.Embed(
-                            description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
+                            description=f"🎶 **Starting playback:** [{song_obj.title}]({song_obj.webpage_url})",
                             color=config.COLOR_PRIMARY
                         )
                     )
                     if sent:
-                        asyncio.create_task(self._auto_delete(sent, 6))
-                else:
-                    sent = await ctx.send(
-                        embed=discord.Embed(
-                            description=f"🎶 **Streaming now:** [{song_obj.title}]({song_obj.webpage_url})",
-                            color=config.COLOR_PRIMARY
-                        )
-                    )
-                    if sent:
-                        asyncio.create_task(self._auto_delete(sent, 6))
+                        asyncio.create_task(self._auto_delete(sent, 3))
 
         except Exception as e:
             if ctx.interaction:
