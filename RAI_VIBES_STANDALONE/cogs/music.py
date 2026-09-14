@@ -35,6 +35,11 @@ YTDL_OPTIONS = {
     "skip_download": True,
     "socket_timeout": 15,
     "retries": 3,
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "ios", "web"]
+        }
+    }
 }
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
@@ -218,15 +223,16 @@ class SearchSelectView(View):
         player.text_channel = interaction.channel
 
         song = Song(selected_data, requester=interaction.user, source_type="youtube")
-        player.queue.append(song)
+        is_queued = player.enqueue_track(song)
 
+        title = "📥 Enqueued to Playback Queue" if is_queued else "🎶 Now Playing..."
         embed = discord.Embed(
-            title="⚡ Track Selected & Enqueued",
+            title=title,
             description=f"[{song.title}]({song.webpage_url})",
             color=config.COLOR_PRIMARY
         )
         embed.set_thumbnail(url=song.thumbnail)
-        embed.add_field(name="Position in Queue", value=f"`#{len(player.queue)}`" if player.current else "`Now Playing`", inline=True)
+        embed.add_field(name="Playback Status", value=f"`Position #{len(player.queue)}`" if is_queued else "`Streaming Now`", inline=True)
         embed.add_field(name="Requested By", value=interaction.user.mention, inline=True)
         embed.set_footer(text="RAI VIBES 💗 Music Engine", icon_url=config.RAI_ICON_URL)
 
@@ -398,6 +404,49 @@ class GuildMusicPlayer:
         vc = self.guild.voice_client
         if vc and (vc.is_playing() or vc.is_paused()):
             vc.stop()
+
+    def is_radio_playing(self) -> bool:
+        """Returns True if the current audio stream is 24/7 radio or idle lo-fi broadcast."""
+        if not self.current:
+            return False
+        return (
+            getattr(self.current, "source_type", None) in ("radio", "autoplay")
+            or getattr(self.current, "duration", 1) == 0
+            or "radio" in str(getattr(self.current, "title", "")).lower()
+            or "lo-fi" in str(getattr(self.current, "title", "")).lower()
+            or "fm" in str(getattr(self.current, "title", "")).lower()
+            or "24/7" in str(getattr(self.current, "uploader", ""))
+        )
+
+    def enqueue_track(self, song: Song, is_queue_mode: bool = False) -> bool:
+        """
+        Enqueues a song:
+        - If 24/7 radio/lo-fi is streaming, user track interrupts radio and starts playing immediately!
+        - If another user track is actively playing, song is appended to queue and returns True.
+        - If idle, song is added and playback starts immediately.
+        Returns True if queued behind an active user track, False if playing now.
+        """
+        is_radio = self.is_radio_playing()
+        user_song_active = bool(
+            (self.current is not None and not is_radio)
+            or (self.voice_client and (self.voice_client.is_playing() or self.voice_client.is_paused()) and not is_radio)
+        )
+
+        if is_radio:
+            if is_queue_mode and len(self.queue) > 0:
+                self.queue.append(song)
+            else:
+                self.queue.appendleft(song)
+            self.skip()  # Stop the infinite radio stream immediately so user track plays right now!
+            return False
+
+        if user_song_active:
+            self.queue.append(song)
+            return True
+        else:
+            self.queue.append(song)
+            self.play_next_song.set()
+            return False
 
     def shuffle(self):
         temp = list(self.queue)
@@ -1043,10 +1092,9 @@ class Music(commands.Cog):
                 if t.get("thumbnail"):
                     song_obj.thumbnail = t["thumbnail"]
                 
-                is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
-                player.queue.append(song_obj)
+                is_queued = player.enqueue_track(song_obj, is_queue_mode=is_queue_mode)
 
-                if is_currently_playing:
+                if is_queued:
                     # Calculate estimated time until playing
                     est_sec = 0
                     if player.current:
@@ -1074,15 +1122,22 @@ class Music(commands.Cog):
                     else:
                         await ctx.send(embed=embed)
                 else:
+                    embed = discord.Embed(
+                        title="🎶 Now Playing...",
+                        description=f"▶️ Streaming **[{song_obj.title}]({song_obj.webpage_url})** in `{player.voice_client.channel.name if player.voice_client and player.voice_client.channel else 'Voice Channel'}`!",
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
+                    embed.set_footer(text=f"Requested by {ctx.author.display_name} • High-Fidelity Audio", icon_url=ctx.author.display_avatar.url)
                     if ctx.interaction:
-                        try:
-                            await ctx.interaction.delete_original_response()
-                        except Exception:
-                            pass
+                        await ctx.interaction.followup.send(embed=embed)
+                    else:
+                        await ctx.send(embed=embed)
             else:
                 remaining_space = max(0, config.MAX_QUEUE_SIZE - len(player.queue))
                 added_tracks = spotify_tracks[:remaining_space]
 
+                is_radio = player.is_radio_playing()
                 for t in added_tracks:
                     unresolved_song = Song(
                         data={
@@ -1096,6 +1151,11 @@ class Music(commands.Cog):
                         source_type="spotify"
                     )
                     player.queue.append(unresolved_song)
+
+                if is_radio:
+                    player.skip()
+                elif not player.current and not (player.voice_client and player.voice_client.is_playing()):
+                    player.play_next_song.set()
 
                 embed = discord.Embed(
                     title="⚡ Spotify Playlist / Album Enqueued!",
@@ -1131,16 +1191,15 @@ class Music(commands.Cog):
                     return await ctx.interaction.followup.send(f"❌ No results found for: `{query}`", ephemeral=True)
                 return await ctx.send(f"❌ No results found for: `{query}`")
 
-            is_currently_playing = bool(player.current is not None or (player.voice_client and (player.voice_client.is_playing() or player.voice_client.is_paused())))
-            player.queue.append(song_obj)
+            is_queued = player.enqueue_track(song_obj, is_queue_mode=is_queue_mode)
 
-            if status_msg and not is_currently_playing:
+            if status_msg and not is_queued:
                 try:
                     await status_msg.delete()
                 except Exception:
                     pass
 
-            if is_currently_playing:
+            if is_queued:
                 # Calculate estimated time until playing (Rythm Style)
                 est_sec = 0
                 if player.current:
@@ -1175,12 +1234,22 @@ class Music(commands.Cog):
                 else:
                     await ctx.send(embed=embed)
             else:
-                # If starting playback now, delete thinking message if interaction
-                if ctx.interaction:
+                if status_msg:
                     try:
-                        await ctx.interaction.delete_original_response()
+                        await status_msg.delete()
                     except Exception:
                         pass
+                embed = discord.Embed(
+                    title="🎶 Now Playing...",
+                    description=f"▶️ Streaming **[{song_obj.title}]({song_obj.webpage_url})** in `{player.voice_client.channel.name if player.voice_client and player.voice_client.channel else 'Voice Channel'}`!",
+                    color=config.COLOR_PRIMARY
+                )
+                embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
+                embed.set_footer(text=f"Requested by {ctx.author.display_name} • High-Fidelity Audio", icon_url=ctx.author.display_avatar.url)
+                if ctx.interaction:
+                    await ctx.interaction.followup.send(embed=embed)
+                else:
+                    await ctx.send(embed=embed)
 
         except Exception as e:
             if ctx.interaction:
