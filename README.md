@@ -1,5 +1,6 @@
 # ⚡ THOR VIBES DISCORD MUSIC BOT
-### *Command The Power • Hear The Rhythm*
+
+*Command The Power • Hear The Rhythm*
 
 A high-performance Discord Music Bot featuring Bassboost, 8D Audio, Slowed + Reverb, Nightcore, 24/7 Radio, Live Lyrics, Favorites, and Spotify & YouTube integration.
 
