@@ -479,18 +479,40 @@ class Welcome(commands.Cog):
         except Exception as e:
             logger.warning(f"Could not generate goodbye card for {member.name}: {e}")
 
-        # 3. Public Goodbye channel spam disabled to keep chat clean
+        # 3. Post to Public Goodbyes Channel
+        goodbye_chan = guild.get_channel(1546122222329008199) or next((c for c in guild.text_channels if "goodbye" in c.name.lower()), None)
+        if goodbye_chan:
+            farewell_embed = discord.Embed(
+                title="👋 ⋆⋅ FAREWELL FROM RAI FAM ⋅⋆ 👋",
+                description=(
+                    f"✦ ───────────────────────────── ✦\n\n"
+                    f"**{member.display_name}** (`{member.name}`) has left the sanctuary.\n"
+                    f"We wish you all the best on your journeys ahead! 🌸\n\n"
+                    f"• **Remaining Family Members:** `{member_count}`\n\n"
+                    f"✦ ───────────────────────────── ✦"
+                ),
+                color=0xE74C3C
+            )
+            farewell_embed.set_footer(text=f"Member Departed • {guild.name}", icon_url=guild.icon.url if guild.icon else None)
+            farewell_embed.timestamp = discord.utils.utcnow()
+            try:
+                if card_file:
+                    farewell_embed.set_image(url="attachment://grand_goodbye.png")
+                    await goodbye_chan.send(embed=farewell_embed, file=card_file)
+                else:
+                    await goodbye_chan.send(embed=farewell_embed)
+            except Exception as e:
+                logger.warning(f"Error sending farewell to #goodbyes: {e}")
 
         # 4. Mod Log Record
         log_chan = (
             guild.get_channel(1546540192343523399) or
-            guild.get_channel(1546122222329008199) or
-            next((c for c in guild.text_channels if "audit" in c.name.lower() or "goodbye" in c.name.lower()), None)
+            next((c for c in guild.text_channels if "audit" in c.name.lower() or "moderation" in c.name.lower()), None)
         )
-        if log_chan:
+        if log_chan and log_chan.id != 1546122222329008199:
             log_embed = discord.Embed(
-                title="👋 Member Left",
-                description=f"**{member.name}** (`{member.id}`) has departed. Member count is now **{member_count}**.",
+                title="🚪 Member Departed",
+                description=f"**{member.name}** (`{member.id}`) left the server. Current member count: **{member_count}**.",
                 color=config.COLOR_SECONDARY
             )
             log_embed.timestamp = discord.utils.utcnow()

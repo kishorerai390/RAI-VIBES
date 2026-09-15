@@ -1005,6 +1005,19 @@ class EntrySound(commands.Cog):
                         vol = prof.get("volume", 85) / 100.0
                         asyncio.create_task(self.play_sound_in_channel(member.guild, before.channel, sfx, volume_factor=vol))
 
+                        # Send visual exit banner embed if enabled
+                        if prof.get("banner_enabled", True):
+                            try:
+                                exit_embed = discord.Embed(
+                                    title="👋 VOICE DEPARTURE",
+                                    description=f"🌙 {member.mention} departed the room.\n🎶 **Exit Theme:** **{sfx.get('emoji', '🚪')} {sfx['name']}**",
+                                    color=0x7289DA
+                                )
+                                exit_embed.set_thumbnail(url=member.display_avatar.url)
+                                await before.channel.send(embed=exit_embed, delete_after=8.0)
+                            except Exception:
+                                pass
+
     @commands.hybrid_group(name="entrysound", aliases=["entrance", "joinsound"], description="Manage your voice channel entrance & exit sound effect themes.")
     async def entrysound_group(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
