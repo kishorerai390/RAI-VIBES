@@ -89,7 +89,7 @@ async def on_ready():
     embed3 = discord.Embed(
         title="🤖 ⋆⋅ BOT COMMANDS CHEAT SHEET ⋅⋆ 🤖",
         description=(
-            "### 🎵 AURA ✦ (Music & Audio)\n"
+            "### 🎵 RAI VIBES 💗 (Music & Audio)\n"
             "> • `/play <song>` — Stream any track or YouTube/Spotify playlist\n"
             "> • `/pause` / `/resume` — Control playback\n"
             "> • `/skip` — Skip to next song in queue\n"
@@ -98,7 +98,7 @@ async def on_ready():
             "> • `/serverinfo` — Everglow-style interactive server stats\n"
             "> • `/userinfo [@member]` — Inspect badges, avatar, banner & join date\n"
             "> • `/rank` — Check your chat level and XP\n\n"
-            "### 🛡️ SENTINEL 🛡️ (Security & Tickets)\n"
+            "### 🛡️ RAI SENTINEL 🛡️ (Security & Tickets)\n"
             "> • <#1545514505520545886> — Click button to open a private ticket\n"
             "> • Automatic Anti-Nuke, Anti-Raid & Spam Filtering enabled 24/7"
         ),
