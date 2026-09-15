@@ -553,6 +553,136 @@ class Economy(commands.Cog):
         view = ShopBuyView(interaction.user.id)
         await interaction.response.send_message(embed=embed, view=view)
 
+    # 7. BALANCE / WALLET
+    @app_commands.command(name="balance", description="Check your current coin balance, daily streak, and reputation points.")
+    @app_commands.describe(member="Optional member whose wallet you want to view")
+    async def balance_command(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+        target = member or interaction.user
+        if target.bot:
+            return await interaction.response.send_message("❌ Bots do not have economy wallets.", ephemeral=True)
+
+        user_data = get_user_data(target.id)
+        coins = user_data.get("coins", 0)
+        streak = user_data.get("streak", 0)
+        rep = user_data.get("rep", 0)
+
+        embed = discord.Embed(
+            title=f"👛 {target.display_name.upper()}'S WALLET",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"🪙 **Coin Balance:** `{coins:,}` Coins\n"
+                f"🔥 **Daily Streak:** `{streak}` Days\n"
+                f"⭐ **Community Rep:** `{rep}` Points\n\n"
+                f"✦ ───────────────────────────── ✦\n"
+                f"💡 *Use `/daily` to claim bonus coins or `/shop` to purchase VIP perks!*"
+            ),
+            color=0xFF69B4
+        )
+        embed.set_thumbnail(url=target.display_avatar.url)
+        embed.set_footer(text="RAI FAM 💗 • Vault & Economy System", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+    # 8. GAMBLE / COIN TOSS BET
+    @app_commands.command(name="gamble", description="Double or nothing! Bet coins on Heads or Tails.")
+    @app_commands.describe(bet="Amount of coins to gamble (Min: 10)", choice="Your prediction")
+    @app_commands.choices(choice=[
+        app_commands.Choice(name="Heads 👑", value="heads"),
+        app_commands.Choice(name="Tails 🪙", value="tails")
+    ])
+    async def gamble_command(self, interaction: discord.Interaction, bet: int, choice: str):
+        if bet < 10:
+            return await interaction.response.send_message("❌ Minimum bet is `10` Coins.", ephemeral=True)
+
+        user_data = get_user_data(interaction.user.id)
+        coins = user_data.get("coins", 0)
+        if coins < bet:
+            return await interaction.response.send_message(
+                f"❌ You don't have enough coins! Your balance: `{coins:,}` Coins.",
+                ephemeral=True
+            )
+
+        outcome = random.choice(["heads", "tails"])
+        won = (choice.lower() == outcome)
+
+        if won:
+            new_bal = update_user_coins(interaction.user.id, bet)
+            embed = discord.Embed(
+                title="🎉 YOU WON THE COIN FLIP!",
+                description=(
+                    f"The coin spun through the air and landed on **{outcome.upper()}**!\n\n"
+                    f"✨ **Prediction:** `{choice.capitalize()}` *(Correct!)*\n"
+                    f"💰 **Profit:** `+{bet:,}` Coins\n"
+                    f"👛 **New Balance:** `{new_bal:,}` Coins"
+                ),
+                color=0x2ECC71
+            )
+        else:
+            new_bal = update_user_coins(interaction.user.id, -bet)
+            embed = discord.Embed(
+                title="💀 BETTER LUCK NEXT TIME!",
+                description=(
+                    f"The coin spun through the air and landed on **{outcome.upper()}**!\n\n"
+                    f"❌ **Prediction:** `{choice.capitalize()}` *(Missed)*\n"
+                    f"💸 **Loss:** `-{bet:,}` Coins\n"
+                    f"👛 **New Balance:** `{new_bal:,}` Coins"
+                ),
+                color=0xE74C3C
+            )
+
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        embed.set_footer(text="RAI FAM 💗 • High Stakes Arena", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+    # 9. RICHEST LEADERBOARD
+    @app_commands.command(name="richest", description="View the top 10 richest members in the server.")
+    async def richest_command(self, interaction: discord.Interaction):
+        data = load_economy()
+        if not data:
+            return await interaction.response.send_message("ℹ️ No economy data recorded yet.", ephemeral=True)
+
+        # Sort by coin balance descending
+        sorted_users = sorted(data.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
+        top_10 = sorted_users[:10]
+
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+        lines = []
+
+        for idx, (uid_str, udata) in enumerate(top_10):
+            medal = medals[idx] if idx < len(medals) else f"`#{idx+1}`"
+            try:
+                member = interaction.guild.get_member(int(uid_str))
+                name = member.display_name if member else f"User {uid_str}"
+            except Exception:
+                name = f"User {uid_str}"
+
+            c = udata.get("coins", 0)
+            streak = udata.get("streak", 0)
+            lines.append(f"{medal} **{name}** — `{c:,}` Coins *(🔥 {streak}d)*")
+
+        board_text = "\n".join(lines) if lines else "No entries yet."
+
+        user_coins = get_user_data(interaction.user.id).get("coins", 0)
+        # Find user rank
+        user_rank = "Unranked"
+        for rank_idx, (uid_str, _) in enumerate(sorted_users):
+            if uid_str == str(interaction.user.id):
+                user_rank = f"#{rank_idx + 1}"
+                break
+
+        embed = discord.Embed(
+            title="🏆 RAI FAM 💗 • RICHEST MEMBERS LEADERBOARD",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"{board_text}\n\n"
+                f"✦ ───────────────────────────── ✦\n"
+                f"👤 **Your Rank:** `{user_rank}` with **`{user_coins:,}` Coins**"
+            ),
+            color=0xF1C40F
+        )
+        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else config.RAI_ICON_URL)
+        embed.set_footer(text="Earn coins by chatting or relaxing in VC (+5 coins every 2 min)!", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Economy(bot))
