@@ -6,10 +6,11 @@ if sys.platform == "win32":
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+GUILD_ID = os.getenv('GUILD_ID', '1457382179981099090')
 headers = {'Authorization': f'Bot {TOKEN}', 'User-Agent': 'DiscordBot (Audit, 1.0)'}
 
 try:
-    req = urllib.request.Request('https://discord.com/api/v10/guilds/1525030316845301781/channels', headers=headers)
+    req = urllib.request.Request(f'https://discord.com/api/v10/guilds/{GUILD_ID}/channels', headers=headers)
     with urllib.request.urlopen(req) as resp:
         chans = json.loads(resp.read().decode('utf-8'))
     

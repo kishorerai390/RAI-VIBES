@@ -150,41 +150,7 @@ class IdentityRolesView(View):
         self.add_item(SelfRoleButton("Under 18", "Under 18", "🎒", discord.ButtonStyle.secondary, row=0))
 
 
-class VerifyButtonView(View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @button(label="Verify & Enter Community", emoji="✅", style=discord.ButtonStyle.success, custom_id="verify_member_btn")
-    async def verify_button(self, interaction: discord.Interaction, btn: Button):
-        await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-        if not guild:
-            return await interaction.followup.send("❌ Server error.", ephemeral=True)
-
-        role_rai = discord.utils.get(guild.roles, id=1545494584203673740) or discord.utils.get(guild.roles, name="🌸 ✧ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘")
-        role_ver = discord.utils.get(guild.roles, id=1546540194310782976) or discord.utils.get(guild.roles, name="Verified")
-
-        member = interaction.user
-        if isinstance(member, discord.User):
-            member = await guild.fetch_member(interaction.user.id)
-
-        roles_to_add = []
-        if role_rai and role_rai not in member.roles:
-            roles_to_add.append(role_rai)
-        if role_ver and role_ver not in member.roles:
-            roles_to_add.append(role_ver)
-
-        if not roles_to_add and (role_rai in member.roles or role_ver in member.roles):
-            return await interaction.followup.send("✨ **You are already verified!** All community channels & voice lounges are open to you. Enjoy your stay! 🌸", ephemeral=True)
-
-        if roles_to_add:
-            try:
-                await member.add_roles(*roles_to_add, reason="Passed Verification Gate")
-                await interaction.followup.send(f"🎉 **Verification Successful!** Welcome to **{guild.name}**! All voice lounges and channels are now unlocked! 🌸", ephemeral=True)
-            except Exception as e:
-                await interaction.followup.send(f"❌ Failed to assign role: {e}", ephemeral=True)
-        else:
-            await interaction.followup.send("❌ Verification role not configured.", ephemeral=True)
+from cogs.verify import VerifyButtonView, VerifiedNextStepsView
 
 
 

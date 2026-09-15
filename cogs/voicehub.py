@@ -537,10 +537,16 @@ class VoiceHub(commands.Cog):
                 except Exception:
                     pass
 
-        # 2. User Joined a "Join to Create" / Chamber generator channel
+        # 2. User Joined a "Join to Create" / Generator channel
         if after.channel:
             norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
-            if "join to create" in norm_name or "create" in norm_name or "➕" in after.channel.name or "chamber" in norm_name:
+            is_generator = (
+                "join to create" in norm_name
+                or "create ghost" in norm_name
+                or "generator" in norm_name
+                or (("➕" in after.channel.name or "[+]" in norm_name) and any(w in norm_name for w in ("create", "join", "hub")))
+            )
+            if is_generator:
                 category = after.channel.category
                 ch_name_lower = norm_name
 

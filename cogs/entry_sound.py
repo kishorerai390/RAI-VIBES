@@ -22,6 +22,24 @@ logger = logging.getLogger("EntrySound")
 
 DATA_DIR = Path("data")
 ENTRY_SOUND_FILE = DATA_DIR / "entry_sounds.json"
+CUSTOM_SOUNDS_DIR = DATA_DIR / "custom_sounds"
+
+def is_channel_suppressed(channel: Optional[discord.VoiceChannel]) -> bool:
+    """Returns True if the voice channel is a generator, AFK, or quiet room where entry sounds should be silenced."""
+    if not channel:
+        return True
+    norm_name = unicodedata.normalize('NFKD', channel.name).lower()
+    # Generators
+    if any(w in norm_name for w in ("join to create", "create ghost", "generator")):
+        return True
+    if "➕" in channel.name and ("create" in norm_name or "join" in norm_name):
+        return True
+    # Quiet, checking, or AFK channels
+    if any(w in norm_name for w in ("afk", "sleep", "💤", "checking", "check-in", "silent", "quiet", "study", "focus")):
+        return True
+    if channel.guild and channel.guild.afk_channel and channel.id == channel.guild.afk_channel.id:
+        return True
+    return False
 
 FFMPEG_BEFORE_OPTIONS = (
     '-headers "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n'
@@ -940,8 +958,7 @@ class EntrySound(commands.Cog):
 
         # 1. ENTRANCE SOUND (Member joined or moved to a voice room)
         if after.channel and (not before.channel or before.channel.id != after.channel.id):
-            norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
-            if any(w in norm_name for w in ("join to create", "➕", "chamber", "generator")):
+            if is_channel_suppressed(after.channel):
                 return
 
             prof = get_user_entry_profile(member.id)
@@ -975,6 +992,8 @@ class EntrySound(commands.Cog):
 
         # 2. EXIT SOUND (Member left a voice room with other listeners remaining)
         elif before.channel and (not after.channel or before.channel.id != after.channel.id):
+            if is_channel_suppressed(before.channel):
+                return
             remaining_humans = [m for m in before.channel.members if not m.bot]
             if len(remaining_humans) >= 1:
                 prof = get_user_entry_profile(member.id)
@@ -1098,6 +1117,160 @@ class EntrySound(commands.Cog):
 
         st = "ENABLED 🔔 (Will play on join & leave)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
         await ctx.send(f"Voice Themes are now **{st}**!", ephemeral=True)
+
+    @entrysound_group.command(name="upload", description="Upload an audio file (.mp3, .wav, .ogg, max 8MB) as your personal entrance sound.")
+    @app_commands.describe(file="Audio file attachment (.mp3, .wav, or .ogg)")
+    async def upload_cmd(self, ctx: commands.Context, file: discord.Attachment):
+        await ctx.defer(ephemeral=True)
+        prof = get_user_entry_profile(ctx.author.id)
+        is_unlocked = prof.get("custom_unlocked", False) or ctx.author.id == OWNER_ID
+        if not is_unlocked:
+            vip_role = discord.utils.get(ctx.author.roles, name="💎 ┊ 𝐑𝐀𝐈 𝐄𝐋𝐈𝐓𝐄")
+            if vip_role or getattr(ctx.author, "premium_since", None):
+                is_unlocked = True
+                unlock_custom_pass(ctx.author.id)
+
+        if not is_unlocked:
+            return await ctx.send(
+                "🔒 **Custom Audio Upload is a Premium Perk!**\n"
+                "Unlock it in `#🛒・server-shop` with **🔮 Custom Audio URL Pass** (`3,000 Coins`), "
+                "or gain instant access by becoming a **💎 VIP Elite** or **Server Booster**!",
+                ephemeral=True
+            )
+
+        filename = file.filename.lower()
+        if not any(filename.endswith(ext) for ext in [".mp3", ".wav", ".ogg", ".m4a"]):
+            return await ctx.send("❌ Only audio files (`.mp3`, `.wav`, `.ogg`, `.m4a`) are supported.", ephemeral=True)
+
+        if file.size > 8 * 1024 * 1024:
+            return await ctx.send("❌ Audio file size cannot exceed 8MB.", ephemeral=True)
+
+        try:
+            CUSTOM_SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
+            safe_ext = Path(file.filename).suffix
+            dest_file = CUSTOM_SOUNDS_DIR / f"{ctx.author.id}_custom{safe_ext}"
+            await file.save(dest_file)
+
+            data = load_entry_data()
+            u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {})
+            u_prof["custom_url"] = str(dest_file.resolve())
+            u_prof["equipped"] = "custom"
+            u_prof["enabled"] = True
+            u_prof["custom_unlocked"] = True
+            save_entry_data(data)
+
+            embed = discord.Embed(
+                title="✨ CUSTOM AUDIO ATTACHMENT SAVED & EQUIPPED!",
+                description=(
+                    f"✦ ───────────────────────────── ✦\n\n"
+                    f"Successfully saved **`{file.filename}`** (`{file.size // 1024} KB`) as your VIP Voice Entrance Theme! 🎵\n\n"
+                    f"• **Playback Mode:** Personal Custom File 🔮\n"
+                    f"• **Status:** Active & Ready ✅\n"
+                    f"• **Volume:** `{u_prof.get('volume', 85)}%`\n\n"
+                    f"✦ ───────────────────────────── ✦\n"
+                    f"💡 *Use `/entrysound test` in any voice lounge to hear your custom audio!*"
+                ),
+                color=0x2ECC71
+            )
+            embed.set_footer(text="RAI FAM 💗 • Custom Audio Studio", icon_url=config.RAI_ICON_URL)
+            await ctx.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error saving uploaded sound: {e}")
+            await ctx.send(f"❌ Error saving audio file: {e}", ephemeral=True)
+
+    @entrysound_group.command(name="custom", description="Set a direct web audio stream URL (.mp3, .wav) as your entrance theme.")
+    @app_commands.describe(url="Direct public URL to an MP3 or WAV audio stream")
+    async def custom_cmd(self, ctx: commands.Context, url: str):
+        await ctx.defer(ephemeral=True)
+        prof = get_user_entry_profile(ctx.author.id)
+        is_unlocked = prof.get("custom_unlocked", False) or ctx.author.id == OWNER_ID
+        if not is_unlocked:
+            vip_role = discord.utils.get(ctx.author.roles, name="💎 ┊ 𝐑𝐀𝐈 𝐄𝐋𝐈𝐓𝐄")
+            if vip_role or getattr(ctx.author, "premium_since", None):
+                is_unlocked = True
+                unlock_custom_pass(ctx.author.id)
+
+        if not is_unlocked:
+            return await ctx.send(
+                "🔒 **Custom Audio Stream URL is a Premium Perk!**\n"
+                "Unlock it in `#🛒・server-shop` with **🔮 Custom Audio URL Pass** (`3,000 Coins`), "
+                "or gain instant access by becoming a **💎 VIP Elite** or **Server Booster**!",
+                ephemeral=True
+            )
+
+        url = url.strip()
+        if not (url.startswith("http://") or url.startswith("https://")):
+            return await ctx.send("❌ Invalid URL. Must start with `http://` or `https://`.", ephemeral=True)
+
+        data = load_entry_data()
+        u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {})
+        u_prof["custom_url"] = url
+        u_prof["equipped"] = "custom"
+        u_prof["enabled"] = True
+        u_prof["custom_unlocked"] = True
+        save_entry_data(data)
+
+        embed = discord.Embed(
+            title="✨ CUSTOM AUDIO URL EQUIPPED!",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"Successfully set your personal entrance theme URL:\n"
+                f"`{url[:75]}...`\n\n"
+                f"• **Playback Mode:** Personal Web Stream 🔮\n"
+                f"• **Status:** Active & Ready ✅\n"
+                f"• **Volume:** `{u_prof.get('volume', 85)}%`\n\n"
+                f"✦ ───────────────────────────── ✦\n"
+                f"💡 *Use `/entrysound test` in any voice lounge to preview live!*"
+            ),
+            color=0x2ECC71
+        )
+        embed.set_footer(text="RAI FAM 💗 • Custom Audio Studio", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, ephemeral=True)
+
+    @entrysound_group.command(name="preview", description="Preview and listen to any entrance theme.")
+    @app_commands.describe(theme="Theme key or name (e.g. gigachad, anime_wow, tokyo_drift)")
+    async def preview_cmd(self, ctx: commands.Context, theme: Optional[str] = None):
+        if not theme:
+            prof = get_user_entry_profile(ctx.author.id)
+            theme = prof.get("equipped", "airhorn")
+
+        target_key = theme.lower().strip().replace(" ", "_")
+        sfx = None
+        if target_key == "custom":
+            prof = get_user_entry_profile(ctx.author.id)
+            if prof.get("custom_url"):
+                sfx = {"name": "🔮 Custom Audio Stream", "url": prof["custom_url"], "duration": 4.0, "category": "Custom", "emoji": "🔮"}
+        else:
+            sfx = ENTRY_SOUNDS.get(target_key)
+            if not sfx:
+                for k, v in ENTRY_SOUNDS.items():
+                    if target_key in k or target_key in v["name"].lower():
+                        sfx = v
+                        target_key = k
+                        break
+
+        if not sfx:
+            valid_list = ", ".join([f"`{k}`" for k in list(ENTRY_SOUNDS.keys())[:8]])
+            return await ctx.send(f"❌ Unknown theme `{theme}`. Try one of: {valid_list}...", ephemeral=True)
+
+        if ctx.author.voice and ctx.author.voice.channel:
+            vol = get_user_entry_profile(ctx.author.id).get("volume", 85) / 100.0
+            await ctx.send(f"🎧 Previewing **{sfx.get('emoji', '🎵')} {sfx['name']}** in {ctx.author.voice.channel.mention} at `{int(vol*100)}%` volume...", ephemeral=True)
+            await self.play_sound_in_channel(ctx.guild, ctx.author.voice.channel, sfx, volume_factor=vol)
+        else:
+            embed = discord.Embed(
+                title=f"🎧 Sound Preview: {sfx.get('emoji', '🎵')} {sfx['name']}",
+                description=(
+                    f"• **Category:** `{sfx.get('category', 'General')}`\n"
+                    f"• **Description:** {sfx.get('description', 'High-quality sound effect')}\n"
+                    f"• **Duration:** `{sfx.get('duration', 3.0)}s`\n"
+                    f"• **Price:** `{sfx.get('price', 1000):,} Coins`\n\n"
+                    f"💡 *Join any voice channel and run `/entrysound preview {target_key}` to hear it live through the bot!*"
+                ),
+                color=0x00F5D4
+            )
+            embed.set_footer(text="RAI FAM 💗 • Audio Preview", icon_url=config.RAI_ICON_URL)
+            await ctx.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
