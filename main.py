@@ -168,7 +168,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                     pass
 
         # 1. Dedicated Song Requests Channel Direct Queue (Zero-prefix)
-        if "song-request" in message.channel.name.lower() or "requests" in message.channel.name.lower():
+        if message.channel.id == 1545534637122527332 or "song-request" in message.channel.name.lower() or "requests" in message.channel.name.lower() or "ꜱᴏɴɢ" in message.channel.name:
             if content and not content.startswith("/"):
                 ctx = await b.get_context(message)
                 try:
