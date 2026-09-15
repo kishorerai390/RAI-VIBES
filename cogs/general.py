@@ -183,6 +183,9 @@ class General(commands.Cog):
         self.bot = bot
         self.start_time = time.time()
 
+    async def cog_load(self):
+        self.bot.add_view(ServerInfoButtonsView())
+
     @commands.hybrid_command(name="ping", description="Check RAI VIBES 💗 response latency.")
     async def ping(self, ctx: commands.Context):
         start = time.monotonic()
@@ -687,51 +690,56 @@ class PollView(discord.ui.View):
 
 class ServerInfoButtonsView(discord.ui.View):
 
-    def __init__(self, guild: discord.Guild):
-        super().__init__(timeout=180)
+    def __init__(self, guild: discord.Guild = None):
+        super().__init__(timeout=None)
         self.guild = guild
 
-    @discord.ui.button(label="Server Icon", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Server Icon", style=discord.ButtonStyle.secondary, custom_id="serverinfo:icon")
     async def server_icon(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.guild.icon:
+        guild = interaction.guild or self.guild
+        if not guild or not guild.icon:
             return await interaction.response.send_message("❌ This server does not have an icon.", ephemeral=True)
-        embed = discord.Embed(title=f"🖼️ Icon • {self.guild.name}", color=0x2B2D31)
-        embed.set_image(url=self.guild.icon.url)
-        embed.description = f"[Download Icon]({self.guild.icon.url})"
+        embed = discord.Embed(title=f"🖼️ Icon • {guild.name}", color=0x2B2D31)
+        embed.set_image(url=guild.icon.url)
+        embed.description = f"[Download Icon]({guild.icon.url})"
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="Server Banner", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Server Banner", style=discord.ButtonStyle.secondary, custom_id="serverinfo:banner")
     async def server_banner(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.guild.banner:
+        guild = interaction.guild or self.guild
+        if not guild or not guild.banner:
             return await interaction.response.send_message("❌ This server does not have a server banner.", ephemeral=True)
-        embed = discord.Embed(title=f"🎨 Banner • {self.guild.name}", color=0x2B2D31)
-        embed.set_image(url=self.guild.banner.url)
-        embed.description = f"[Download Banner]({self.guild.banner.url})"
+        embed = discord.Embed(title=f"🎨 Banner • {guild.name}", color=0x2B2D31)
+        embed.set_image(url=guild.banner.url)
+        embed.description = f"[Download Banner]({guild.banner.url})"
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="Splash", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Splash", style=discord.ButtonStyle.secondary, custom_id="serverinfo:splash")
     async def server_splash(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.guild.splash:
+        guild = interaction.guild or self.guild
+        if not guild or not guild.splash:
             return await interaction.response.send_message("❌ This server does not have an invite splash background.", ephemeral=True)
-        embed = discord.Embed(title=f"✨ Splash • {self.guild.name}", color=0x2B2D31)
-        embed.set_image(url=self.guild.splash.url)
-        embed.description = f"[Download Splash]({self.guild.splash.url})"
+        embed = discord.Embed(title=f"✨ Splash • {guild.name}", color=0x2B2D31)
+        embed.set_image(url=guild.splash.url)
+        embed.description = f"[Download Splash]({guild.splash.url})"
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="Features", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Features", style=discord.ButtonStyle.secondary, custom_id="serverinfo:features")
     async def server_features(self, interaction: discord.Interaction, button: discord.ui.Button):
-        features = self.guild.features
+        guild = interaction.guild or self.guild
+        features = guild.features if guild else []
         if not features:
             desc = "> No special features enabled."
         else:
             desc = "\n".join(f"> • `{feat.replace('_', ' ').title()}`" for feat in sorted(features))
-        embed = discord.Embed(title=f"🌟 Features • {self.guild.name}", description=desc, color=0x2B2D31)
+        name = guild.name if guild else "Server"
+        embed = discord.Embed(title=f"🌟 Features • {name}", description=desc, color=0x2B2D31)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 class UserInfoButtonsView(discord.ui.View):
     def __init__(self, member: discord.Member, bot: commands.Bot):
-        super().__init__(timeout=180)
+        super().__init__(timeout=300)
         self.member = member
         self.bot = bot
 
@@ -745,16 +753,17 @@ class UserInfoButtonsView(discord.ui.View):
 
     @discord.ui.button(label="Banner", style=discord.ButtonStyle.secondary)
     async def view_banner(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
         try:
             user = await self.bot.fetch_user(self.member.id)
             if not user.banner:
-                return await interaction.response.send_message("❌ This user does not have a custom profile banner.", ephemeral=True)
+                return await interaction.followup.send("❌ This user does not have a custom profile banner.", ephemeral=True)
             embed = discord.Embed(title=f"🎨 Banner • {self.member.name}", color=0x2B2D31)
             embed.set_image(url=user.banner.url)
             embed.description = f"[Download Banner]({user.banner.url})"
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(f"❌ Could not fetch banner: {e}", ephemeral=True)
+            await interaction.followup.send(f"❌ Could not fetch banner: {e}", ephemeral=True)
 
     @discord.ui.button(label="Roles", style=discord.ButtonStyle.secondary)
     async def view_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
