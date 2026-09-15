@@ -6,9 +6,11 @@
     "losses": 0
   },
   "1457380609641938981": {
-    "coins": 71355,
+    "coins": 999999999999,
     "last_daily": 0,
     "wins": 0,
-    "losses": 0
+    "losses": 0,
+    "streak": 999,
+    "rep": 999
   }
 }

@@ -309,6 +309,9 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.welcome",
         "cogs.bump_reminder",
         "cogs.radio",
+        "cogs.giveaway",
+        "cogs.booster",
+        "cogs.qotd",
     ]
 
     for extension in initial_extensions:

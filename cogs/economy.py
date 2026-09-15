@@ -15,6 +15,8 @@ import config
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 ECONOMY_FILE = DATA_DIR / "economy.json"
 
+OWNER_ID = 1457380609641938981
+
 SHOP_ITEMS = {
     "dj_pass": {
         "name": "🎧 DJ Pass Role",
@@ -28,15 +30,39 @@ SHOP_ITEMS = {
         "name": "💎 VIP Elite Prestige",
         "description": "Gain the prestigious VIP role with exclusive lounge & VC access",
         "price": 2500,
-        "role_id": None,
+        "role_id": 1545834931165335673,
         "role_name": "💎 ┊ 𝐑𝐀𝐈 𝐄𝐋𝐈𝐓𝐄",
         "emoji": "💎"
     },
-    "custom_color": {
-        "name": "🎨 Royal Gold Name Color",
-        "description": "Shine in server chat with the exclusive Royal Gold name color",
+    "sakura_pink": {
+        "name": "🌸 Sakura Pink Name Color",
+        "description": "Shine in chat with the aesthetic Sakura Pink username color",
         "price": 800,
-        "role_id": 1546088559830634586,  # Royal Gold
+        "role_id": 1546088552293728268,
+        "role_name": "Sakura Pink",
+        "emoji": "🌸"
+    },
+    "neon_purple": {
+        "name": "💜 Neon Purple Name Color",
+        "description": "Vibrant glowing neon purple name in all server channels",
+        "price": 800,
+        "role_id": 1546088554747142174,
+        "role_name": "Neon Purple",
+        "emoji": "💜"
+    },
+    "cyber_cyan": {
+        "name": "💎 Cyber Cyan Name Color",
+        "description": "Futuristic neon cyan glow for your username",
+        "price": 800,
+        "role_id": 1546088557742129232,
+        "role_name": "Cyber Cyan",
+        "emoji": "💎"
+    },
+    "royal_gold": {
+        "name": "💛 Royal Gold Name Color",
+        "description": "Prestigious shimmering gold name in server chat",
+        "price": 800,
+        "role_id": 1546088559830634586,
         "role_name": "Royal Gold",
         "emoji": "💛"
     }
@@ -72,10 +98,16 @@ def get_user_data(user_id: int) -> dict:
             "last_rep": 0
         }
         save_economy(data)
+    if int(user_id) == OWNER_ID:
+        data[uid]["coins"] = 999_999_999_999
+        data[uid]["streak"] = max(data[uid].get("streak", 0), 999)
+        data[uid]["rep"] = max(data[uid].get("rep", 0), 999)
     return data[uid]
 
 
 def update_user_coins(user_id: int, delta: int) -> int:
+    if int(user_id) == OWNER_ID:
+        return 999_999_999_999
     data = load_economy()
     uid = str(user_id)
     if uid not in data:
@@ -259,28 +291,40 @@ class TriviaView(View):
 # =====================================================================
 # SHOP VIEW
 # =====================================================================
+class ShopSelect(discord.ui.Select):
+    def __init__(self):
+        options = []
+        for key, item in SHOP_ITEMS.items():
+            options.append(discord.SelectOption(
+                label=f"{item['name']} ({item['price']:,} coins)",
+                value=key,
+                description=item['description'][:95],
+                emoji=item['emoji']
+            ))
+        super().__init__(
+            placeholder="🛒 Click here to select a role or color to buy...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: ShopBuyView = self.view
+        await view.process_purchase(interaction, self.values[0])
+
+
 class ShopBuyView(View):
     def __init__(self, user_id: int):
-        super().__init__(timeout=90)
+        super().__init__(timeout=120)
         self.user_id = user_id
+        self.add_item(ShopSelect())
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This shop menu belongs to someone else.", ephemeral=True)
             return False
         return True
-
-    @button(label="Buy DJ Pass (1,000)", style=discord.ButtonStyle.primary, emoji="🎧")
-    async def buy_dj(self, interaction: discord.Interaction, button: Button):
-        await self.process_purchase(interaction, "dj_pass")
-
-    @button(label="Buy VIP Elite (2,500)", style=discord.ButtonStyle.success, emoji="💎")
-    async def buy_vip(self, interaction: discord.Interaction, button: Button):
-        await self.process_purchase(interaction, "vip_elite")
-
-    @button(label="Buy Royal Gold (800)", style=discord.ButtonStyle.secondary, emoji="💛")
-    async def buy_color(self, interaction: discord.Interaction, button: Button):
-        await self.process_purchase(interaction, "custom_color")
 
     async def process_purchase(self, interaction: discord.Interaction, item_key: str):
         item = SHOP_ITEMS.get(item_key)
@@ -535,15 +579,17 @@ class Economy(commands.Cog):
             title="🛒 RAI FAM • OFFICIAL PERKS STORE",
             description=(
                 f"Welcome to the Server Store, {interaction.user.mention}! 🌸\n"
-                f"Your Wallet Balance: **`{user_coins:,} Coins`** 🪙\n\n"
-                f"**Available Exclusive Items:**\n"
+                f"Your Wallet Balance: **`{user_coins:,}` Coins** 🪙\n\n"
+                f"**Available Exclusive Roles & Perks:**\n"
                 f"• 🎧 **DJ Pass Role** — `1,000 Coins`\n"
                 f"  *Full audio control, skip priority, and sound filter access.*\n\n"
                 f"• 💎 **VIP Elite Role** — `2,500 Coins`\n"
                 f"  *Prestige badge, private VIP voice lounge, and cinema lounge access.*\n\n"
-                f"• 💛 **Royal Gold Name Color** — `800 Coins`\n"
-                f"  *Stand out in text channels with a brilliant royal gold name.*\n\n"
-                f"👉 *Click the buttons below to purchase instantly!*"
+                f"• 🌸 **Sakura Pink Name Color** — `800 Coins`\n"
+                f"• 💜 **Neon Purple Name Color** — `800 Coins`\n"
+                f"• 💎 **Cyber Cyan Name Color** — `800 Coins`\n"
+                f"• 💛 **Royal Gold Name Color** — `800 Coins`\n\n"
+                f"👉 *Choose any item from the dropdown menu below to buy!*"
             ),
             color=0x9B5DE5
         )
@@ -566,11 +612,13 @@ class Economy(commands.Cog):
         streak = user_data.get("streak", 0)
         rep = user_data.get("rep", 0)
 
+        coin_display = "∞ *(Infinite Vault • Server Owner)*" if target.id == OWNER_ID else f"`{coins:,}` Coins"
+
         embed = discord.Embed(
             title=f"👛 {target.display_name.upper()}'S WALLET",
             description=(
                 f"✦ ───────────────────────────── ✦\n\n"
-                f"🪙 **Coin Balance:** `{coins:,}` Coins\n"
+                f"🪙 **Coin Balance:** {coin_display}\n"
                 f"🔥 **Daily Streak:** `{streak}` Days\n"
                 f"⭐ **Community Rep:** `{rep}` Points\n\n"
                 f"✦ ───────────────────────────── ✦\n"
@@ -595,7 +643,7 @@ class Economy(commands.Cog):
 
         user_data = get_user_data(interaction.user.id)
         coins = user_data.get("coins", 0)
-        if coins < bet:
+        if coins < bet and interaction.user.id != OWNER_ID:
             return await interaction.response.send_message(
                 f"❌ You don't have enough coins! Your balance: `{coins:,}` Coins.",
                 ephemeral=True
@@ -606,25 +654,27 @@ class Economy(commands.Cog):
 
         if won:
             new_bal = update_user_coins(interaction.user.id, bet)
+            bal_str = "∞ (Owner Vault)" if interaction.user.id == OWNER_ID else f"`{new_bal:,}` Coins"
             embed = discord.Embed(
                 title="🎉 YOU WON THE COIN FLIP!",
                 description=(
                     f"The coin spun through the air and landed on **{outcome.upper()}**!\n\n"
                     f"✨ **Prediction:** `{choice.capitalize()}` *(Correct!)*\n"
                     f"💰 **Profit:** `+{bet:,}` Coins\n"
-                    f"👛 **New Balance:** `{new_bal:,}` Coins"
+                    f"👛 **New Balance:** {bal_str}"
                 ),
                 color=0x2ECC71
             )
         else:
             new_bal = update_user_coins(interaction.user.id, -bet)
+            bal_str = "∞ (Owner Vault)" if interaction.user.id == OWNER_ID else f"`{new_bal:,}` Coins"
             embed = discord.Embed(
                 title="💀 BETTER LUCK NEXT TIME!",
                 description=(
                     f"The coin spun through the air and landed on **{outcome.upper()}**!\n\n"
                     f"❌ **Prediction:** `{choice.capitalize()}` *(Missed)*\n"
                     f"💸 **Loss:** `-{bet:,}` Coins\n"
-                    f"👛 **New Balance:** `{new_bal:,}` Coins"
+                    f"👛 **New Balance:** {bal_str}"
                 ),
                 color=0xE74C3C
             )
@@ -640,12 +690,15 @@ class Economy(commands.Cog):
         if not data:
             return await interaction.response.send_message("ℹ️ No economy data recorded yet.", ephemeral=True)
 
-        # Sort by coin balance descending
-        sorted_users = sorted(data.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
-        top_10 = sorted_users[:10]
+        # Sort by coin balance descending, exclude owner from normal rank since owner has infinite
+        sorted_users = [
+            (uid, udata) for uid, udata in sorted(data.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
+            if int(uid) != OWNER_ID
+        ]
+        top_10 = sorted_users[:9]
 
-        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
-        lines = []
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+        lines = ["👑 **rf.rai_006** — `∞ Coins` *(🔥 999d • Server Owner)*"]
 
         for idx, (uid_str, udata) in enumerate(top_10):
             medal = medals[idx] if idx < len(medals) else f"`#{idx+1}`"
@@ -659,15 +712,17 @@ class Economy(commands.Cog):
             streak = udata.get("streak", 0)
             lines.append(f"{medal} **{name}** — `{c:,}` Coins *(🔥 {streak}d)*")
 
-        board_text = "\n".join(lines) if lines else "No entries yet."
+        board_text = "\n".join(lines)
 
         user_coins = get_user_data(interaction.user.id).get("coins", 0)
-        # Find user rank
-        user_rank = "Unranked"
-        for rank_idx, (uid_str, _) in enumerate(sorted_users):
-            if uid_str == str(interaction.user.id):
-                user_rank = f"#{rank_idx + 1}"
-                break
+        user_rank = "👑 Server Owner (#1)" if interaction.user.id == OWNER_ID else "Unranked"
+        if interaction.user.id != OWNER_ID:
+            for rank_idx, (uid_str, _) in enumerate(sorted_users):
+                if uid_str == str(interaction.user.id):
+                    user_rank = f"#{rank_idx + 2}"
+                    break
+
+        coin_str = "∞ Coins" if interaction.user.id == OWNER_ID else f"{user_coins:,} Coins"
 
         embed = discord.Embed(
             title="🏆 RAI FAM 💗 • RICHEST MEMBERS LEADERBOARD",
@@ -675,7 +730,7 @@ class Economy(commands.Cog):
                 f"✦ ───────────────────────────── ✦\n\n"
                 f"{board_text}\n\n"
                 f"✦ ───────────────────────────── ✦\n"
-                f"👤 **Your Rank:** `{user_rank}` with **`{user_coins:,}` Coins**"
+                f"👤 **Your Rank:** `{user_rank}` with **`{coin_str}`**"
             ),
             color=0xF1C40F
         )
