@@ -312,6 +312,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.giveaway",
         "cogs.booster",
         "cogs.qotd",
+        "cogs.exchange",
     ]
 
     for extension in initial_extensions:
