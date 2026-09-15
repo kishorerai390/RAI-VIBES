@@ -73,6 +73,14 @@ SHOP_ITEMS = {
         "role_id": None,
         "role_name": None,
         "emoji": "🔊"
+    },
+    "custom_sound_pass": {
+        "name": "🔮 Custom Audio URL Pass",
+        "description": "Unlock setting any direct MP3/audio stream link as your entrance theme",
+        "price": 3000,
+        "role_id": None,
+        "role_name": None,
+        "emoji": "🔮"
     }
 }
 
@@ -374,6 +382,12 @@ class ShopBuyView(View):
             if len(prof.get("unlocked", [])) >= len(ALL_SOUND_KEYS) and user.id != OWNER_ID:
                 return await send_reply(content="⚠️ You have already unlocked all Voice Channel Entrance Themes!")
             unlock_all_sounds(user.id)
+        elif item_key == "custom_sound_pass":
+            from cogs.entry_sound import get_user_entry_profile, unlock_custom_pass
+            prof = get_user_entry_profile(user.id)
+            if prof.get("custom_unlocked", False) and user.id != OWNER_ID:
+                return await send_reply(content="⚠️ You already have the Custom Audio URL Pass!")
+            unlock_custom_pass(user.id)
         else:
             role = None
             if item.get("role_id"):
