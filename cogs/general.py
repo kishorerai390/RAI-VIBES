@@ -378,61 +378,46 @@ class General(commands.Cog):
 
         # General Field
         general_val = (
-            f"> **ID:** {guild.id}\n"
-            f"> **Owner:** <@{guild.owner_id}>\n"
-            f"> **Created:** {created_str}\n"
-            f"> **Region:** Auto\n"
-            f"> **Vanity URL:** {vanity_str}"
+            f"> • **Server ID:** `{guild.id}`\n"
+            f"> • **Owner:** <@{guild.owner_id}>\n"
+            f"> • **Created:** {created_str}\n"
+            f"> • **Vanity URL:** `{vanity_str}`"
         )
-        embed.add_field(name="General", value=general_val, inline=False)
+        embed.add_field(name="🌐 Overview", value=general_val, inline=False)
 
-        # Members
+        # Members & Roles
         members_val = (
-            f"> **Total:** {total_members}\n"
-            f"> **Humans:** {human_members}\n"
-            f"> **Bots:** {bot_members}"
+            f"> • **Total Members:** `{total_members}` (👤 `{human_members}` Humans • 🤖 `{bot_members}` Bots)\n"
+            f"> • **Roles:** `{roles_count}` • **Emojis:** `{emojis_count}` • **Stickers:** `{stickers_count}`"
         )
-        embed.add_field(name="Members", value=members_val, inline=True)
+        embed.add_field(name="👥 Community & Roles", value=members_val, inline=False)
 
         # Channels
         channels_val = (
-            f"> **AFK:** {afk_ch}\n"
-            f"> **Text:** {text_channels}\n"
-            f"> **Voice:** {voice_channels}"
+            f"> • **Total Channels:** `{text_channels + voice_channels}` (💬 `{text_channels}` Text • 🔊 `{voice_channels}` Voice)\n"
+            f"> • **AFK Voice:** {afk_ch}"
         )
-        embed.add_field(name="Channels", value=channels_val, inline=True)
+        embed.add_field(name="📂 Channel Layout", value=channels_val, inline=False)
 
-        # Roles & Media
-        roles_media_val = (
-            f"> **Roles:** {roles_count}\n"
-            f"> **Emojis:** {emojis_count}\n"
-            f"> **Stickers:** {stickers_count}"
+        # Boosting & Security
+        boost_sec_val = (
+            f"> • **Nitro Boost:** `Level {boost_level}` (`{boost_count}` Boosts) • **Booster Role:** {booster_role_str}\n"
+            f"> • **Verification:** `{verification_str}` • **2FA:** `{mfa_str}` • **Filter:** `{filter_str}`"
         )
-        embed.add_field(name="Roles & Media", value=roles_media_val, inline=True)
-
-        # Boosting
-        boosting_val = (
-            f"> **Level:** {boost_level}\n"
-            f"> **Boosts:** {boost_count}\n"
-            f"> **Booster Role:** {booster_role_str}"
-        )
-        embed.add_field(name="Boosting", value=boosting_val, inline=True)
-
-        # Security
-        security_val = (
-            f"> **Verification:** {verification_str}\n"
-            f"> **Content Filter:** {filter_str}\n"
-            f"> **2FA Requirement:** {mfa_str}"
-        )
-        embed.add_field(name="Security", value=security_val, inline=True)
+        embed.add_field(name="🛡️ Boosting & Security", value=boost_sec_val, inline=False)
 
         # System Channels
-        system_val = (
-            f"> **Rules:** {rules_str}\n"
-            f"> **Updates:** {updates_str}\n"
-            f"> **System Msgs:** {system_str}"
-        )
-        embed.add_field(name="System Channels", value=system_val, inline=True)
+        system_lines = []
+        if guild.rules_channel:
+            system_lines.append(f"• **Rules:** {guild.rules_channel.mention}")
+        if guild.public_updates_channel:
+            system_lines.append(f"• **Updates:** {guild.public_updates_channel.mention}")
+        if guild.system_channel:
+            system_lines.append(f"• **System:** {guild.system_channel.mention}")
+        if not system_lines:
+            system_lines.append("• *None configured*")
+
+        embed.add_field(name="📌 System Channels", value="> " + "\n> ".join(system_lines), inline=False)
 
         # Footer
         author_user = ctx.author
@@ -456,37 +441,30 @@ class General(commands.Cog):
         embed.set_thumbnail(url=avatar_url)
 
         # General Identity
+        nick_str = f" (Nick: `{member.nick}`)" if member.nick else ""
         general_val = (
-            f"> **Username:** {member.name}\n"
-            f"> **Nickname:** {member.nick or 'None'}\n"
-            f"> **ID:** {member.id}\n"
-            f"> **Created:** {created_str}\n"
-            f"> **Bot:** {'Yes' if member.bot else 'No'}"
+            f"> • **User ID:** `{member.id}`\n"
+            f"> • **Username:** `{member.name}`{nick_str}\n"
+            f"> • **Account Created:** {created_str}\n"
+            f"> • **Bot Account:** `{'Yes' if member.bot else 'No'}`"
         )
-        embed.add_field(name="Identity", value=general_val, inline=False)
+        embed.add_field(name="👤 Identity", value=general_val, inline=False)
 
-        # Membership
+        # Membership & Presence
         role_count = max(0, len(member.roles) - 1)
         top_role = member.top_role.mention if member.top_role else "None"
         timeout_status = "Yes" if getattr(member, "is_timed_out", lambda: False)() else "No"
-        membership_val = (
-            f"> **Joined Server:** {joined_str}\n"
-            f"> **Top Role:** {top_role}\n"
-            f"> **Roles:** {role_count}\n"
-            f"> **Timed Out:** {timeout_status}"
-        )
-        embed.add_field(name="Membership", value=membership_val, inline=True)
-
-        # Presence & Badges
         booster_status = f"Since {member.premium_since.strftime('%b %d, %Y')}" if member.premium_since else "Not Boosting"
         status_str = str(getattr(member, "status", "offline")).capitalize()
         activity_str = member.activity.name if member.activity else "None"
-        presence_val = (
-            f"> **Status:** {status_str}\n"
-            f"> **Activity:** {activity_str}\n"
-            f"> **Booster:** {booster_status}"
+
+        membership_val = (
+            f"> • **Joined Server:** {joined_str}\n"
+            f"> • **Top Role:** {top_role} • **Roles:** `{role_count}`\n"
+            f"> • **Status:** `{status_str}` • **Activity:** `{activity_str}`\n"
+            f"> • **Nitro Booster:** `{booster_status}` • **Timed Out:** `{timeout_status}`"
         )
-        embed.add_field(name="Presence & Badges", value=presence_val, inline=True)
+        embed.add_field(name="🌟 Membership & Activity", value=membership_val, inline=False)
 
         # Footer
         curr_time = discord.utils.utcnow().strftime("%I:%M %p")
