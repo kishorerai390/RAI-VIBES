@@ -7,12 +7,15 @@ import random
 import time
 from collections import deque
 from typing import Optional, List, Dict, Any
+import logging
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import Select, View, Button
 import yt_dlp
+
+logger = logging.getLogger("Music")
 
 import config
 from utils.ffmpeg_setup import get_ffmpeg_executable
@@ -912,6 +915,127 @@ class Music(commands.Cog):
             await msg.delete()
         except Exception:
             pass
+
+    # -------------------------------------------------------------------------
+    # ZERO-PREFIX LISTENER FOR #song-requests
+    # -------------------------------------------------------------------------
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Zero-prefix song request engine for #song-requests channel."""
+        if not message.guild or message.author.bot:
+            return
+
+        ch_name = getattr(message.channel, "name", "").lower()
+        if message.channel.id != 1545534637122527332 and "song-request" not in ch_name:
+            return
+
+        content = message.content.strip()
+        if not content:
+            return
+
+        # Ignore commands starting with standard prefixes
+        if content.startswith(("!", "/", "?", ".", "-", "$")):
+            return
+
+        # Delete the user's message immediately to preserve pristine channel aesthetic
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        # Check if user is in a voice channel
+        user_vc = getattr(getattr(message.author, "voice", None), "channel", None)
+        if not user_vc:
+            notice = await message.channel.send(
+                embed=discord.Embed(
+                    description=f"⚠️ {message.author.mention} **You must be in a voice channel** (e.g. `🌧️ | LO-FI ZONE`) to request music!",
+                    color=config.COLOR_WARNING
+                )
+            )
+            asyncio.create_task(self._auto_delete(notice, 7))
+            return
+
+        voice_client = await self.ensure_voice(message)
+        if not voice_client:
+            return
+
+        player = self.get_or_create_player(message.guild)
+        player.voice_client = voice_client
+        player.text_channel = message.channel
+
+        status_card = None
+        try:
+            status_card = await message.channel.send(
+                embed=discord.Embed(
+                    description=f"🔍 Searching & buffering **`{content[:50]}`** for {message.author.mention}...",
+                    color=config.COLOR_PRIMARY
+                )
+            )
+        except Exception:
+            pass
+
+        try:
+            if is_spotify_url(content):
+                spotify_tracks = await resolve_spotify(content)
+                if spotify_tracks:
+                    if len(spotify_tracks) == 1:
+                        t = spotify_tracks[0]
+                        song_obj = await Song.create_source(t["search_query"], message.author, self.bot.loop)
+                        if song_obj:
+                            if t.get("thumbnail"):
+                                song_obj.thumbnail = t["thumbnail"]
+                            is_queued = player.enqueue_track(song_obj)
+                            card_desc = f"**[{song_obj.title}]({song_obj.webpage_url})**\n📥 Added to queue by {message.author.mention}" if is_queued else f"🎶 Now streaming: **[{song_obj.title}]({song_obj.webpage_url})**"
+                            card = await message.channel.send(
+                                embed=discord.Embed(
+                                    title="⚡ Spotify Track Added",
+                                    description=card_desc,
+                                    color=config.COLOR_PRIMARY
+                                )
+                            )
+                            asyncio.create_task(self._auto_delete(card, 10))
+                    else:
+                        space = max(0, config.MAX_QUEUE_SIZE - len(player.queue))
+                        batch = spotify_tracks[:space]
+                        for t in batch:
+                            s = await Song.create_source(t["search_query"], message.author, self.bot.loop)
+                            if s:
+                                player.enqueue_track(s)
+                        card = await message.channel.send(
+                            embed=discord.Embed(
+                                title="⚡ Spotify Playlist Enqueued",
+                                description=f"Enqueued **{len(batch)} tracks** for {message.author.mention}!",
+                                color=config.COLOR_PRIMARY
+                            )
+                        )
+                        asyncio.create_task(self._auto_delete(card, 10))
+            else:
+                song_obj = await Song.create_source(content, message.author, self.bot.loop)
+                if song_obj:
+                    is_queued = player.enqueue_track(song_obj)
+                    dur_str = time.strftime("%M:%S", time.gmtime(song_obj.duration)) if song_obj.duration > 0 else "Live"
+                    card_title = "🎵 Song Added to Queue" if is_queued else "🎶 Starting Playback"
+                    card = await message.channel.send(
+                        embed=discord.Embed(
+                            title=card_title,
+                            description=f"**[{song_obj.title}]({song_obj.webpage_url})**\n⏱️ `{dur_str}` • Requested by {message.author.mention}",
+                            color=config.COLOR_PRIMARY
+                        )
+                    )
+                    asyncio.create_task(self._auto_delete(card, 10))
+                else:
+                    err = await message.channel.send(
+                        embed=discord.Embed(
+                            description=f"❌ No audio stream found for: `{content[:50]}`",
+                            color=config.COLOR_ERROR
+                        )
+                    )
+                    asyncio.create_task(self._auto_delete(err, 6))
+        except Exception as e:
+            logger.error(f"Error in zero-prefix song request: {e}")
+        finally:
+            if status_card:
+                asyncio.create_task(self._auto_delete(status_card, 1))
 
     def get_player(self, guild_id: int) -> Optional[GuildMusicPlayer]:
         if guild_id in self.players:
