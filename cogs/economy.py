@@ -306,6 +306,7 @@ class ShopSelect(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
+            custom_id="shop_role_select",
             row=0
         )
 
@@ -315,32 +316,48 @@ class ShopSelect(discord.ui.Select):
 
 
 class ShopBuyView(View):
-    def __init__(self, user_id: int):
-        super().__init__(timeout=120)
+    def __init__(self, user_id: Optional[int] = None):
+        super().__init__(timeout=None)
         self.user_id = user_id
         self.add_item(ShopSelect())
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
+        if self.user_id and interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This shop menu belongs to someone else.", ephemeral=True)
             return False
         return True
 
     async def process_purchase(self, interaction: discord.Interaction, item_key: str):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+
+        async def send_reply(content: str = None, embed: discord.Embed = None):
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(content=content, embed=embed, ephemeral=True)
+                else:
+                    await interaction.response.send_message(content=content, embed=embed, ephemeral=True)
+            except Exception:
+                pass
+
         item = SHOP_ITEMS.get(item_key)
         if not item:
-            return await interaction.response.send_message("❌ Unknown item.", ephemeral=True)
+            return await send_reply(content="❌ Unknown item.")
 
         user = interaction.user
         guild = interaction.guild
         data = get_user_data(user.id)
         current_coins = data.get("coins", 0)
 
-        if current_coins < item["price"]:
-            return await interaction.response.send_message(
-                f"❌ **Insufficient Coins!** You have `{current_coins:,}` Coins, but **{item['name']}** costs `{item['price']:,}` Coins.\n"
-                f"💡 *Earn more by chatting, participating in voice lounges (+5 coins every 2 min), or claiming `/daily`!*",
-                ephemeral=True
+        if current_coins < item["price"] and user.id != OWNER_ID:
+            return await send_reply(
+                content=(
+                    f"❌ **Insufficient Coins!** You have `{current_coins:,}` Coins, but **{item['name']}** costs `{item['price']:,}` Coins.\n"
+                    f"💡 *Earn more by chatting, participating in voice lounges (+5 coins every 2 min), or claiming `/daily`!*"
+                )
             )
 
         role = None
@@ -351,26 +368,27 @@ class ShopBuyView(View):
 
         if role:
             if role in user.roles:
-                return await interaction.response.send_message(f"⚠️ You already have the **{role.name}** perk!", ephemeral=True)
+                return await send_reply(content=f"⚠️ You already have the **{role.name}** perk!")
             try:
                 await user.add_roles(role, reason=f"Purchased {item['name']} from Server Shop")
             except Exception as e:
-                return await interaction.response.send_message(f"❌ Failed to grant role: {e}", ephemeral=True)
+                return await send_reply(content=f"❌ Failed to grant role: {e}")
 
         new_balance = update_user_coins(user.id, -item["price"])
+        bal_str = "∞ (Owner Vault)" if user.id == OWNER_ID else f"{new_balance:,} Coins"
         embed = discord.Embed(
             title="🎉 PURCHASE SUCCESSFUL!",
             description=(
                 f"Congratulations {user.mention}! You acquired **{item['name']}**!\n\n"
                 f"💸 **Amount Paid:** `{item['price']:,} Coins`\n"
-                f"💰 **New Balance:** `{new_balance:,}` Coins\n"
+                f"💰 **New Balance:** `{bal_str}`\n"
                 f"✨ Perk is now active on your server profile!"
             ),
             color=0x2ECC71
         )
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_footer(text="RAI FAM 💗 • Server Shop", icon_url=config.RAI_ICON_URL)
-        await interaction.response.send_message(embed=embed)
+        await send_reply(embed=embed)
 
 
 # =====================================================================

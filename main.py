@@ -80,6 +80,9 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.voicehub import VoiceControlView
         from utils.views import MusicPlayerView
         from cogs.verify import VerifyButtonView
+        from cogs.economy import ShopBuyView
+        from cogs.exchange import ExchangeBoothView
+        from cogs.giveaway import GiveawayView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
@@ -87,6 +90,9 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(VoiceControlView())
         b.add_view(MusicPlayerView())
         b.add_view(VerifyButtonView())
+        b.add_view(ShopBuyView())
+        b.add_view(ExchangeBoothView())
+        b.add_view(GiveawayView())
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")
