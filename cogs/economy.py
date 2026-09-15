@@ -65,6 +65,14 @@ SHOP_ITEMS = {
         "role_id": 1546088559830634586,
         "role_name": "Royal Gold",
         "emoji": "💛"
+    },
+    "vip_sound_pass": {
+        "name": "🔊 VIP Entrance Themes Pass",
+        "description": "Unlock all Voice Channel entrance themes & signature join fanfares",
+        "price": 1500,
+        "role_id": None,
+        "role_name": None,
+        "emoji": "🔊"
     }
 }
 
@@ -360,19 +368,26 @@ class ShopBuyView(View):
                 )
             )
 
-        role = None
-        if item["role_id"]:
-            role = guild.get_role(item["role_id"])
-        if not role:
-            role = discord.utils.get(guild.roles, name=item["role_name"])
+        if item_key == "vip_sound_pass":
+            from cogs.entry_sound import get_user_entry_profile, ALL_SOUND_KEYS, unlock_all_sounds
+            prof = get_user_entry_profile(user.id)
+            if len(prof.get("unlocked", [])) >= len(ALL_SOUND_KEYS) and user.id != OWNER_ID:
+                return await send_reply(content="⚠️ You have already unlocked all Voice Channel Entrance Themes!")
+            unlock_all_sounds(user.id)
+        else:
+            role = None
+            if item.get("role_id"):
+                role = guild.get_role(item["role_id"])
+            if not role and item.get("role_name"):
+                role = discord.utils.get(guild.roles, name=item["role_name"])
 
-        if role:
-            if role in user.roles:
-                return await send_reply(content=f"⚠️ You already have the **{role.name}** perk!")
-            try:
-                await user.add_roles(role, reason=f"Purchased {item['name']} from Server Shop")
-            except Exception as e:
-                return await send_reply(content=f"❌ Failed to grant role: {e}")
+            if role:
+                if role in user.roles:
+                    return await send_reply(content=f"⚠️ You already have the **{role.name}** perk!")
+                try:
+                    await user.add_roles(role, reason=f"Purchased {item['name']} from Server Shop")
+                except Exception as e:
+                    return await send_reply(content=f"❌ Failed to grant role: {e}")
 
         new_balance = update_user_coins(user.id, -item["price"])
         bal_str = "∞ (Owner Vault)" if user.id == OWNER_ID else f"{new_balance:,} Coins"
