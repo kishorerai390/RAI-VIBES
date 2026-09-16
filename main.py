@@ -18,7 +18,9 @@ from utils.persistent_views import (
     ColorRolesView,
     GamingRolesView,
     NotificationRolesView,
-    IdentityRolesView
+    IdentityRolesView,
+    ServerGuideView,
+    GamingHubStationView
 )
 
 # Configure Logging
@@ -97,6 +99,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(GiveawayView())
         b.add_view(PublicEntrySoundLaunchView())
         b.add_view(SuggestionVoteView())
+        b.add_view(ServerGuideView())
+        b.add_view(GamingHubStationView())
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")

@@ -460,9 +460,16 @@ class Economy(commands.Cog):
         streak = data[uid].get("streak", 0)
         streak = streak + 1 if diff < 172800 else 1
 
-        base_reward = 250
-        streak_bonus = min(250, streak * 25)
-        total_reward = base_reward + streak_bonus
+        if streak >= 7:
+            base_reward = 500
+            multiplier = 2.0
+            streak_tag = f"🔥 **STREAK MASTER! (Day {streak})** • 2x Multiplier Active!"
+        else:
+            base_reward = 150
+            multiplier = round(1.0 + (streak - 1) * 0.25, 2)
+            streak_tag = f"⚡ **Day {streak} Login Streak** • {multiplier}x Multiplier"
+
+        total_reward = int(base_reward * multiplier)
 
         data[uid]["coins"] = data[uid].get("coins", 0) + total_reward
         data[uid]["last_daily"] = now
@@ -470,18 +477,19 @@ class Economy(commands.Cog):
         save_economy(data)
 
         embed = discord.Embed(
-            title="🎁 DAILY REWARD CLAIMED!",
+            title="🎁 DAILY STREAK REWARD CLAIMED!",
             description=(
                 f"Welcome back, {interaction.user.mention}! Here is your daily reward:\n\n"
-                f"🪙 **Base Reward:** `+{base_reward}` Coins\n"
-                f"🔥 **Streak Bonus:** `+{streak_bonus}` Coins *(Day {streak})*\n"
+                f"{streak_tag}\n\n"
+                f"🪙 **Base Allowance:** `+{base_reward}` Coins\n"
+                f"✨ **Multiplier:** `{multiplier}x`\n"
                 f"💰 **Total Earned:** `+{total_reward:,}` Coins\n"
                 f"👛 **New Balance:** `{data[uid]['coins']:,}` Coins"
             ),
             color=0xF1C40F
         )
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        embed.set_footer(text="Come back in 24 hours to keep your streak alive!", icon_url=config.RAI_ICON_URL)
+        embed.set_footer(text="Keep your streak going daily to maximize your multiplier!", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
     # 2. COMMUNITY REPUTATION

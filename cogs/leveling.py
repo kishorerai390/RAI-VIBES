@@ -1,3 +1,4 @@
+import io
 import json
 from pathlib import Path
 import time
@@ -55,12 +56,110 @@ def get_user_rep(member_id: int) -> int:
             pass
     return 0
 
-MILESTONE_ROLES = {
-    5: "✦ 𝐑𝐢𝐬𝐢𝐧𝐠 𝐒𝐭𝐚𝐫",
-    10: "✦ 𝐀𝐝𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐫",
-    20: "✦ 𝐕𝐚𝐧𝐠𝐮𝐚𝐫𝐝",
-    50: "✦ 𝐈𝐦𝐦𝐨𝐫𝐭𝐚𝐥"
-}
+def sanitize_for_canvas(text: str, max_len: int = 16) -> str:
+    import unicodedata
+    norm = unicodedata.normalize('NFKD', text)
+    clean = "".join([c for c in norm if ord(c) < 128 or c.isalnum() or c in " -_!."]).strip()
+    if not clean:
+        clean = "RAI Member"
+    return clean[:max_len] if len(clean) <= max_len else f"{clean[:max_len-2]}.."
+
+def create_grand_levelup_image(avatar_bytes: bytes, username: str, old_level: int, new_level: int, coin_bonus: int) -> io.BytesIO:
+    """Generates a luxury 900x350 Cyber-Pink & Emerald level-up card with user avatar."""
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
+    WIDTH, HEIGHT = 900, 350
+    
+    # 1. Base Image with Deep Gradient Dark Background
+    img = Image.new("RGBA", (WIDTH, HEIGHT), color=(11, 9, 18, 255))
+    draw = ImageDraw.Draw(img)
+
+    # 2. Ambient Cyber-Pink & Emerald Radiant Glow
+    for r in range(160, 0, -12):
+        alpha = int(28 * (1 - r / 160))
+        draw.ellipse([60 - r, 60 - r, 60 + r, 60 + r], fill=(0, 255, 136, alpha))
+        draw.ellipse([WIDTH - 60 - r, HEIGHT - 60 - r, WIDTH - 60 + r, HEIGHT - 60 + r], fill=(255, 105, 180, alpha))
+        draw.ellipse([WIDTH // 2 - r, 20 - r, WIDTH // 2 + r, 20 + r], fill=(255, 215, 0, int(alpha * 0.6)))
+
+    # Outer Cyber Frame (Gold + Pink Accents)
+    draw.rounded_rectangle([12, 12, WIDTH - 12, HEIGHT - 12], radius=28, outline=(0, 255, 136, 200), width=3)
+    draw.rounded_rectangle([18, 18, WIDTH - 18, HEIGHT - 18], radius=24, outline=(255, 215, 0, 140), width=2)
+    draw.rounded_rectangle([22, 22, WIDTH - 22, HEIGHT - 22], radius=20, outline=(28, 22, 42, 255), width=2)
+
+    # Top Crown Ribbon Accent
+    draw.rectangle([140, 12, WIDTH - 140, 18], fill=(0, 255, 136, 240))
+    draw.rectangle([200, 18, WIDTH - 200, 22], fill=(255, 215, 0, 255))
+
+    # Corner Decorative Sparkles
+    bracket_color = (255, 215, 0, 220)
+    draw.line([(30, 45), (45, 30)], fill=bracket_color, width=3)
+    draw.line([(WIDTH - 45, 30), (WIDTH - 30, 45)], fill=bracket_color, width=3)
+    draw.line([(30, HEIGHT - 45), (45, HEIGHT - 30)], fill=bracket_color, width=3)
+    draw.line([(WIDTH - 45, HEIGHT - 30), (WIDTH - 30, HEIGHT - 45)], fill=bracket_color, width=3)
+
+    # 3. Avatar Processing (Circular Crop with Concentric Glowing Rings)
+    try:
+        raw_avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
+        raw_avatar = raw_avatar.resize((180, 180), Image.Resampling.LANCZOS)
+        
+        mask = Image.new("L", (180, 180), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.ellipse((0, 0, 180, 180), fill=255)
+        
+        avatar_circle = ImageOps.fit(raw_avatar, mask.size, centering=(0.5, 0.5))
+        avatar_circle.putalpha(mask)
+
+        # Concentric Outer Glow Rings (Emerald -> Gold -> Pink)
+        draw.ellipse([58, 80, 252, 274], outline=(0, 255, 136, 220), width=6)
+        draw.ellipse([62, 84, 248, 270], outline=(255, 215, 0, 200), width=4)
+        draw.ellipse([65, 87, 245, 267], outline=(255, 105, 180, 255), width=3)
+        img.paste(avatar_circle, (65, 87), avatar_circle)
+    except Exception as e:
+        logger.warning(f"Could not render avatar image: {e}")
+        draw.ellipse([65, 87, 245, 267], fill=(0, 255, 136, 255))
+
+    # 4. Text Content Rendering
+    try:
+        font_sub = ImageFont.truetype("arialbd.ttf", 22)
+        font_name = ImageFont.truetype("arialbd.ttf", 38)
+        font_lvl = ImageFont.truetype("arialbd.ttf", 26)
+        font_tags = ImageFont.truetype("arialbd.ttf", 16)
+    except Exception:
+        font_sub = ImageFont.load_default()
+        font_name = font_sub
+        font_lvl = font_sub
+        font_tags = font_sub
+
+    # Header: "⭐ LEVEL UP ADVANCEMENT ⭐"
+    draw.text((280, 72), "⭐ LEVEL UP ADVANCEMENT ⭐", fill=(0, 255, 136, 255), font=font_sub)
+    
+    # Username with Glow/Shadow Effect
+    clean_name = sanitize_for_canvas(username, max_len=18)
+    draw.text((282, 110), clean_name, fill=(20, 10, 30, 255), font=font_name)
+    draw.text((280, 108), clean_name, fill=(255, 255, 255, 255), font=font_name)
+    
+    # Level Progress Badge with Emerald Border
+    badge_bg = [280, 172, 600, 222]
+    draw.rounded_rectangle(badge_bg, radius=14, fill=(24, 38, 28, 255), outline=(0, 255, 136, 240), width=2)
+    draw.text((298, 182), f"🚀 LEVEL {old_level} ➔ LEVEL {new_level}", fill=(0, 255, 136, 255), font=font_lvl)
+
+    # Feature Highlights Badges
+    pills = [
+        (f"💰 +{coin_bonus} COINS BONUS", (255, 215, 0)),
+        ("⚡ XP BOOSTED", (0, 240, 255)),
+        ("🌸 RAI FAMILY", (255, 105, 180))
+    ]
+    px = 280
+    for pill, color in pills:
+        pill_len = len(pill) * 9 + 20
+        draw.rounded_rectangle([px, 246, px + pill_len, 282], radius=10, fill=(25, 35, 30, 230), outline=(color[0], color[1], color[2], 180), width=1)
+        draw.text((px + 10, 254), pill, fill=color, font=font_tags)
+        px += pill_len + 12
+
+    # 5. Export to BytesIO
+    output = io.BytesIO()
+    img.save(output, format="PNG")
+    output.seek(0)
+    return output
 
 def render_progress_bar(current: int, total: int, length: int = 10) -> str:
     if total <= 0:
@@ -80,17 +179,6 @@ class Leveling(commands.Cog):
 
     def cog_unload(self):
         self.voice_xp_task.cancel()
-
-    async def ensure_milestone_roles(self, guild: discord.Guild):
-        """Ensure milestone roles exist in the guild."""
-        for lvl, role_name in MILESTONE_ROLES.items():
-            existing = discord.utils.get(guild.roles, name=role_name)
-            if not existing:
-                try:
-                    colors = {5: 0x00FFCC, 10: 0x0099FF, 20: 0x9933FF, 50: 0xFF0066}
-                    await guild.create_role(name=role_name, color=discord.Color(colors.get(lvl, 0xFF007F)), reason="Level milestone reward role")
-                except Exception as e:
-                    logger.debug(f"Could not create role {role_name}: {e}")
 
     # -------------------------------------------------------------
     # MESSAGE XP LISTENER
@@ -115,33 +203,47 @@ class Leveling(commands.Cog):
             await self.handle_level_up(message.guild, message.author, new_lvl, message.channel)
 
     async def handle_level_up(self, guild: discord.Guild, member: discord.Member, new_level: int, channel: discord.abc.Messageable):
-        """Sends level-up celebration and awards milestone roles."""
-        role_reward_text = ""
-        # Check if a milestone role was unlocked
-        if new_level in MILESTONE_ROLES:
-            role_name = MILESTONE_ROLES[new_level]
-            role = discord.utils.get(guild.roles, name=role_name)
-            if not role:
-                await self.ensure_milestone_roles(guild)
-                role = discord.utils.get(guild.roles, name=role_name)
-            if role and role < guild.me.top_role:
-                try:
-                    await member.add_roles(role, reason=f"Level milestone {new_level} reached")
-                    role_reward_text = f"\n🎖️ **Unlocked Role Reward:** {role.mention}!"
-                except Exception as e:
-                    logger.debug(f"Failed to award role {role_name}: {e}")
+        """Sends luxury level-up celebration canvas and awards coin bonus."""
+        coin_bonus = new_level * 50
+        award_vc_coins(member.id, coin_bonus)
+
+        # Target announcement channel: #⭐・ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ (1549407114861215815)
+        target_channel = guild.get_channel(1549407114861215815) or channel
+
+        card_file = None
+        try:
+            avatar_bytes = await member.display_avatar.read()
+            img_io = create_grand_levelup_image(
+                avatar_bytes=avatar_bytes,
+                username=member.display_name,
+                old_level=max(1, new_level - 1),
+                new_level=new_level,
+                coin_bonus=coin_bonus
+            )
+            card_file = discord.File(fp=img_io, filename="levelup_advancement.png")
+        except Exception as e:
+            logger.warning(f"Could not generate levelup canvas card: {e}")
 
         embed = discord.Embed(
-            title="🎉 LEVEL UP! • ADVANCEMENT UNLOCKED",
-            description=f"Congratulations {member.mention}! You just reached **Level {new_level}**! ✨{role_reward_text}",
+            title="⭐ ✦ LEVEL UP ADVANCEMENT ✦ ⭐",
+            description=(
+                f"Congratulations {member.mention}! You ascended to **Level {new_level}**!\n\n"
+                f"🪙 **Bonus Coins Awarded:** `+{coin_bonus} Coins`\n"
+                f"✨ Keep chatting and participating in voice lounges to climb the leaderboards!"
+            ),
             color=0x00FF88
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_footer(text="Keep chatting & participating to earn more XP!")
+        if card_file:
+            embed.set_image(url="attachment://levelup_advancement.png")
+        embed.set_footer(text="RAI VIBES Leveling Suite • Earn coins & prestige", icon_url=config.RAI_ICON_URL)
+
         try:
-            await channel.send(embed=embed)
-        except Exception:
-            pass
+            if card_file:
+                await target_channel.send(content=f"🎉 {member.mention}", embed=embed, file=card_file)
+            else:
+                await target_channel.send(content=f"🎉 {member.mention}", embed=embed)
+        except Exception as e:
+            logger.debug(f"Failed to post level up in {target_channel}: {e}")
 
     # -------------------------------------------------------------
     # VOICE XP LOOP (Runs every 2 minutes)
