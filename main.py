@@ -87,6 +87,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.giveaway import GiveawayView
         from cogs.entry_sound import PublicEntrySoundLaunchView
         from cogs.suggestions import SuggestionVoteView
+        from cogs.movie_party import MovieRSVPView
+        from cogs.pets import PetCareView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
@@ -101,6 +103,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(SuggestionVoteView())
         b.add_view(ServerGuideView())
         b.add_view(GamingHubStationView())
+        b.add_view(MovieRSVPView())
+        b.add_view(PetCareView(owner_id=0))
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")
@@ -329,6 +333,11 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.exchange",
         "cogs.entry_sound",
         "cogs.suggestions",
+        "cogs.pets",
+        "cogs.casino",
+        "cogs.squads",
+        "cogs.quotes",
+        "cogs.movie_party",
     ]
 
     for extension in initial_extensions:

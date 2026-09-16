@@ -17,19 +17,15 @@ from utils.persistent_views import (
     ServerGuideView
 )
 
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+TOKEN = config.DISCORD_TOKEN
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", 1457382179981099090))
 
 
 async def deploy_guide(client: discord.Client):
-    guild = client.get_guild(GUILD_ID)
-    if not guild:
-        print(f"[Error] Guild {GUILD_ID} not found.")
-        return
-
-    guide_channel = discord.utils.get(guild.text_channels, name="🧭・ꜱᴇʀᴠᴇʀ-ɢᴜɪᴅᴇ") or discord.utils.get(guild.text_channels, name="server-guide")
-    if not guide_channel:
-        print("[Error] Could not find server-guide channel.")
+    try:
+        chan = await client.fetch_channel(1546125872661012611)
+    except Exception as e:
+        print(f"[Error] Could not fetch guide channel: {e}")
         return
 
     embed = discord.Embed(
@@ -40,8 +36,11 @@ async def deploy_guide(client: discord.Client):
             "📌 **Quick Landmarks:**\n"
             "• `#✨・ᴠᴇʀɪꜰʏ-ʜᴇʀᴇ` — 1-Click Verification Gate\n"
             "• `#🎀・ᴘɪᴄᴋ-ʀᴏʟᴇꜱ` — Aesthetic Self-Roles & Identity\n"
-            "• `#💬・ɢᴇɴᴇʀᴀʟ-ᴄʜᴀᴛ` — Active Lounge & Conversations\n"
+            "• `#💬・ɢᴇɴᴇʀᴀʟ-ᴄʜᴀᴛ` — Active Lounge & Virtual Pets\n"
+            "• `#🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ` — Casino Games, Slots & Music Quiz\n"
             "• `#🎵・ꜱᴏɴɢ-ʀᴇǫᴜᴇꜱᴛꜱ` — Zero-Prefix High-Fidelity Music Engine\n"
+            "• `#🍿・ᴍᴏᴠɪᴇ-ɴɪɢʜᴛꜱ` — Community Watch-Parties & RSVPs\n"
+            "• `#📸・ᴍᴇᴅɪᴀ-ɢᴀʟʟᴇʀʏ` — Media Highlights & Aesthetic Quote Cards\n"
             "• `#🛒・ꜱᴇʀᴠᴇʀ-ꜱʜᴏᴘ` — Redeem Exclusive Perks & Badges\n"
             "• `#💡・ꜱᴜɢɢᴇꜱᴛɪᴏɴꜱ` — Interactive Community Ideas Hub"
         ),
@@ -50,9 +49,14 @@ async def deploy_guide(client: discord.Client):
     embed.set_thumbnail(url=config.RAI_ICON_URL)
     embed.set_footer(text="RAI VIBES 💗 • Select a guide section below for full details", icon_url=config.RAI_ICON_URL)
 
-    await guide_channel.purge(limit=10)
-    await guide_channel.send(embed=embed, view=ServerGuideView())
-    print(f"[Success] Deployed interactive Server Guide to #{guide_channel.name}!")
+    # Fetch and edit existing guide message directly
+    try:
+        msg = await chan.fetch_message(1549799717183946906)
+        await msg.edit(embed=embed, view=ServerGuideView())
+        print(f"[Success] Updated Server Guide message ({msg.id}) with all 9 interactive options!")
+    except Exception:
+        new_msg = await chan.send(embed=embed, view=ServerGuideView())
+        print(f"[Success] Deployed new guide embed ({new_msg.id}) in #{chan.name}!")
 
 
 def print_help():

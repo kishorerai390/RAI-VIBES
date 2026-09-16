@@ -232,6 +232,30 @@ class ServerGuideSelect(discord.ui.Select):
                 description="Verification, rules codex & color styles",
                 emoji="🛡️"
             ),
+            discord.SelectOption(
+                label="Virtual Companion Pets & Nickname Badges",
+                value="guide_pets",
+                description="Adopt pets & display badges beside your nickname",
+                emoji="🐾"
+            ),
+            discord.SelectOption(
+                label="Cyber Casino & Minigames Hub",
+                value="guide_casino",
+                description="Blackjack, Slots, Coinflip & Music Quiz in gaming-hub",
+                emoji="🎰"
+            ),
+            discord.SelectOption(
+                label="Voice Clans & Squad Wars",
+                value="guide_squads",
+                description="Form squads, clan tags, and voice XP leaderboards",
+                emoji="👥"
+            ),
+            discord.SelectOption(
+                label="Movie Nights & Aesthetic Quote Cards",
+                value="guide_community",
+                description="Watch-party RSVPs & quotes in media-gallery",
+                emoji="🍿"
+            ),
         ]
         super().__init__(
             placeholder="🧭 Select a guide topic to explore...",
@@ -337,6 +361,66 @@ class ServerGuideSelect(discord.ui.Select):
                     "Need assistance from staff? Open a private ticket in **`#🎫・ᴛɪᴄᴋᴇᴛ-ꜱᴜᴘᴘᴏʀᴛ`**."
                 ),
                 color=0xFF4081
+            )
+        elif val == "guide_pets":
+            embed = discord.Embed(
+                title="🐾 Virtual Companion Pets & Nickname Badges",
+                description=(
+                    "**Adopt Your Personal Companion:**\n"
+                    "• `/pet list` — Browse all 8 companion pet species (🐱 Cat, 🦊 Fox, 🐉 Dragon, 🐼 Panda, 🐺 Wolf, 🦅 Phoenix, 🐰 Bunny, 🐸 Frog).\n"
+                    "• `/pet adopt [species] [name]` — Adopt and bond with your companion!\n\n"
+                    "**🏷️ Nickname Badges (Beside Your Name!):**\n"
+                    "• `/pet badge` — Toggle your pet's badge beside your server nickname!\n"
+                    "• Formats supported: Suffix (`Kishore 🐾`), Prefix (`[🦊] Kishore`), or Profile-only.\n\n"
+                    "**🍖 Pet Care & Evolution:**\n"
+                    "• `/pet feed` — Feed your pet delicious treats with coins (+XP, +Happiness).\n"
+                    "• `/pet play` — Play fun minigames with your companion.\n"
+                    "• `/pet profile` — View your pet's evolution stage (Baby ➔ Juvenile ➔ Mythic) and active coin perks!"
+                ),
+                color=0x00FFCC
+            )
+        elif val == "guide_casino":
+            embed = discord.Embed(
+                title="🎰 Cyber Casino & Minigames Hub",
+                description=(
+                    "**Play High-Stakes Games in `#🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ`:**\n\n"
+                    "**♠️ Blackjack (`/blackjack [bet]`):**\n"
+                    "• Challenge the dealer in live 21! Click `[Hit]`, `[Stand]`, or `[Double Down]`. Natural blackjack pays 3:2!\n\n"
+                    "**🎰 Cyber-Pink Slots (`/slots [bet]`):**\n"
+                    "• Spin the 3-reel neon slots. Match 3 for up to a **10x Mega Jackpot** (`💎💎💎`)!\n\n"
+                    "**🪙 Coinflip (`/coinflip [heads/tails] [bet]`):**\n"
+                    "• Fast-paced 50/50 double-or-nothing coin toss.\n\n"
+                    "**🎵 Music Quiz (`/musicquiz [genre]`):**\n"
+                    "• Guess 10-second song clips in VC with 4 button choices! Fastest winner gets +150 Coins!"
+                ),
+                color=0xFF007F
+            )
+        elif val == "guide_squads":
+            embed = discord.Embed(
+                title="👥 Voice Clans & Squad Wars",
+                description=(
+                    "**Form Your Clan:**\n"
+                    "• `/squad create [name] [tag]` — Register your clan squad (e.g. `[AURA]`).\n"
+                    "• `/squad join [name]` — Join your friends' squad.\n"
+                    "• `/squad tag` — Toggle your squad clan tag in your server nickname!\n\n"
+                    "**✨ Collective Voice XP:**\n"
+                    "• Hang out in voice lounges with squadmates to earn collective Clan XP.\n"
+                    "• Level up your squad and dominate the weekly leaderboard (`/squad leaderboard`) in `#⭐・ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ`!"
+                ),
+                color=0xFFD700
+            )
+        elif val == "guide_community":
+            embed = discord.Embed(
+                title="🍿 Movie Nights & Aesthetic Quote Cards",
+                description=(
+                    "**🍿 Movie Night & Watch-Party RSVPs:**\n"
+                    "• `/movie host [title] [time] [description]` — Host a watch-along in `#🍿・ᴍᴏᴠɪᴇ-ɴɪɢʜᴛꜱ`.\n"
+                    "• Click **`[Count Me In! 🍿]`** to receive an automatic reminder DM before showtime!\n\n"
+                    "**💬 Canvas Quote Cards:**\n"
+                    "• Right-click any funny or memorable message ➔ **Apps ➔ 'Create Quote Card'** (or `/quote [message_id]`).\n"
+                    "• The bot generates a luxury framed image card and showcases it in `#📸・ᴍᴇᴅɪᴀ-ɢᴀʟʟᴇʀʏ`!"
+                ),
+                color=0x9B59B6
             )
         else:
             embed = discord.Embed(

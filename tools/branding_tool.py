@@ -8,7 +8,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+import config
+
+TOKEN = config.DISCORD_TOKEN
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", 1457382179981099090))
 
 
