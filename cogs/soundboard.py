@@ -191,7 +191,7 @@ class Soundboard(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="soundboard", aliases=["sfxpanel", "sounds"], description="Display the interactive Voice Channel Soundboard control panel.")
+    @commands.hybrid_command(name="soundboard", aliases=["sfxpanel", "sounds", "fx", "djfx"], description="Display the interactive Voice Channel Soundboard control panel.")
     async def soundboard_cmd(self, ctx: commands.Context):
         embed = discord.Embed(
             title="🎛️ RAI VIBES 💗 • LIVE SOUNDBOARD PANEL",
@@ -208,6 +208,11 @@ class Soundboard(commands.Cog):
 
         view = SoundboardView()
         await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="fx", description="Open the live DJ Soundboard FX Pad in your current voice channel.")
+    async def fx_cmd(self, ctx: commands.Context):
+        """Direct shortcut for the DJ FX Soundboard Pad."""
+        await self.soundboard_cmd(ctx)
 
     @commands.hybrid_command(name="sfx", description="Play a specific sound effect directly in your voice room.")
     @app_commands.describe(effect="Select the sound effect to trigger")

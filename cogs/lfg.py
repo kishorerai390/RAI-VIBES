@@ -231,14 +231,16 @@ class LFG(commands.Cog):
     @app_commands.describe(
         game="Choose the game you are queueing for",
         slots="Total squad size required (2 to 5)",
-        note="Brief objective (e.g. Push Rank, Casual, Tournament Practice)"
+        note="Brief objective (e.g. Push Rank, Casual, Tournament Practice)",
+        ping_role="Auto-ping the corresponding game role so squadmates get notified"
     )
     async def lfg_create(
         self,
         interaction: discord.Interaction,
         game: Literal["bgmi", "freefire", "roblox", "gtarp", "valorant", "pc", "other"],
         slots: Literal[2, 3, 4, 5],
-        note: Optional[str] = None
+        note: Optional[str] = None,
+        ping_role: Optional[bool] = True
     ):
         game_title = GAME_EMOJIS.get(game, "Squad Session")
         needed = slots - 1
@@ -274,8 +276,25 @@ class LFG(commands.Cog):
             or interaction.channel
         )
 
+        role_mention = ""
+        if ping_role:
+            role_keywords = {
+                "bgmi": ["bgmi", "battlegrounds"],
+                "freefire": ["free fire", "freefire"],
+                "roblox": ["roblox"],
+                "gtarp": ["gta", "fivem"],
+                "valorant": ["valorant"],
+                "pc": ["pc", "steam"]
+            }
+            kws = role_keywords.get(game, [])
+            for r in interaction.guild.roles:
+                if any(kw in r.name.lower() for kw in kws):
+                    role_mention = f" {r.mention}"
+                    break
+
+        announcement = f"📢 **New LFG Squad Created for {game_title}!** Need **{needed}** more players!{role_mention}"
         msg = await hub.send(
-            content=f"📢 **New LFG Squad Created for {game_title}!** Need **{needed}** more players!",
+            content=announcement,
             embed=embed,
             view=view
         )

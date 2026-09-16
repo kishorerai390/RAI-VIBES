@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import random
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Literal
@@ -289,6 +290,74 @@ class Squads(commands.Cog):
 
             embed.set_footer(text="Earn squad XP by hanging out in voice rooms together!", icon_url=config.RAI_ICON_URL)
             return await interaction.response.send_message(embed=embed)
+
+    @commands.hybrid_command(name="teams", description="Randomly split members in your voice room into two balanced squads with captains.")
+    async def teams(self, ctx: commands.Context):
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            return await ctx.send("❌ You must be in a voice channel with other players to randomize teams!", ephemeral=True)
+
+        members = [m for m in ctx.author.voice.channel.members if not m.bot]
+        if len(members) < 2:
+            return await ctx.send("⚠️ You need at least 2 people in your voice channel to split into teams!", ephemeral=True)
+
+        shuffled = members.copy()
+        random.shuffle(shuffled)
+        mid = len(shuffled) // 2
+
+        team_a = shuffled[:mid]
+        team_b = shuffled[mid:]
+
+        captain_a = team_a[0]
+        captain_b = team_b[0]
+
+        team_a_str = "\n".join([f"• {m.mention} {'👑 *(Captain)*' if m == captain_a else ''}" for m in team_a])
+        team_b_str = "\n".join([f"• {m.mention} {'👑 *(Captain)*' if m == captain_b else ''}" for m in team_b])
+
+        embed = discord.Embed(
+            title="⚖️ BALANCED SQUAD RANDOMIZER",
+            description=f"Divided **{len(members)} players** from {ctx.author.voice.channel.mention} into 2 balanced squads:",
+            color=config.COLOR_PRIMARY
+        )
+        embed.add_field(name=f"🔵 TEAM ALPHA ({len(team_a)})", value=team_a_str, inline=True)
+        embed.add_field(name=f"🔴 TEAM BRAVO ({len(team_b)})", value=team_b_str, inline=True)
+        embed.set_footer(text="RAI VIBES 💗 • Matchmaking Engine", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="bracket", description="Generate a single-elimination tournament match bracket for custom games.")
+    @app_commands.describe(teams="Comma-separated squad names (4, 8, or 16 teams)")
+    async def bracket(self, ctx: commands.Context, teams: Optional[str] = None):
+        if teams:
+            team_list = [t.strip() for t in teams.split(",") if t.strip()]
+        else:
+            team_list = [f"Squad #{i+1}" for i in range(8)]
+
+        count = len(team_list)
+        if count < 4:
+            return await ctx.send("❌ Tournament brackets require at least 4 teams! Provide comma-separated names, e.g. `/bracket teams: Alpha, Bravo, Charlie, Delta`.", ephemeral=True)
+
+        random.shuffle(team_list)
+
+        embed = discord.Embed(
+            title="🏆 TOURNAMENT SINGLE-ELIMINATION BRACKET",
+            description=f"Generated balanced match schedule for **{count} participating squads**:",
+            color=0xFFD700
+        )
+
+        matches = []
+        for i in range(0, len(team_list) - 1, 2):
+            matches.append(f"**Match #{len(matches)+1}:** `{team_list[i]}` ⚔️ `{team_list[i+1]}`")
+
+        if len(team_list) % 2 != 0:
+            matches.append(f"**Match #{len(matches)+1}:** `{team_list[-1]}` *(Bye to next round)*")
+
+        embed.add_field(name="⚔️ ROUND 1 / QUARTERFINALS", value="\n".join(matches), inline=False)
+        embed.add_field(
+            name="🏁 ADVANCEMENT PATH",
+            value="```fix\n[Round 1 / Quarterfinals] ➔ [Semifinals] ➔ [Grand Championship Final]\n```",
+            inline=False
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Community Tournament System", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):

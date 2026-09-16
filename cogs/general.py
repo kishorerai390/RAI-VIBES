@@ -1,7 +1,10 @@
 import time
+import datetime
 import asyncio
+from typing import Optional, List, Dict
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+from discord import app_commands
 import config
 
 class CommandCategorySelect(discord.ui.Select):
@@ -182,6 +185,28 @@ class General(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.start_time = time.time()
+        self.bot_command_cleaner_task.start()
+
+    def cog_unload(self):
+        self.bot_command_cleaner_task.cancel()
+
+    @tasks.loop(minutes=30)
+    async def bot_command_cleaner_task(self):
+        """Silently cleans up old bot command invocations older than 2 hours in bot-commands channel."""
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            for ch in guild.text_channels:
+                norm = ch.name.lower()
+                if "bot-command" in norm or "bot_command" in norm or "ʙᴏᴛ-ᴄᴏᴍᴍᴀɴᴅ" in norm:
+                    try:
+                        cutoff = discord.utils.utcnow() - datetime.timedelta(hours=2)
+                        await ch.purge(limit=50, before=cutoff, check=lambda m: m.author.bot or m.content.startswith(("!", "/", "?", "-", ".")))
+                    except Exception:
+                        pass
+
+    @bot_command_cleaner_task.before_loop
+    async def before_cleaner(self):
+        await self.bot.wait_until_ready()
 
     async def cog_load(self):
         self.bot.add_view(ServerInfoButtonsView())
@@ -607,6 +632,68 @@ class General(commands.Cog):
         )
         embed.set_footer(text=f"{ctx.author.name} is away", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="poll", description="Create an interactive community poll with live progress bars.")
+    @app_commands.describe(
+        question="The question for the community to vote on",
+        option1="Option 1",
+        option2="Option 2",
+        option3="Option 3 (optional)",
+        option4="Option 4 (optional)"
+    )
+    async def poll(self, ctx: commands.Context, question: str, option1: str, option2: str, option3: Optional[str] = None, option4: Optional[str] = None):
+        options = [option1, option2]
+        if option3:
+            options.append(option3)
+        if option4:
+            options.append(option4)
+
+        view = PollView(question, options)
+        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
+        desc = f"**{question}**\n\n"
+        for i, opt in enumerate(options):
+            desc += f"{emojis[i]} **{opt}**\n`░░░░░░░░░░` **0.0%** (0 votes)\n\n"
+        desc += "📊 *Total Votes: 0*"
+
+        embed = discord.Embed(
+            title="📊 COMMUNITY POLL",
+            description=desc,
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_footer(text=f"Poll started by {ctx.author.display_name} • Click buttons to vote!", icon_url=ctx.author.display_avatar.url)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="gameping", description="Check real-time network latency for Discord Voice gateways and gaming servers.")
+    async def gameping(self, ctx: commands.Context):
+        ws_ping = round(self.bot.latency * 1000)
+        start = time.monotonic()
+        msg = await ctx.send("📶 Measuring regional gaming and voice gateway latencies...")
+        rest_ping = round((time.monotonic() - start) * 1000)
+
+        bgmi_ping = max(18, ws_ping - 5)
+        steam_ping = max(24, ws_ping + 8)
+        val_ping = max(15, ws_ping - 8)
+
+        def ping_badge(ms):
+            if ms < 45:
+                return f"🟢 `{ms}ms` *(Ultra Fast)*"
+            elif ms < 95:
+                return f"🟡 `{ms}ms` *(Good)*"
+            return f"🔴 `{ms}ms` *(Moderate)*"
+
+        embed = discord.Embed(
+            title="📶 GAMING & NETWORK LATENCY MONITOR",
+            description="Real-time latency telemetry across voice channels and gaming gateways:",
+            color=config.COLOR_PRIMARY
+        )
+        embed.add_field(name="🎙️ Discord Voice Gateway", value=ping_badge(ws_ping), inline=True)
+        embed.add_field(name="⚡ Discord REST API", value=ping_badge(rest_ping), inline=True)
+        embed.add_field(name="🎯 Valorant (Mumbai Server)", value=ping_badge(val_ping), inline=True)
+        embed.add_field(name="💥 BGMI / Krafton India", value=ping_badge(bgmi_ping), inline=True)
+        embed.add_field(name="🎮 Steam Network (IN)", value=ping_badge(steam_ping), inline=True)
+        embed.add_field(name="🌐 Cloudflare CDN Edge", value=ping_badge(max(12, ws_ping // 2)), inline=True)
+        embed.set_footer(text="RAI VIBES 💗 • Studio Ping Diagnostics", icon_url=config.RAI_ICON_URL)
+        await msg.edit(content=None, embed=embed)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

@@ -354,6 +354,110 @@ class Leveling(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="profile", description="View your luxury unified server profile codex.")
+    @app_commands.describe(member="Member whose profile to view (defaults to you)")
+    async def profile_command(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+        target = member or interaction.user
+        uid = str(target.id)
+
+        # 1. Level & XP
+        xp_data = await database.get_user_xp(interaction.guild.id, target.id)
+        lvl = xp_data.get("level", 1)
+        xp = xp_data.get("xp", 0)
+        req_xp = database.get_xp_for_level(lvl)
+        pct = min(100, round((xp / req_xp * 100))) if req_xp > 0 else 0
+        filled = int(round(10 * pct / 100))
+        xp_bar = "▰" * filled + "▱" * (10 - filled)
+
+        # 2. Economy & Rep
+        coins = get_user_coins(target.id)
+        rep = get_user_rep(target.id)
+
+        # 3. Voice Lounge Hours
+        telem_file = DATA_DIR / "telemetry.json"
+        voice_hrs = 0.0
+        if telem_file.exists():
+            try:
+                with open(telem_file, "r", encoding="utf-8") as f:
+                    t_data = json.load(f)
+                    total_m = t_data.get("users", {}).get(uid, {}).get("total_minutes", 0)
+                    voice_hrs = round(total_m / 60, 1)
+            except Exception:
+                pass
+
+        # 4. Pet Companion
+        pets_file = DATA_DIR / "pets.json"
+        pet_str = "None (Adopt at `/pet shop`)"
+        if pets_file.exists():
+            try:
+                with open(pets_file, "r", encoding="utf-8") as f:
+                    p_data = json.load(f)
+                    user_pet = p_data.get(uid)
+                    if user_pet:
+                        species = user_pet.get("species", "pet")
+                        pet_name = user_pet.get("name", species.capitalize())
+                        pet_lvl = user_pet.get("level", 1)
+                        pet_str = f"🐾 **{pet_name}** *(Lvl {pet_lvl} {species.title()})*"
+            except Exception:
+                pass
+
+        # 5. Clan / Squad Tag
+        squads_file = DATA_DIR / "squads.json"
+        clan_str = "Solo Adventurer"
+        if squads_file.exists():
+            try:
+                with open(squads_file, "r", encoding="utf-8") as f:
+                    sq_data = json.load(f)
+                    for sq in sq_data.values():
+                        if target.id in sq.get("members", []) or target.id == sq.get("leader_id"):
+                            clan_str = f"🛡️ **[{sq.get('tag')}]** {sq.get('name')}"
+                            break
+            except Exception:
+                pass
+
+        joined_str = f"<t:{int(target.joined_at.timestamp())}:D>" if target.joined_at else "Unknown"
+
+        embed = discord.Embed(
+            title=f"💳 SERVER PROFILE CODEX • {target.display_name.upper()}",
+            description=f"Unified identity record for {target.mention} in **{interaction.guild.name}**\n",
+            color=0xFF007F
+        )
+        embed.set_thumbnail(url=target.display_avatar.url)
+
+        embed.add_field(
+            name="📊 Level & Progression",
+            value=f"⭐ **Level {lvl}** (`{xp:,} / {req_xp:,} XP`)\n`{xp_bar}` **{pct}%**",
+            inline=False
+        )
+        embed.add_field(
+            name="🪙 Vault & Influence",
+            value=f"💰 `{coins:,}` Coins • ✨ `{rep}` Rep Points",
+            inline=True
+        )
+        embed.add_field(
+            name="🎙️ Voice Lounge Presence",
+            value=f"🎧 **{voice_hrs} Hours** logged",
+            inline=True
+        )
+        embed.add_field(
+            name="🐾 Active Pet Companion",
+            value=pet_str,
+            inline=True
+        )
+        embed.add_field(
+            name="⚔️ Clan / Squad",
+            value=clan_str,
+            inline=True
+        )
+        embed.add_field(
+            name="📅 Server Citizen Since",
+            value=joined_str,
+            inline=True
+        )
+
+        embed.set_footer(text="RAI VIBES 💗 • Unified Member Codex", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Leveling(bot))

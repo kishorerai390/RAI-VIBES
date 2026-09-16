@@ -1254,6 +1254,127 @@ class Moderation(commands.Cog):
         else:
             await ctx.send(f"No notes existed for **{user.mention}**.", ephemeral=True)
 
+    @commands.hybrid_command(name="modpanel", description="Open an interactive quick-action moderation dashboard for a member.")
+    @app_commands.describe(member="The member to inspect or moderate")
+    @commands.has_permissions(moderate_members=True)
+    async def modpanel(self, ctx: commands.Context, member: discord.Member):
+        infra = load_infractions()
+        g_id = str(ctx.guild.id)
+        u_id = str(member.id)
+        strikes = infra.get(g_id, {}).get(u_id, {}).get("strikes", 0)
+        joined = f"<t:{int(member.joined_at.timestamp())}:R>" if member.joined_at else "Unknown"
+
+        embed = discord.Embed(
+            title=f"⚡ STAFF MODERATION PANEL • {member.display_name}",
+            description=(
+                f"**User:** {member.mention} (`{member.id}`)\n"
+                f"**Joined Server:** {joined}\n"
+                f"**Account Age:** <t:{int(member.created_at.timestamp())}:R>\n"
+                f"**Current Strikes:** `{strikes}` warning(s)\n"
+                f"**Top Role:** {member.top_role.mention}\n\n"
+                f"⚡ *Click any quick-action button below to enforce instantly:*"
+            ),
+            color=config.COLOR_WARNING
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text="RAI SENTINEL 🛡️ Staff Enforcement", icon_url=config.RAI_ICON_URL)
+
+        view = ModPanelView(member, ctx.author, self)
+        await ctx.send(embed=embed, view=view, ephemeral=True)
+
+
+class ModPanelView(discord.ui.View):
+    def __init__(self, target: discord.Member, author: discord.Member, cog):
+        super().__init__(timeout=300)
+        self.target = target
+        self.author = author
+        self.cog = cog
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author.id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You are not authorized to use this staff panel.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="5m Timeout", style=discord.ButtonStyle.secondary, emoji="⏳")
+    async def timeout_5m(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.target.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+            return await interaction.response.send_message("❌ You cannot moderate this member due to role hierarchy.", ephemeral=True)
+        if self.target.top_role >= interaction.guild.me.top_role:
+            return await interaction.response.send_message("❌ I cannot moderate this member due to role hierarchy.", ephemeral=True)
+
+        try:
+            await self.target.timeout(datetime.timedelta(minutes=5), reason=f"ModPanel 5m Timeout by {interaction.user.name}")
+            await interaction.response.send_message(f"✅ Timed out {self.target.mention} for **5 minutes**.", ephemeral=True)
+            self.stop()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error applying timeout: {e}", ephemeral=True)
+
+    @discord.ui.button(label="1h Timeout", style=discord.ButtonStyle.secondary, emoji="⏰")
+    async def timeout_1h(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.target.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+            return await interaction.response.send_message("❌ You cannot moderate this member due to role hierarchy.", ephemeral=True)
+        if self.target.top_role >= interaction.guild.me.top_role:
+            return await interaction.response.send_message("❌ I cannot moderate this member due to role hierarchy.", ephemeral=True)
+
+        try:
+            await self.target.timeout(datetime.timedelta(hours=1), reason=f"ModPanel 1h Timeout by {interaction.user.name}")
+            await interaction.response.send_message(f"✅ Timed out {self.target.mention} for **1 hour**.", ephemeral=True)
+            self.stop()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error applying timeout: {e}", ephemeral=True)
+
+    @discord.ui.button(label="Warn Member", style=discord.ButtonStyle.secondary, emoji="⚠️")
+    async def warn_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        infra = load_infractions()
+        g_id = str(interaction.guild.id)
+        u_id = str(self.target.id)
+        g_infra = infra.setdefault(g_id, {})
+        u_infra = g_infra.setdefault(u_id, {"strikes": 0, "logs": []})
+        u_infra["strikes"] += 1
+        strike_num = u_infra["strikes"]
+        log_entry = {
+            "action": "WARN",
+            "reason": "ModPanel Staff Warning",
+            "moderator": interaction.user.name,
+            "timestamp": time.time()
+        }
+        u_infra["logs"].append(log_entry)
+        save_infractions(infra)
+        await interaction.response.send_message(f"⚠️ Warned {self.target.mention}. Total strikes: **{strike_num}**.", ephemeral=True)
+
+    @discord.ui.button(label="Kick Member", style=discord.ButtonStyle.danger, emoji="👢")
+    async def kick_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.user.guild_permissions.kick_members:
+            return await interaction.response.send_message("❌ You do not have permission to kick members.", ephemeral=True)
+        if self.target.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+            return await interaction.response.send_message("❌ Role hierarchy prevents kicking this user.", ephemeral=True)
+        if self.target.top_role >= interaction.guild.me.top_role:
+            return await interaction.response.send_message("❌ Bot role hierarchy prevents kicking this user.", ephemeral=True)
+
+        try:
+            await self.target.kick(reason=f"ModPanel kick by {interaction.user.name}")
+            await interaction.response.send_message(f"👢 Kicked {self.target.mention} from the server.", ephemeral=True)
+            self.stop()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error kicking member: {e}", ephemeral=True)
+
+    @discord.ui.button(label="Ban Member", style=discord.ButtonStyle.danger, emoji="🔨")
+    async def ban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.user.guild_permissions.ban_members:
+            return await interaction.response.send_message("❌ You do not have permission to ban members.", ephemeral=True)
+        if self.target.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+            return await interaction.response.send_message("❌ Role hierarchy prevents banning this user.", ephemeral=True)
+        if self.target.top_role >= interaction.guild.me.top_role:
+            return await interaction.response.send_message("❌ Bot role hierarchy prevents banning this user.", ephemeral=True)
+
+        try:
+            await self.target.ban(reason=f"ModPanel ban by {interaction.user.name}", delete_message_days=1)
+            await interaction.response.send_message(f"🔨 Banned {self.target.mention} from the server.", ephemeral=True)
+            self.stop()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error banning member: {e}", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))

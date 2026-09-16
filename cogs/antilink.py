@@ -18,7 +18,9 @@ KNOWN_SCAM_PATTERNS = [
     "discorcl", "dlscord", "discrod", "discord-nitro", "free-nitro", "nitro-gift",
     "steamcommuniity", "steamcomminuty", "gift-discord", "discordapp.biz", "discord-app.me",
     "airdrop-nitro", "claim-nitro", "steam-gift", "discordgift", "t.me/airdrop",
-    "discord-claim", "nitro-drop", "free-steam", "discord-boost", "get-nitro", "gift-nitro.click"
+    "discord-claim", "nitro-drop", "free-steam", "discord-boost", "get-nitro", "gift-nitro.click",
+    "discord-event", "steam-community", "csgo-skin", "nitrogift", "discord-drop", "discord-nitro.org",
+    "discord-free", "free-boost", "claim-steam", "discordapp.info", "nitro-free.org", "discord-gifts.ru"
 ]
 
 class AntiLink(commands.Cog):
@@ -36,7 +38,7 @@ class AntiLink(commands.Cog):
             channel = guild.get_channel(log_id)
             if channel and isinstance(channel, discord.TextChannel):
                 return channel
-        for name in ["・𝘀𝗲𝗰𝘂𝗿𝗶𝘁𝘆-𝗹𝗼𝗴𝘀・", "・𝗮𝘂𝗱𝗶𝘁-𝗹𝗼𝗴𝘀・", "security-logs", "mod-logs"]:
+        for name in ["🚨・ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ", "・𝘀𝗲𝗰𝘂𝗿𝗶𝘁𝘆-𝗹𝗼𝗴𝘀・", "・𝗮𝘂𝗱𝗶𝘁-𝗹𝗼𝗴𝘀・", "security-logs", "sentinel-logs", "mod-logs"]:
             channel = discord.utils.get(guild.text_channels, name=name)
             if channel:
                 return channel

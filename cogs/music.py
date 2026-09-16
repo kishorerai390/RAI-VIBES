@@ -1879,6 +1879,124 @@ class Music(commands.Cog):
 
         self.bot.loop.create_task(_sleep_countdown())
 
+    @commands.hybrid_command(name="history", aliases=["recent", "recentlyplayed"], description="View the last 15 songs played across the server with 1-click re-queue.")
+    async def history_cmd(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.history:
+            return await ctx.send("ℹ️ No recently played songs recorded yet for this session.", ephemeral=True)
+
+        embed = discord.Embed(
+            title="🕒 RECENTLY PLAYED MUSIC HISTORY",
+            description=f"Showing the last **{min(15, len(player.history))}** tracks played in this server.\nUse the dropdown below to instantly re-queue any track!",
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_thumbnail(url=config.RAI_ICON_URL)
+        embed.set_footer(text="RAI VIBES 💗 • Playback History Engine", icon_url=config.RAI_ICON_URL)
+
+        for i, s in enumerate(reversed(list(player.history)[-15:]), 1):
+            dur = time.strftime("%M:%S", time.gmtime(s.duration)) if s.duration else "Live"
+            embed.add_field(
+                name=f"{i}. {s.title[:65]}",
+                value=f"⏱️ `{dur}` • 👤 `{s.uploader[:25] if s.uploader else 'Artist'}` • 📥 Requested by `{s.requester.display_name if s.requester else 'Community'}`",
+                inline=False
+            )
+
+        view = HistoryRequeueView(self, player)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.hybrid_command(name="artist", description="Search artist profile, genre, and top 5 popular songs.")
+    @app_commands.describe(name="Name of the artist or band to inspect")
+    async def artist_cmd(self, ctx: commands.Context, *, name: str):
+        if ctx.interaction:
+            await ctx.defer()
+
+        import urllib.request, urllib.parse, json
+        encoded = urllib.parse.quote(name)
+        url = f"https://itunes.apple.com/search?term={encoded}&entity=song&limit=5"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            data = None
+
+        if not data or not data.get("results"):
+            msg = f"❌ No artist or tracks found matching `{name}`."
+            return await (ctx.interaction.followup.send(msg) if ctx.interaction else ctx.send(msg))
+
+        results = data["results"]
+        first = results[0]
+        artist_name = first.get("artistName", name)
+        genre = first.get("primaryGenreName", "Pop / Hip-Hop / Indie")
+        artwork = first.get("artworkUrl100", "").replace("100x100bb", "600x600bb")
+
+        embed = discord.Embed(
+            title=f"🎤 ARTIST SPOTLIGHT • {artist_name.upper()}",
+            description=f"🏷️ **Primary Genre:** `{genre}`\n🎧 **Verified Profile & Discography**\n\n### 🔥 Top 5 Popular Songs:",
+            color=config.COLOR_PRIMARY
+        )
+        if artwork:
+            embed.set_thumbnail(url=artwork)
+        embed.set_footer(text="RAI VIBES 💗 • Music Discovery Studio", icon_url=config.RAI_ICON_URL)
+
+        for i, track in enumerate(results, 1):
+            track_name = track.get("trackName", "Track")
+            album_name = track.get("collectionName", "Single")
+            preview_url = track.get("previewUrl", "")
+            val = f"💿 Album: *{album_name}*"
+            if preview_url:
+                val += f"\n🔗 [Audio Preview]({preview_url})"
+            embed.add_field(
+                name=f"{i}. {track_name}",
+                value=val,
+                inline=False
+            )
+
+        await (ctx.interaction.followup.send(embed=embed) if ctx.interaction else ctx.send(embed=embed))
+
+
+class HistorySelect(Select):
+    def __init__(self, cog, player: GuildMusicPlayer, history_list: list):
+        self.cog = cog
+        self.player = player
+        options = []
+        for i, s in enumerate(reversed(history_list[-15:])):
+            title = s.title[:90]
+            options.append(discord.SelectOption(
+                label=f"{i+1}. {title}"[:100],
+                value=str(i),
+                description=f"By {s.uploader}"[:100] if s.uploader else "Music Stream",
+                emoji="🎵"
+            ))
+        super().__init__(placeholder="Select a recently played song to re-queue...", min_values=1, max_values=1, options=options)
+        self.history_items = list(reversed(history_list[-15:]))
+
+    async def callback(self, interaction: discord.Interaction):
+        idx = int(self.values[0])
+        song = self.history_items[idx]
+        user_vc = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if not user_vc:
+            return await interaction.response.send_message("❌ Please join a voice channel first!", ephemeral=True)
+
+        await interaction.response.defer()
+        vc = await self.cog.ensure_voice(interaction)
+        if not vc:
+            return await interaction.followup.send("❌ Could not connect to voice channel.", ephemeral=True)
+
+        song_obj = await Song.create_source(song.webpage_url or song.title, interaction.user, self.cog.bot.loop)
+        if song_obj:
+            is_queued = self.player.enqueue_track(song_obj)
+            desc = f"📥 Re-queued: **[{song_obj.title}]({song_obj.webpage_url})**" if is_queued else f"🎶 Now streaming: **[{song_obj.title}]({song_obj.webpage_url})**"
+            await interaction.followup.send(embed=discord.Embed(description=desc, color=config.COLOR_PRIMARY))
+        else:
+            await interaction.followup.send("❌ Could not re-queue that track.", ephemeral=True)
+
+
+class HistoryRequeueView(View):
+    def __init__(self, cog, player: GuildMusicPlayer):
+        super().__init__(timeout=120)
+        self.add_item(HistorySelect(cog, player, list(player.history)))
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Music(bot))

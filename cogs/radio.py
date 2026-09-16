@@ -272,6 +272,60 @@ class Radio(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • 24/7 Music Engine", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="alarm", description="Schedule the bot to join voice and stream radio after set minutes.")
+    @app_commands.describe(
+        minutes="Minutes from now to trigger the alarm (e.g. 15, 30, 60, 480)",
+        station="Radio station to wake up to (defaults to lo-fi / chill)"
+    )
+    @app_commands.choices(station=[
+        app_commands.Choice(name="☕ Global Lofi Hip Hop / Study Beats", value="lofi"),
+        app_commands.Choice(name="📻 Tamil Panpalai Gold 24/7", value="tamilnadu_fm"),
+        app_commands.Choice(name="📻 AIR Kodai Tamil FM 24/7", value="sooriyan_fm"),
+        app_commands.Choice(name="🌊 Chillout Lounge / Ambient", value="chill"),
+        app_commands.Choice(name="🌆 Synthwave / 80s Retrowave", value="synthwave"),
+    ])
+    async def alarm(self, ctx: commands.Context, minutes: int, station: Optional[app_commands.Choice[str]] = None):
+        if minutes < 1 or minutes > 1440:
+            return await ctx.send("❌ Alarm duration must be between 1 and 1440 minutes (24 hours).", ephemeral=True)
+
+        user_vc = getattr(getattr(ctx.author, "voice", None), "channel", None)
+        if not user_vc:
+            return await ctx.send("❌ Please join your desired voice channel first so the alarm knows where to stream!", ephemeral=True)
+
+        station_key = station.value if station else "lofi"
+        st_data = RADIO_STATIONS.get(station_key, RADIO_STATIONS["lofi"])
+
+        embed = discord.Embed(
+            title="⏰ VOICE RADIO ALARM SCHEDULED",
+            description=(
+                f"Your alarm has been set for **{minutes} minutes** from now!\n\n"
+                f"📍 **Target Channel:** {user_vc.mention}\n"
+                f"📻 **Station:** `{st_data['name']}`\n"
+                f"🔔 The bot will automatically connect and stream peaceful wake-up melodies."
+            ),
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_thumbnail(url=st_data["thumb"])
+        embed.set_footer(text="RAI VIBES 💗 • Scheduled Voice Alarm", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+        async def _alarm_coro():
+            await asyncio.sleep(minutes * 60)
+            target_chan = self.bot.get_channel(user_vc.id)
+            if target_chan and isinstance(target_chan, discord.VoiceChannel):
+                await self.start_radio_in_channel(target_chan, station_key=station_key)
+                try:
+                    wake_embed = discord.Embed(
+                        title="⏰ WAKE UP & VIBE!",
+                        description=f"🔔 {ctx.author.mention} Your scheduled radio alarm has fired! Streaming **{st_data['name']}** in {target_chan.mention}.",
+                        color=config.COLOR_GOLD
+                    )
+                    await target_chan.send(content=ctx.author.mention, embed=wake_embed)
+                except Exception:
+                    pass
+
+        self.bot.loop.create_task(_alarm_coro())
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Radio(bot))

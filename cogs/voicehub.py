@@ -8,7 +8,8 @@ import json
 import unicodedata
 import asyncio
 import time
-from typing import Optional, Dict
+from pathlib import Path
+from typing import Optional, Dict, Literal
 
 import config
 
@@ -646,6 +647,83 @@ class VoiceHub(commands.Cog):
         if before.channel and before.channel != after.channel and self.is_temporary_channel(before.channel):
             if len(before.channel.members) == 0:
                 self.schedule_inactivity_deletion(before.channel, delay=self.INACTIVITY_GRACE_SECONDS)
+
+    @commands.hybrid_command(name="vctune", description="Auto-optimize all voice channels to maximum allowable studio bitrate (up to 384kbps).")
+    @commands.has_permissions(manage_channels=True)
+    async def vctune(self, ctx: commands.Context):
+        guild = ctx.guild
+        tier = guild.premium_tier
+        max_bitrate = guild.bitrate_limit
+        updated = 0
+        for vc in guild.voice_channels:
+            if vc.bitrate < max_bitrate:
+                try:
+                    await vc.edit(bitrate=max_bitrate, reason="[VoiceHub Studio Enhancer] Optimized voice bitrate to max limit")
+                    updated += 1
+                except Exception:
+                    pass
+
+        embed = discord.Embed(
+            title="🔊 STUDIO VOICE BITRATE ENHANCER",
+            description=(
+                f"✅ **Server Voice Channels Optimized!**\n\n"
+                f"💎 **Server Boost Tier:** `Tier {tier}`\n"
+                f"🚀 **Maximum Allowed Bitrate:** `{max_bitrate // 1000} kbps`\n"
+                f"🎚️ **Channels Enhanced:** `{updated}` channels updated to studio quality audio."
+            ),
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Studio Audio Engine", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="quiethours", description="Configure late-night quiet hours to mute join sounds and alerts.")
+    @app_commands.describe(
+        action="Turn quiet hours on, off, or inspect status",
+        start_hour="Start hour in 24h format (e.g. 1 for 1:00 AM)",
+        end_hour="End hour in 24h format (e.g. 6 for 6:00 AM)"
+    )
+    @commands.has_permissions(manage_guild=True)
+    async def quiethours(self, ctx: commands.Context, action: Optional[Literal["enable", "disable", "status"]] = "status", start_hour: Optional[int] = 1, end_hour: Optional[int] = 6):
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        qh_file = data_dir / "quiethours.json"
+        data = {}
+        if qh_file.exists():
+            try:
+                with open(qh_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+
+        gid = str(ctx.guild.id)
+        guild_cfg = data.setdefault(gid, {"enabled": False, "start": 1, "end": 6})
+
+        if action == "enable":
+            guild_cfg["enabled"] = True
+            guild_cfg["start"] = max(0, min(23, start_hour or 1))
+            guild_cfg["end"] = max(0, min(23, end_hour or 6))
+            with open(qh_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            desc = f"🌙 **Quiet Hours ENABLED!**\nFrom **{guild_cfg['start']:02d}:00** to **{guild_cfg['end']:02d}:00**, automatic entrance sounds and bot alerts will be muted."
+            color = config.COLOR_SUCCESS
+        elif action == "disable":
+            guild_cfg["enabled"] = False
+            with open(qh_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            desc = "☀️ **Quiet Hours DISABLED.** All alerts and entrance chimes will operate normally 24/7."
+            color = config.COLOR_DARK
+        else:
+            status = "🟢 ACTIVE" if guild_cfg.get("enabled") else "⚪ DISABLED"
+            desc = f"📊 **Current Status:** `{status}`\n⏰ **Window:** `{guild_cfg.get('start', 1):02d}:00` – `{guild_cfg.get('end', 6):02d}:00`"
+            color = config.COLOR_PRIMARY
+
+        embed = discord.Embed(
+            title="🔇 SCHEDULED QUIET HOURS CONFIG",
+            description=desc,
+            color=color
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Peace & Rest Watchdog", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(VoiceHub(bot))

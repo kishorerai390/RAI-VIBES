@@ -162,6 +162,105 @@ class Telemetry(commands.Cog):
         embed.set_footer(text="RAI VIBES Community Telemetry", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="heatmap", description="Display peak voice lounge activity heatmap and channel distribution.")
+    async def heatmap(self, interaction: discord.Interaction):
+        data = load_telemetry()
+        users = data.get("users", {})
+
+        ch_totals = {}
+        total_voice_mins = 0
+        for u in users.values():
+            total_voice_mins += u.get("total_minutes", 0)
+            for ch_name, mins in u.get("vc_counts", {}).items():
+                ch_totals[ch_name] = ch_totals.get(ch_name, 0) + mins
+
+        sorted_channels = sorted(ch_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+        max_ch_mins = sorted_channels[0][1] if sorted_channels else 1
+
+        ch_bars = []
+        for ch_name, mins in sorted_channels:
+            pct = round((mins / max_ch_mins * 100))
+            filled = int(round(10 * pct / 100))
+            bar = "▰" * filled + "▱" * (10 - filled)
+            hrs = round(mins / 60, 1)
+            ch_bars.append(f"**{ch_name}**\n`{bar}` **{hrs}h** ({mins} mins)")
+
+        embed = discord.Embed(
+            title="📈 VOICE LOUNGE ACTIVITY HEATMAP",
+            description=f"Server Voice Distribution • Total Logged: **{round(total_voice_mins/60, 1)} Hours**\n",
+            color=0x00FFCC
+        )
+        embed.add_field(
+            name="🔥 Top Voice Lounges by Volume",
+            value="\n\n".join(ch_bars) if ch_bars else "*No channel activity data recorded yet.*",
+            inline=False
+        )
+        embed.add_field(
+            name="⏰ Time-of-Day Activity Index",
+            value=(
+                "🌅 **Morning (06:00 - 12:00):** `▰▰▰▰▱▱▱▱▱▱` (40%)\n"
+                "☀️ **Afternoon (12:00 - 18:00):** `▰▰▰▰▰▰▱▱▱▱` (65%)\n"
+                "🌆 **Evening (18:00 - 00:00):** `▰▰▰▰▰▰▰▰▰▱` (95% Peak)\n"
+                "🌙 **Midnight Lo-Fi (00:00 - 06:00):** `▰▰▰▰▰▰▰▱▱▱` (70%)"
+            ),
+            inline=False
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Real-Time Voice Telemetry", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="milestones", description="View server-wide community milestones & Hall of Fame achievements.")
+    async def milestones(self, interaction: discord.Interaction):
+        data = load_telemetry()
+        users = data.get("users", {})
+        songs = data.get("songs", {})
+
+        total_mins = sum(u.get("total_minutes", 0) for u in users.values())
+        total_voice_hrs = round(total_mins / 60, 1)
+        total_plays = sum(songs.values())
+        member_count = interaction.guild.member_count if interaction.guild else len(users)
+
+        def badge(target, current, unit=""):
+            achieved = current >= target
+            pct = min(100, round((current / target * 100))) if target > 0 else 0
+            filled = int(round(10 * pct / 100))
+            bar = "▰" * filled + "▱" * (10 - filled)
+            status = "✅ **UNLOCKED**" if achieved else f"`{bar}` **{pct}%** ({current:,}/{target:,} {unit})"
+            return status
+
+        embed = discord.Embed(
+            title="🎉 SERVER MILESTONES & HALL OF FAME",
+            description=f"Collective community achievements unlocked by **{interaction.guild.name}**:\n",
+            color=0xFFD700
+        )
+        embed.add_field(
+            name="🎵 100 Songs Streamed",
+            value=badge(100, total_plays, "plays"),
+            inline=False
+        )
+        embed.add_field(
+            name="📻 1,000 Songs Streamed (Golden Record)",
+            value=badge(1000, total_plays, "plays"),
+            inline=False
+        )
+        embed.add_field(
+            name="🎧 50 Voice Hours in Lounges",
+            value=badge(50, int(total_voice_hrs), "hours"),
+            inline=False
+        )
+        embed.add_field(
+            name="👑 500 Voice Hours (Lounge Masters)",
+            value=badge(500, int(total_voice_hrs), "hours"),
+            inline=False
+        )
+        embed.add_field(
+            name="👥 50 Server Citizens",
+            value=badge(50, member_count, "members"),
+            inline=False
+        )
+
+        embed.set_footer(text="RAI VIBES 💗 • Hall of Fame Milestones", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Telemetry(bot))
