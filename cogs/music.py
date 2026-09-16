@@ -850,6 +850,11 @@ class GuildMusicPlayer:
                 self.play_next_song.set()
 
             if self.text_channel and not self.is_restarting_for_filters:
+                try:
+                    from cogs.telemetry import record_song_play
+                    record_song_play(song.title)
+                except Exception:
+                    pass
                 if self.now_playing_message:
                     try:
                         await self.now_playing_message.delete()
@@ -1796,6 +1801,83 @@ class Music(commands.Cog):
         )
         embed.set_footer(text="RAI VIBES 💗 • Intelligent Music Engine", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="search", description="Search YouTube for top 5 matches and pick with interactive buttons.")
+    @app_commands.describe(query="Song title or artist to search for")
+    async def search(self, ctx: commands.Context, *, query: str):
+        if ctx.interaction:
+            try:
+                await ctx.defer()
+            except Exception:
+                pass
+
+        voice_client = await self.ensure_voice(ctx)
+        if not voice_client:
+            return
+
+        embed = discord.Embed(
+            description=f"🔎 **Searching top results for:** `{query}`...",
+            color=config.COLOR_PRIMARY
+        )
+        msg = await (ctx.interaction.followup.send(embed=embed) if ctx.interaction else ctx.send(embed=embed))
+
+        results = await Song.search_multiple(query, max_results=5, loop=self.bot.loop)
+        if not results:
+            err_embed = discord.Embed(
+                description=f"❌ No search results found for `{query}`.",
+                color=config.COLOR_ERROR
+            )
+            return await msg.edit(embed=err_embed)
+
+        search_embed = discord.Embed(
+            title=f"🔎 TOP SEARCH RESULTS • '{query[:30]}'",
+            description="Select a track from the dropdown menu or tap a button below:",
+            color=config.COLOR_PRIMARY
+        )
+        for i, item in enumerate(results):
+            dur = time.strftime("%M:%S", time.gmtime(item.get("duration", 0)))
+            search_embed.add_field(
+                name=f"{i+1}. {item.get('title', 'Unknown')[:48]}",
+                value=f"⏱️ `{dur}` • 👤 `{item.get('uploader', 'Artist')[:25]}`",
+                inline=False
+            )
+        search_embed.set_footer(text="RAI VIBES 💗 • Music Picker", icon_url=config.RAI_ICON_URL)
+
+        view = SearchResultView(self, ctx, results, message=msg)
+        await msg.edit(embed=search_embed, view=view)
+
+    @commands.hybrid_command(name="sleeptimer", aliases=["sleep"], description="Set a countdown timer to automatically stop music.")
+    @app_commands.describe(minutes="Minutes until music stops (e.g. 15, 30, 45, 60, 90)")
+    async def sleeptimer(self, ctx: commands.Context, minutes: int):
+        if minutes <= 0 or minutes > 240:
+            return await ctx.send("❌ Sleep timer must be between 1 and 240 minutes.", ephemeral=True)
+
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.is_connected:
+            return await ctx.send("❌ Bot is not currently connected to voice.", ephemeral=True)
+
+        embed = discord.Embed(
+            title="🌙 AUDIO SLEEP TIMER ACTIVATED",
+            description=f"Music will gently stop in **{minutes} minutes**.\nRest easy and sweet dreams! 💤",
+            color=0x9B59B6
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Sleep Well", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+        async def _sleep_countdown():
+            await asyncio.sleep(minutes * 60)
+            p = self.get_player(ctx.guild.id)
+            if p and p.voice_client and p.voice_client.is_connected():
+                p.queue.clear()
+                p.mode_247 = False
+                await p.voice_client.disconnect()
+                if p.text_channel:
+                    try:
+                        await p.text_channel.send("🌙 **Sleep timer expired.** Playback stopped. Goodnight! 💤")
+                    except Exception:
+                        pass
+
+        self.bot.loop.create_task(_sleep_countdown())
 
 
 async def setup(bot: commands.Bot):

@@ -23,6 +23,10 @@ FILTER_PRESETS = {
     "pop": "equalizer=f=1000:width_type=h:width=100:g=3",
     "rock": "equalizer=f=100:width_type=h:width=100:g=4,equalizer=f=8000:width_type=h:width=100:g=4",
     "soft": "lowpass=f=1000",
+    "lofi_mellow": "lowpass=f=3200,equalizer=f=100:width_type=h:width=50:g=4,aecho=0.8:0.88:25:0.2",
+    "subbass_engine": "equalizer=f=50:width_type=h:width=40:g=14,bass=g=12:f=90",
+    "vocal_clarity": "highpass=f=120,equalizer=f=3000:width_type=h:width=1200:g=6,equalizer=f=5000:width_type=h:width=1500:g=4",
+    "cinema": "stereotools=mlev=0.7:slev=1.45,equalizer=f=80:width_type=h:width=40:g=6",
 }
 
 def get_filter_string(active_filters: list[str], custom_speed: float = 1.0) -> str:

@@ -121,9 +121,94 @@ class Filters(commands.Cog):
         await player.restart_current_with_filters()
         await ctx.send(f"⏩ **Playback speed set to:** `{value}x`")
 
-    @commands.hybrid_command(name="filter_reset", aliases=["clearfilters", "resetfilter"], description="Reset and remove all active audio filters.")
-    async def filter_reset(self, ctx: commands.Context):
-        await self.apply_player_filter(ctx, "off", "Off")
+    @commands.hybrid_command(name="equalizer", aliases=["eq"], description="Open the live interactive Studio Audio Equalizer switchboard.")
+    async def equalizer(self, ctx: commands.Context):
+        player = self.get_player(ctx)
+        if not player or not player.is_connected or not player.current:
+            return await ctx.send("❌ RAI VIBES must be streaming in a voice channel to open the Equalizer.", ephemeral=True)
+
+        active_list = ", ".join([f"`{f}`" for f in player.active_filters]) if player.active_filters else "`Flat / Clean`"
+        embed = discord.Embed(
+            title="🎛️ STUDIO AUDIO EQUALIZER",
+            description=(
+                f"Now Playing: **[{player.current.title}]({player.current.webpage_url})**\n\n"
+                f"🎚️ **Active DSP Filters:** {active_list}\n\n"
+                f"Click buttons below to toggle real-time audiophile DSP enhancements:"
+            ),
+            color=0x00FFCC
+        )
+        embed.set_footer(text="RAI VIBES Studio Sound Engine • High Fidelity Real-time DSP", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, view=StudioEqualizerView(self, ctx.guild.id))
+
+
+class StudioEqualizerView(discord.ui.View):
+    def __init__(self, filters_cog: Filters, guild_id: int):
+        super().__init__(timeout=120)
+        self.filters_cog = filters_cog
+        self.guild_id = guild_id
+
+    async def toggle_filter(self, interaction: discord.Interaction, filter_key: str, name: str):
+        music_cog = self.filters_cog.bot.get_cog("Music")
+        if not music_cog:
+            return await interaction.response.send_message("❌ Music engine not available.", ephemeral=True)
+        player = music_cog.get_player(self.guild_id)
+        if not player or not player.is_connected or not player.current:
+            return await interaction.response.send_message("❌ Nothing is currently playing in voice.", ephemeral=True)
+
+        if filter_key == "off":
+            player.active_filters.clear()
+            player.custom_speed = 1.0
+            await player.restart_current_with_filters()
+            status_text = "✨ Reset to Studio Flat reference master."
+        else:
+            if filter_key in player.active_filters:
+                player.active_filters.remove(filter_key)
+                status_text = f"⚪ Disabled `{name}`"
+            else:
+                player.active_filters.append(filter_key)
+                status_text = f"⚡ Activated `{name}`"
+            await player.restart_current_with_filters()
+
+        active_list = ", ".join([f"`{f}`" for f in player.active_filters]) if player.active_filters else "`Flat / Clean`"
+        embed = discord.Embed(
+            title="🎛️ STUDIO AUDIO EQUALIZER",
+            description=(
+                f"Now Playing: **[{player.current.title}]({player.current.webpage_url})**\n\n"
+                f"Status: {status_text}\n"
+                f"🎚️ **Active DSP Filters:** {active_list}"
+            ),
+            color=0x00FFCC
+        )
+        embed.set_footer(text="RAI VIBES Studio Sound Engine • High Fidelity Real-time DSP", icon_url=config.RAI_ICON_URL)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Lo-Fi Mellow", emoji="☕", style=discord.ButtonStyle.primary, row=0)
+    async def btn_lofi(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "lofi_mellow", "Lo-Fi Mellow")
+
+    @discord.ui.button(label="Sub-Bass 3D", emoji="⚡", style=discord.ButtonStyle.primary, row=0)
+    async def btn_bass(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "subbass_engine", "Sub-Bass 3D Engine")
+
+    @discord.ui.button(label="Vocal Clarity", emoji="🎤", style=discord.ButtonStyle.primary, row=0)
+    async def btn_vocal(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "vocal_clarity", "Vocal Clarity")
+
+    @discord.ui.button(label="Cinema Surround", emoji="🍿", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_cinema(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "cinema", "Cinema Surround")
+
+    @discord.ui.button(label="8D Spatial", emoji="🌌", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_8d(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "8d", "8D Spatial Audio")
+
+    @discord.ui.button(label="Nightcore", emoji="⚡", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_nc(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "nightcore", "Nightcore")
+
+    @discord.ui.button(label="Reset / Flat", emoji="🔄", style=discord.ButtonStyle.danger, row=2)
+    async def btn_flat(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        await self.toggle_filter(interaction, "off", "Flat / Clean")
 
 
 async def setup(bot: commands.Bot):
