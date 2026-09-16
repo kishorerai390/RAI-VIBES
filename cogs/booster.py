@@ -56,10 +56,23 @@ class Booster(commands.Cog):
                     color=0xF47FFF
                 )
                 embed.set_thumbnail(url=after.display_avatar.url)
-                embed.set_image(url="https://media.tenor.com/images/3a1050ec094e9f78eaecbc5f7e7f6dc5/tenor.gif")
                 embed.set_footer(text=f"Total Boost Level: Level {after.guild.premium_tier} ({after.guild.premium_subscription_count} Boosts)", icon_url=config.RAI_ICON_URL)
+                
+                card_file = None
                 try:
-                    await ch.send(content=f"🚀 **NEW BOOST!** Thank you {after.mention}!", embed=embed)
+                    from utils.canvas import generate_booster_card
+                    av_bytes = await after.display_avatar.read()
+                    buf = generate_booster_card(av_bytes, after.display_name, after.guild.premium_subscription_count, after.guild.premium_tier)
+                    card_file = discord.File(fp=buf, filename="boost.png")
+                    embed.set_image(url="attachment://boost.png")
+                except Exception:
+                    pass
+
+                try:
+                    if card_file:
+                        await ch.send(content=f"🚀 **NEW BOOST!** Thank you {after.mention}!", embed=embed, file=card_file)
+                    else:
+                        await ch.send(content=f"🚀 **NEW BOOST!** Thank you {after.mention}!", embed=embed)
                 except Exception as e:
                     logger.warning(f"Could not send boost celebration: {e}")
 

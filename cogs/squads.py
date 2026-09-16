@@ -5,12 +5,12 @@ import random
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Literal
-
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
 import config
+from utils.canvas import generate_bracket_card
 
 logger = logging.getLogger("Squads")
 
@@ -357,7 +357,18 @@ class Squads(commands.Cog):
             inline=False
         )
         embed.set_footer(text="RAI VIBES 💗 • Community Tournament System", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
+
+        match_tuples = []
+        for i in range(0, len(team_list) - 1, 2):
+            match_tuples.append((team_list[i], team_list[i+1]))
+        if len(team_list) % 2 != 0:
+            match_tuples.append((team_list[-1], "BYE (Advance)"))
+
+        card_buf = generate_bracket_card(match_tuples, round_name="Quarterfinals" if count >= 8 else "Semifinals")
+        file = discord.File(fp=card_buf, filename="bracket.png")
+        embed.set_image(url="attachment://bracket.png")
+
+        await ctx.send(embed=embed, file=file)
 
 
 async def setup(bot: commands.Bot):

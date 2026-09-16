@@ -1628,7 +1628,39 @@ class Music(commands.Cog):
 
         embed = player.build_now_playing_embed()
         view = MusicPlayerView(self, ctx.guild.id)
-        await ctx.send(embed=embed, view=view)
+
+        card_file = None
+        try:
+            from utils.canvas import generate_nowplaying_card
+            import urllib.request
+            thumb_bytes = None
+            if player.current.thumbnail:
+                try:
+                    req = urllib.request.Request(player.current.thumbnail, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=3) as r:
+                        thumb_bytes = r.read()
+                except Exception:
+                    pass
+
+            elapsed = int(time.time() - player.start_time) if player.start_time else 0
+            req_name = player.current.requester.display_name if player.current.requester else "Community"
+            card_buf = generate_nowplaying_card(
+                thumbnail_bytes=thumb_bytes,
+                title=player.current.title,
+                artist=player.current.uploader or "Artist",
+                duration_sec=player.current.duration or 0,
+                elapsed_sec=elapsed,
+                requester_name=req_name
+            )
+            card_file = discord.File(fp=card_buf, filename="nowplaying.png")
+            embed.set_image(url="attachment://nowplaying.png")
+        except Exception:
+            pass
+
+        if card_file:
+            await ctx.send(embed=embed, view=view, file=card_file)
+        else:
+            await ctx.send(embed=embed, view=view)
 
     # =========================================================================
     # COMMAND: QUEUE / Q

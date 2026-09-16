@@ -59,6 +59,89 @@ async def deploy_guide(client: discord.Client):
         print(f"[Success] Deployed new guide embed ({new_msg.id}) in #{chan.name}!")
 
 
+from utils.canvas import generate_channel_header
+
+async def deploy_headers(client: discord.Client):
+    guild = client.get_guild(GUILD_ID)
+    if not guild:
+        print(f"[Error] Guild {GUILD_ID} not found.")
+        return
+
+    headers_config = [
+        {
+            "channel_names": ["🧭・ꜱᴇʀᴠᴇʀ-ɢᴜɪᴅᴇ", "server-guide", "guide"],
+            "title": "SERVER COMPASS & GUIDE",
+            "subtitle": "Your Master Navigation Hub • Welcome to RAI VIBES 💗",
+            "icon": "🧭",
+            "accent": (255, 0, 128),
+            "embed_desc": "Welcome to **RAI VIBES**! Explore all interactive features, roles, and music lounges below."
+        },
+        {
+            "channel_names": ["💬・ɢᴇɴᴇʀᴀʟ-ᴄʜᴀᴛ", "general-chat", "general"],
+            "title": "COMMUNITY LOUNGE",
+            "subtitle": "Active Hangout • Virtual Pets • Text & Voice XP",
+            "icon": "💬",
+            "accent": (0, 240, 255),
+            "embed_desc": "The main social heartbeat of RAI VIBES. Chat, earn XP, show off pets, and vibe!"
+        },
+        {
+            "channel_names": ["🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ", "gaming-hub", "gaming"],
+            "title": "ESPORTS & GAMING HUB",
+            "subtitle": "Squad Matchmaking • Tournament Brackets • Mini-Games",
+            "icon": "🎮",
+            "accent": (255, 215, 0),
+            "embed_desc": "Queue for squads (`/lfg`), split teams (`/teams`), or generate tournament brackets (`/bracket`)."
+        },
+        {
+            "channel_names": ["🌧️・ʟᴏ-ꜰɪ-ᴢᴏɴᴇ", "lo-fi-zone", "lofi"],
+            "title": "24/7 LO-FI SANCTUARY",
+            "subtitle": "High-Fidelity Ambient Beats • Study & Chill",
+            "icon": "🌧️",
+            "accent": (155, 89, 182),
+            "embed_desc": "Continuous 24/7 aesthetic lo-fi audio stream. Grab a coffee and rest easy."
+        },
+        {
+            "channel_names": ["🚨・ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ", "sentinel-logs", "security-logs"],
+            "title": "SENTINEL SECURITY SHIELD",
+            "subtitle": "Automated Threat Defense • Anti-Nuke • Audit Radar",
+            "icon": "🚨",
+            "accent": (255, 75, 75),
+            "embed_desc": "Real-time audit log of anti-raid, phishing shields, and automated moderator enforcements."
+        }
+    ]
+
+    for cfg in headers_config:
+        target_chan = None
+        for name in cfg["channel_names"]:
+            ch = discord.utils.get(guild.text_channels, name=name)
+            if ch:
+                target_chan = ch
+                break
+
+        if not target_chan:
+            print(f"[-] Channel for {cfg['title']} not found, skipping.")
+            continue
+
+        print(f"[+] Generating studio banner for #{target_chan.name}...")
+        buf = generate_channel_header(cfg["title"], cfg["subtitle"], cfg["icon"], cfg["accent"])
+        file = discord.File(fp=buf, filename="header.png")
+
+        hex_color = (cfg["accent"][0] << 16) + (cfg["accent"][1] << 8) + cfg["accent"][2]
+        embed = discord.Embed(
+            title=f"{cfg['icon']} {cfg['title']}",
+            description=cfg["embed_desc"],
+            color=hex_color
+        )
+        embed.set_image(url="attachment://header.png")
+        embed.set_footer(text="RAI VIBES 💗 • Studio Channel Identity", icon_url=config.RAI_ICON_URL)
+
+        try:
+            msg = await target_chan.send(embed=embed, file=file)
+            print(f" [Success] Deployed header in #{target_chan.name} (Msg ID: {msg.id})")
+        except Exception as e:
+            print(f" [Error] Could not post header to #{target_chan.name}: {e}")
+
+
 def print_help():
     print("""
 Setup Wizard CLI Tool
@@ -67,12 +150,13 @@ Usage:
 
 Commands:
   guide    - Deploy or refresh the Master Server Guide interactive embed
+  headers  - Generate & deploy luxury 1920x450 studio channel header banners
 """)
 
 
 async def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "guide"
-    if cmd not in ["guide"]:
+    if cmd not in ["guide", "headers"]:
         print_help()
         return
 
@@ -85,6 +169,8 @@ async def main():
     async def on_ready():
         if cmd == "guide":
             await deploy_guide(client)
+        elif cmd == "headers":
+            await deploy_headers(client)
         await client.close()
 
     await client.start(TOKEN)
@@ -95,3 +181,4 @@ if __name__ == "__main__":
         print_help()
     else:
         asyncio.run(main())
+

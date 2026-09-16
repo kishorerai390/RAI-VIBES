@@ -11,6 +11,7 @@ from discord.ext import commands, tasks
 
 import database
 import config
+from utils.canvas import generate_rank_card, generate_profile_codex
 
 logger = logging.getLogger("Leveling")
 
@@ -310,7 +311,27 @@ class Leveling(commands.Cog):
         embed.set_footer(text=f"Requested by {interaction.user.display_name} • Give rep with /rep <user>!", icon_url=interaction.user.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
 
-        await interaction.response.send_message(embed=embed)
+        avatar_bytes = None
+        try:
+            avatar_bytes = await target.display_avatar.read()
+        except Exception:
+            pass
+
+        card_buf = generate_rank_card(
+            avatar_bytes=avatar_bytes,
+            username=target.display_name,
+            level=level,
+            current_xp=xp_in_level,
+            next_level_xp=xp_needed,
+            rank=rank,
+            coins=coins,
+            rep=rep,
+            messages=msg_count
+        )
+        file = discord.File(fp=card_buf, filename="rank.png")
+        embed.set_image(url="attachment://rank.png")
+
+        await interaction.response.send_message(embed=embed, file=file)
 
     @app_commands.command(name="coins", description="Check your current coin balance and economy status.")
     @app_commands.describe(member="Member to inspect (defaults to you)")
@@ -456,7 +477,30 @@ class Leveling(commands.Cog):
         )
 
         embed.set_footer(text="RAI VIBES 💗 • Unified Member Codex", icon_url=config.RAI_ICON_URL)
-        await interaction.response.send_message(embed=embed)
+
+        avatar_bytes = None
+        try:
+            avatar_bytes = await target.display_avatar.read()
+        except Exception:
+            pass
+
+        card_buf = generate_profile_codex(
+            avatar_bytes=avatar_bytes,
+            username=target.display_name,
+            level=lvl,
+            current_xp=xp,
+            req_xp=req_xp,
+            coins=coins,
+            rep=rep,
+            voice_hrs=voice_hrs,
+            pet_str=pet_str,
+            clan_str=clan_str,
+            join_date_str=joined_str
+        )
+        file = discord.File(fp=card_buf, filename="profile.png")
+        embed.set_image(url="attachment://profile.png")
+
+        await interaction.response.send_message(embed=embed, file=file)
 
 
 async def setup(bot: commands.Bot):
