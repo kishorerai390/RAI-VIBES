@@ -34,8 +34,10 @@ def is_channel_suppressed(channel: Optional[discord.VoiceChannel]) -> bool:
         return True
     if "➕" in channel.name and ("create" in norm_name or "join" in norm_name):
         return True
-    # Quiet, checking, or AFK channels
-    if any(w in norm_name for w in ("afk", "sleep", "💤", "checking", "check-in", "silent", "quiet", "study", "focus")):
+    # Quiet, checking, AFK, or 24/7 Lo-Fi channels
+    if channel.id == 1545781986193309789:
+        return True
+    if any(w in norm_name for w in ("afk", "sleep", "💤", "checking", "check-in", "silent", "quiet", "study", "focus", "lofi", "lo-fi", "ʟᴏ-ꜰɪ")):
         return True
     if channel.guild and channel.guild.afk_channel and channel.id == channel.guild.afk_channel.id:
         return True
