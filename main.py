@@ -349,6 +349,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.stream_alerts",
         "cogs.duels",
         "cogs.profile",
+        "cogs.counting",
     ]
 
     for extension in initial_extensions:

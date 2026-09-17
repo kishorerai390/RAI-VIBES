@@ -25,7 +25,7 @@ class Starboard(commands.Cog):
         starboard_chan = (
             discord.utils.get(guild.text_channels, name="hall-of-fame") or
             discord.utils.get(guild.text_channels, name="starboard") or
-            next((c for c in guild.text_channels if "hall" in c.name or "star" in c.name), None)
+            next((c for c in guild.text_channels if "hall" in c.name.lower() or "ʜᴀʟʟ" in c.name or "star" in c.name.lower() or "⭐" in c.name), None)
         )
         if not starboard_chan or channel.id == starboard_chan.id:
             return

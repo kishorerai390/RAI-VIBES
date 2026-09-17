@@ -363,6 +363,51 @@ class Casino(commands.Cog):
         embed.set_footer(text="RAI VIBES Casino • Double or Nothing")
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="dice", description="Roll high-stakes cyber dice against the bot!")
+    @app_commands.describe(bet="Amount of coins to bet")
+    async def dice(self, interaction: discord.Interaction, bet: int):
+        if bet < 20:
+            return await interaction.response.send_message("❌ Minimum bet is **20 Coins**!", ephemeral=True)
+
+        user_coins = get_coins(interaction.user.id)
+        if user_coins < bet:
+            return await interaction.response.send_message(f"❌ You only have **{user_coins:,} Coins**!", ephemeral=True)
+
+        add_coins(interaction.user.id, -bet)
+        user_roll = random.randint(1, 6)
+        bot_roll = random.randint(1, 6)
+
+        DICE_EMOJIS = {1: "⚀", 2: "⚁", 3: "⚂", 4: "⚃", 5: "⚄", 6: "⚅"}
+
+        if user_roll > bot_roll:
+            multiplier = 3.0 if user_roll == 6 else 2.0
+            winnings = int(bet * multiplier)
+            add_coins(interaction.user.id, winnings)
+            record_stats(interaction.user.id, won=True)
+            res = f"🎉 **VICTORY!** You won **+{winnings:,} Coins** ({multiplier}x multiplier)!"
+            color = 0x00FF88
+        elif user_roll == bot_roll:
+            add_coins(interaction.user.id, bet)  # refund
+            res = f"⚖️ **TIE!** Both rolled **{user_roll}**. Your bet of **{bet:,} Coins** was refunded!"
+            color = 0xFFD700
+        else:
+            record_stats(interaction.user.id, won=False)
+            res = f"💔 **DEFEAT!** The house wins. You lost **{bet:,} Coins**."
+            color = 0xFF4757
+
+        embed = discord.Embed(
+            title="🎲 ┊ 𝐂𝐘𝐁𝐄𝐑  𝐃𝐈𝐂Ｅ  𝐃𝐔𝐄𝐋",
+            description=(
+                f"**Your Roll:** {DICE_EMOJIS[user_roll]} `({user_roll})`\n"
+                f"**Bot Roll:**  {DICE_EMOJIS[bot_roll]} `({bot_roll})`\n\n"
+                f"{res}"
+            ),
+            color=color
+        )
+        embed.set_footer(text="RAI VIBES Casino • High Rollers Arena")
+        await interaction.response.send_message(embed=embed)
+
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Casino(bot))
