@@ -350,6 +350,8 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.duels",
         "cogs.profile",
         "cogs.counting",
+        "cogs.confessions",
+        "cogs.social",
     ]
 
     for extension in initial_extensions:

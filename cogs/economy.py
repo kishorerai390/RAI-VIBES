@@ -753,6 +753,161 @@ class Economy(commands.Cog):
         embed.set_footer(text="Earn coins by chatting or relaxing in VC (+5 coins every 2 min)!", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
+    # 10. WORK COMMAND
+    @app_commands.command(name="work", description="Work an honest shift to earn 150-400 Rai Coins!")
+    async def work_command(self, interaction: discord.Interaction):
+        uid = str(interaction.user.id)
+        data = load_economy()
+        udata = data.setdefault(uid, {"coins": 200, "last_daily": 0, "streak": 0, "rep": 0, "last_rep": 0})
+
+        now = int(time.time())
+        last_work = udata.get("last_work", 0)
+        cooldown = 1800  # 30 mins
+
+        if now - last_work < cooldown:
+            remaining = (cooldown - (now - last_work)) // 60
+            return await interaction.response.send_message(f"⏳ You are exhausted! Rest up and work again in **{remaining} minutes**.", ephemeral=True)
+
+        JOBS = [
+            ("🎧 Hosted a packed DJ session in Vibe Studio", random.randint(200, 450)),
+            ("☕ Brewed iced matcha lattes at the Cyber Cafe", random.randint(180, 380)),
+            ("💻 Fixed a memory leak in the server bot code", random.randint(250, 500)),
+            ("🌸 Designed an aesthetic banner for RAI FAM", random.randint(200, 420)),
+            ("🎮 Won a local gaming tournament in BGMI", random.randint(220, 480)),
+            ("🎵 Mastered an exclusive lo-fi chill hop track", random.randint(190, 400)),
+            ("📦 Delivered bubble tea orders around Neo Tokyo", random.randint(150, 350))
+        ]
+        job_desc, earned = random.choice(JOBS)
+
+        udata["coins"] = udata.get("coins", 0) + earned
+        udata["last_work"] = now
+        save_economy(data)
+
+        embed = discord.Embed(
+            title="💼 ┊ 𝐒𝐇𝐈𝐅𝐓  𝐂𝐎𝐌𝐏𝐋𝐄𝐓𝐄!",
+            description=f"{job_desc}!\n\n💰 **Earned:** `+{earned:,} 🪙 Rai Coins`\n💳 **Wallet Balance:** `{udata['coins']:,} Coins`",
+            color=0x00FF88
+        )
+        embed.set_footer(text="RAI FAM 💗 • Career Matrix • Cooldown: 30m", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+    # 11. CRIME COMMAND
+    @app_commands.command(name="crime", description="Commit a high-stakes cyber heist for big coins or a heavy fine!")
+    async def crime_command(self, interaction: discord.Interaction):
+        uid = str(interaction.user.id)
+        data = load_economy()
+        udata = data.setdefault(uid, {"coins": 200, "last_daily": 0, "streak": 0, "rep": 0, "last_rep": 0})
+
+        now = int(time.time())
+        last_crime = udata.get("last_crime", 0)
+        cooldown = 2700  # 45 mins
+
+        if now - last_crime < cooldown:
+            remaining = (cooldown - (now - last_crime)) // 60
+            return await interaction.response.send_message(f"🚨 The heat is on! Wait **{remaining} minutes** for the police sirens to clear.", ephemeral=True)
+
+        success = random.random() < 0.55
+        udata["last_crime"] = now
+
+        if success:
+            earned = random.randint(550, 1200)
+            udata["coins"] = udata.get("coins", 0) + earned
+            save_economy(data)
+
+            CRIMES_SUCCESS = [
+                f"🥷 You hacked the Neo-Tokyo crypto exchange and siphoned **+{earned:,} Coins**!",
+                f"💎 You pickpocketed a shady black-market vendor and escaped with **+{earned:,} Coins**!",
+                f"🏎️ You outran the cyber police after a street race and secured **+{earned:,} Coins**!"
+            ]
+            embed = discord.Embed(
+                title="🕶️ ┊ 𝐇𝐄𝐈𝐒𝐓  𝐒𝐔𝐂𝐂𝐄𝐒𝐒!",
+                description=random.choice(CRIMES_SUCCESS) + f"\n\n💳 **New Balance:** `{udata['coins']:,} Coins`",
+                color=0xFFD700
+            )
+        else:
+            fine = random.randint(300, 600)
+            udata["coins"] = max(0, udata.get("coins", 0) - fine)
+            save_economy(data)
+
+            CRIMES_FAIL = [
+                f"🚨 Sentinel security tripped the silent alarm! You were fined **-{fine:,} Coins**.",
+                f"🚔 A cyber patrol drone caught you in an alley! You paid **-{fine:,} Coins** bail.",
+                f"⚡ Your hacking deck short-circuited! Repairs cost **-{fine:,} Coins**."
+            ]
+            embed = discord.Embed(
+                title="🚨 ┊ 𝐁𝐔𝐒𝐓𝐄𝐃!",
+                description=random.choice(CRIMES_FAIL) + f"\n\n💳 **Remaining Balance:** `{udata['coins']:,} Coins`",
+                color=0xFF4757
+            )
+
+        embed.set_footer(text="RAI FAM 💗 • Underworld Syndicates • Cooldown: 45m", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+    # 12. ROB COMMAND
+    @app_commands.command(name="rob", description="Attempt to pickpocket Rai Coins from another member!")
+    @app_commands.describe(member="The target member you want to rob")
+    async def rob_command(self, interaction: discord.Interaction, member: discord.Member):
+        if member.id == interaction.user.id:
+            return await interaction.response.send_message("❌ You cannot rob your own pockets!", ephemeral=True)
+        if member.bot:
+            return await interaction.response.send_message("🤖 Bots keep their coins in an encrypted firewall!", ephemeral=True)
+        if member.id == OWNER_ID:
+            return await interaction.response.send_message("👑 The Server Owner is protected by divine royal immunity! You dare not steal from the throne.", ephemeral=True)
+
+        data = load_economy()
+        robber_data = data.setdefault(str(interaction.user.id), {"coins": 200})
+        victim_data = data.setdefault(str(member.id), {"coins": 200})
+
+        if victim_data.get("coins", 0) < 100:
+            return await interaction.response.send_message(f"💔 {member.display_name} is broke and only has `{victim_data.get('coins', 0)} Coins`. Have some mercy!", ephemeral=True)
+        if robber_data.get("coins", 0) < 100:
+            return await interaction.response.send_message("❌ You need at least **100 Coins** in your wallet to risk a robbery fine!", ephemeral=True)
+
+        now = int(time.time())
+        last_rob = robber_data.get("last_rob", 0)
+        cooldown = 3600  # 1 hour
+        if now - last_rob < cooldown:
+            rem = (cooldown - (now - last_rob)) // 60
+            return await interaction.response.send_message(f"⏳ Lie low! You can rob again in **{rem} minutes**.", ephemeral=True)
+
+        robber_data["last_rob"] = now
+        success = random.random() < 0.40
+
+        if success:
+            stolen_pct = random.uniform(0.10, 0.25)
+            stolen = max(10, int(victim_data.get("coins", 0) * stolen_pct))
+            victim_data["coins"] = max(0, victim_data.get("coins", 0) - stolen)
+            robber_data["coins"] = robber_data.get("coins", 0) + stolen
+            save_economy(data)
+
+            embed = discord.Embed(
+                title="💰 ┊ 𝐒𝐔𝐂𝐂𝐄𝐒𝐒𝐅𝐔𝐋  𝐇𝐄𝐈𝐒𝐓!",
+                description=(
+                    f"🧤 You silently swiped **+{stolen:,} 🪙 Rai Coins** from {member.mention}!\n\n"
+                    f"💳 **Your Wallet:** `{robber_data['coins']:,} Coins`"
+                ),
+                color=0x00FF88
+            )
+        else:
+            penalty = min(250, robber_data.get("coins", 0))
+            robber_data["coins"] = max(0, robber_data.get("coins", 0) - penalty)
+            victim_data["coins"] = victim_data.get("coins", 0) + penalty
+            save_economy(data)
+
+            embed = discord.Embed(
+                title="🚨 ┊ 𝐂𝐀𝐔𝐆𝐇𝐓  𝐑𝐄𝐃-𝐇𝐀𝐍𝐃𝐄𝐃!",
+                description=(
+                    f"💥 {member.mention} caught you trying to pickpocket them!\n"
+                    f"You were forced to pay them a penalty of **-{penalty:,} 🪙 Rai Coins**!\n\n"
+                    f"💳 **Your Wallet:** `{robber_data['coins']:,} Coins`"
+                ),
+                color=0xFF4757
+            )
+
+        embed.set_footer(text="RAI FAM 💗 • Street Hustle • Cooldown: 1h", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
+
     await bot.add_cog(Economy(bot))
