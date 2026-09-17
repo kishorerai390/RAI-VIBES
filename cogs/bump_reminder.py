@@ -12,7 +12,7 @@ logger = logging.getLogger("BumpReminder")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATE_FILE = DATA_DIR / "bump_state.json"
-GENERAL_CHAN_ID = 1545502730699808768
+BOT_CMDS_CHAN_ID = 1549416359723532480  # #🤖｜ʙᴏᴛ-ᴄᴍᴅꜱ
 DISBOARD_BOT_ID = 302050872383242240
 COOLDOWN_SECONDS = 7200  # 2 Hours
 
@@ -83,8 +83,8 @@ class BumpReminder(commands.Cog):
         if last_bump > 0 and not reminder_sent:
             elapsed = now - last_bump
             if elapsed >= COOLDOWN_SECONDS:
-                gen_chan = self.bot.get_channel(GENERAL_CHAN_ID)
-                if gen_chan:
+                bot_chan = self.bot.get_channel(BOT_CMDS_CHAN_ID)
+                if bot_chan:
                     embed = discord.Embed(
                         title="<a:pinkflame:1547271954841731193> ✦ DISBOARD BUMP IS READY! ✦ <a:pinkflame:1547271954841731193>",
                         description=(
@@ -98,10 +98,10 @@ class BumpReminder(commands.Cog):
                     )
                     embed.set_footer(text="RAI VIBES • Auto Growth Engine 📈")
                     try:
-                        await gen_chan.send(embed=embed)
+                        await bot_chan.send(embed=embed)
                         self.state["reminder_sent"] = True
                         save_state(self.state)
-                        logger.info("Sent 2-hour bump reminder to #general!")
+                        logger.info("Sent 2-hour bump reminder to #bot-cmds!")
                     except Exception as e:
                         logger.error(f"Failed to send bump reminder: {e}")
 

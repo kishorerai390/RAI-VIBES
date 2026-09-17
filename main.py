@@ -107,6 +107,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.pets import PetCareView
         from cogs.lfg import LFGView
         from cogs.party_games import PartyGamesView
+        from cogs.arcade_panel import ArcadeStationView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
@@ -125,6 +126,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(PetCareView(owner_id=0))
         b.add_view(LFGView())
         b.add_view(PartyGamesView())
+        b.add_view(ArcadeStationView())
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")
@@ -411,6 +413,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.antiraid",
         "cogs.antinuke",
         "cogs.whitelist",
+        "cogs.arcade_panel",
     ]
 
     for extension in initial_extensions:
