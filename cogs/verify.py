@@ -47,8 +47,8 @@ def award_welcome_bonus(user_id: str):
 SMALL_CAPS_MAP = str.maketrans("ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ", "abcdefghijklmnopqrstuvwxyz")
 
 def clean_str(s: str) -> str:
-    """Normalize and convert unicode small-caps characters to standard ascii lowercase."""
-    return s.translate(SMALL_CAPS_MAP).lower()
+    """Normalize unicode small-caps, replace non-breaking spaces, and convert to lowercase."""
+    return s.replace("\xa0", " ").translate(SMALL_CAPS_MAP).strip().lower()
 
 
 class VerifiedNextStepsView(View):
