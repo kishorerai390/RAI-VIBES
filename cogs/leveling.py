@@ -208,8 +208,34 @@ class Leveling(commands.Cog):
             await self.handle_level_up(message.guild, message.author, new_lvl, message.channel)
 
     async def handle_level_up(self, guild: discord.Guild, member: discord.Member, new_level: int, channel: discord.abc.Messageable):
-        """Sends luxury level-up celebration canvas and awards coin bonus."""
+        """Sends luxury level-up celebration canvas and awards coin bonus with milestone perks."""
         coin_bonus = new_level * 50
+
+        # Milestone Perks Definition
+        MILESTONES = {
+            5: {"title": "🥉 Bronze Voyager", "bonus": 250, "perk": "Custom chat titles & shop discount eligibility!"},
+            10: {"title": "🥈 Silver Challenger", "bonus": 500, "perk": "Priority reactions & VIP chat recognition!"},
+            15: {"title": "🥇 Gold Champion", "bonus": 1000, "perk": "Unlocked **✦ ᴅᴊ** role & DJ deck permissions!", "role_id": 1545834928221069522},
+            20: {"title": "💎 Diamond Virtuoso", "bonus": 2000, "perk": "Unlocked `/priority` DJ queue bump & VIP lounge access!"},
+            25: {"title": "👑 RAI Legend", "bonus": 5000, "perk": "Permanent Hall-of-Fame glory & custom personal status!"},
+            30: {"title": "✨ Celestial Apex", "bonus": 10000, "perk": "Immortalized server legend status & maximum perks!"}
+        }
+
+        milestone_data = MILESTONES.get(new_level)
+        milestone_text = ""
+        if milestone_data:
+            extra = milestone_data["bonus"]
+            coin_bonus += extra
+            milestone_text = f"\n\n🏆 **MILESTONE REACHED: {milestone_data['title']}**\n🎁 **Milestone Perk:** {milestone_data['perk']}"
+            if "role_id" in milestone_data:
+                role = guild.get_role(milestone_data["role_id"])
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role, reason=f"Level {new_level} Milestone Unlock")
+                        milestone_text += f"\n✨ **Role Awarded:** {role.mention}"
+                    except Exception as re:
+                        logger.warning(f"Could not assign milestone role: {re}")
+
         award_vc_coins(member.id, coin_bonus)
 
         # Target announcement channel: #⭐・ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ (1549407114861215815)
@@ -232,11 +258,11 @@ class Leveling(commands.Cog):
         embed = discord.Embed(
             title="⭐ ✦ LEVEL UP ADVANCEMENT ✦ ⭐",
             description=(
-                f"Congratulations {member.mention}! You ascended to **Level {new_level}**!\n\n"
-                f"🪙 **Bonus Coins Awarded:** `+{coin_bonus} Coins`\n"
+                f"Congratulations {member.mention}! You ascended to **Level {new_level}**!{milestone_text}\n\n"
+                f"🪙 **Bonus Coins Awarded:** `+{coin_bonus:,} Coins`\n"
                 f"✨ Keep chatting and participating in voice lounges to climb the leaderboards!"
             ),
-            color=0x00FF88
+            color=0xFFD700 if milestone_data else 0x00FF88
         )
         if card_file:
             embed.set_image(url="attachment://levelup_advancement.png")
@@ -526,6 +552,44 @@ class Leveling(commands.Cog):
             logger.warning(f"Failed to generate profile codex canvas: {e}")
             await interaction.response.send_message(embed=embed, ephemeral=(not visible))
 
+    @app_commands.command(name="milestones", description="View all server level milestones, coin rewards, and prestige unlocks.")
+    async def milestones_command(self, interaction: discord.Interaction):
+        MILESTONES = {
+            5: {"title": "🥉 Bronze Voyager", "bonus": 250, "perk": "Custom chat titles & shop discount eligibility"},
+            10: {"title": "🥈 Silver Challenger", "bonus": 500, "perk": "Priority reactions & VIP chat recognition"},
+            15: {"title": "🥇 Gold Champion", "bonus": 1000, "perk": "Unlocked **✦ ᴅᴊ** role & DJ deck permissions", "role_id": 1545834928221069522},
+            20: {"title": "💎 Diamond Virtuoso", "bonus": 2000, "perk": "Unlocked `/priority` DJ queue bump & VIP lounge access"},
+            25: {"title": "👑 RAI Legend", "bonus": 5000, "perk": "Permanent Hall-of-Fame glory & custom personal status"},
+            30: {"title": "✨ Celestial Apex", "bonus": 10000, "perk": "Immortalized server legend status & maximum perks"}
+        }
+
+        user_data = await database.get_user_level_data(interaction.guild.id, interaction.user.id)
+        current_lvl = user_data["level"]
+
+        embed = discord.Embed(
+            title="🏆 ✦ RAI FAM LEVEL MILESTONES & PERKS ✦ 🏆",
+            description=(
+                f"Your current status: **Level {current_lvl}**\n"
+                f"Earn XP naturally by chatting in text lounges and chilling in voice rooms!\n"
+                f"Each milestone rewards lump-sum coin vaults and unlocks exclusive perks.\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            ),
+            color=0xFFD700
+        )
+
+        for lvl, data in sorted(MILESTONES.items()):
+            status_icon = "✅" if current_lvl >= lvl else "🔒"
+            role_hint = f" • Auto-Role: <@&{data['role_id']}>" if "role_id" in data else ""
+            embed.add_field(
+                name=f"{status_icon} Level {lvl} — {data['title']}",
+                value=f"🪙 **Bonus:** `+{data['bonus']:,} Coins`{role_hint}\n✨ **Perk:** {data['perk']}",
+                inline=False
+            )
+
+        embed.set_footer(text="RAI VIBES Leveling Suite • Earn coins & prestige", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Leveling(bot))
+

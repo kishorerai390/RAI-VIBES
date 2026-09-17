@@ -273,14 +273,38 @@ class WelcomeQuickActionsView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="👋 Say Hi!", style=discord.ButtonStyle.success, emoji="🎉", custom_id="welcome_sayhi_btn")
+    @discord.ui.button(label="👋 Say Hi! (+50 Coins)", style=discord.ButtonStyle.success, emoji="🎉", custom_id="welcome_sayhi_btn")
     async def say_hi_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id == self.member_id:
             return await interaction.response.send_message("👋 Welcome to the server! We are so glad to have you here! 💗", ephemeral=True)
-        await interaction.response.send_message(
-            f"🎉 {interaction.user.mention} says: **`Welcome to RAI FAM, {self.member_mention}! Glad you're here! 🌸✨`**",
-            ephemeral=False
+
+        # Prevent duplicate welcomes on the same newcomer from the same user
+        if not hasattr(self, "_welcomed_users"):
+            self._welcomed_users = set()
+        if interaction.user.id in self._welcomed_users:
+            return await interaction.response.send_message(f"🌸 You have already welcomed {self.member_mention}!", ephemeral=True)
+
+        self._welcomed_users.add(interaction.user.id)
+
+        # Award +50 coins to welcoming member and newcomer
+        try:
+            from cogs.casino import add_coins
+            add_coins(interaction.user.id, 50)
+            add_coins(self.member_id, 50)
+        except Exception:
+            pass
+
+        embed = discord.Embed(
+            title="👋 ┊ 𝐖𝐀𝐑𝐌  𝐖𝐄𝐋𝐂𝐎𝐌𝐄!",
+            description=(
+                f"🎉 {interaction.user.mention} says:\n"
+                f"> **`Welcome to RAI FAM, {self.member_mention}! So glad you're here! 🌸✨`**\n\n"
+                f"🪙 **Bonus Awarded:** `+50 Rai Coins` credited to both {interaction.user.mention} and {self.member_mention}!"
+            ),
+            color=0x2ED573
         )
+        embed.set_footer(text="RAI FAM 💗 • Welcome Energy", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
 class Welcome(commands.Cog):
