@@ -174,6 +174,43 @@ class DJ(commands.Cog):
         else:
             await ctx.send(f"🗳️ **Vote added!** `{current_votes}/{required_votes}` listeners have voted to skip. *(Need {required_votes - current_votes} more)*")
 
+    @commands.hybrid_command(name="priority", aliases=["bump"], description="Bump a song to priority position #1 in queue (DJ / Staff only).")
+    @app_commands.describe(song="Song name or link to insert at the front of queue")
+    async def priority_track(self, ctx: commands.Context, *, song: str):
+        if not self.is_dj_or_admin(ctx.author):
+            return await ctx.send("❌ Only designated DJs and Server Staff can use `/priority` queue bumping!", ephemeral=True)
+
+        music_cog = self.bot.get_cog("Music")
+        if not music_cog:
+            return await ctx.send("❌ Music engine not available.", ephemeral=True)
+
+        player = music_cog.get_player(ctx.guild.id)
+        if not player:
+            return await ctx.send("❌ No active player in this server.", ephemeral=True)
+
+        from cogs.music import Song
+        if ctx.interaction:
+            await ctx.defer()
+
+        song_obj = await Song.create_source(song, ctx.author, self.bot.loop)
+        if not song_obj:
+            return await ctx.send(f"❌ Could not resolve song: `{song}`")
+
+        player.queue.appendleft(song_obj)
+        embed = discord.Embed(
+            title="⚡ ┊ 𝐏𝐑𝐈𝐎𝐑𝐈𝐓𝐘  𝐐𝐔𝐄𝐔𝐄  𝐁𝐔𝐌𝐏!",
+            description=(
+                f"👑 **DJ Bump by {ctx.author.mention}!**\n\n"
+                f"🎵 **Next Up:** [{song_obj.title}]({song_obj.webpage_url})\n"
+                f"⏱️ **Duration:** `{song_obj.duration // 60}:{song_obj.duration % 60:02d}`\n"
+                f"⚡ *This track will play immediately after the current song finishes!*"
+            ),
+            color=0xFFD700
+        )
+        embed.set_thumbnail(url=song_obj.thumbnail or config.RAI_ICON_URL)
+        embed.set_footer(text="RAI VIBES 💗 • VIP Priority DJ System", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(DJ(bot))

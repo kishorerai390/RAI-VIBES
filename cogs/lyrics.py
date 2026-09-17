@@ -152,8 +152,46 @@ class Lyrics(commands.Cog):
         )
         embed.set_author(name=f"{data.get('author', 'Artist')} • Lyrics", icon_url=config.RAI_ICON_URL)
         embed.set_thumbnail(url=data.get("thumbnail") or thumbnail_url)
-        embed.set_footer(text=f"RAI VIBES 💗 • Source: {data.get('source', 'Synced Lyrics')}", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="karaoke", description="Display interactive karaoke card with synced lines.")
+    @app_commands.describe(song="Optional song name (defaults to playing track)")
+    async def karaoke(self, ctx: commands.Context, *, song: Optional[str] = None):
+        if ctx.interaction:
+            await ctx.defer()
+
+        target_song = song
+        thumbnail_url = config.RAI_ICON_URL
+
+        if not target_song:
+            music_cog = self.bot.get_cog("Music")
+            player = music_cog.get_player(ctx.guild.id) if music_cog else None
+            if player and player.current:
+                target_song = player.current.title
+                thumbnail_url = player.current.thumbnail or config.RAI_ICON_URL
+            else:
+                return await ctx.send("❌ No music playing. Specify a track name: `/karaoke <song>`")
+
+        data = await self.fetch_lyrics(target_song)
+        if not data or not data.get("lyrics"):
+            return await ctx.send(f"⚠️ Karaoke lyrics could not be found for `{target_song}`.")
+
+        lines = [line.strip() for line in data["lyrics"].split("\n") if line.strip()]
+        display_lines = lines[:24]
+
+        embed = discord.Embed(
+            title=f"🎙️ ┊ 𝐊𝐀𝐑𝐀𝐎𝐊𝐄  𝐌𝐎𝐃𝐄: {data.get('title', target_song)}",
+            description=(
+                f"**Artist:** `{data.get('author', 'Various')}`\n"
+                f"✦ ───────────────────────────────────── ✦\n\n"
+                + "\n".join(f"🎶 {l}" for l in display_lines) +
+                f"\n\n✦ ───────────────────────────────────── ✦\n"
+                f"✨ *Sing along in voice lounge! Synced audio streaming.*"
+            ),
+            color=0xFF1493
+        )
+        embed.set_thumbnail(url=data.get("thumbnail") or thumbnail_url)
+        embed.set_footer(text="RAI VIBES 💗 • Karaoke Sound Engine", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
 

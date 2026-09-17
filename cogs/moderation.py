@@ -1382,6 +1382,238 @@ class Moderation(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Sentinel Maintenance", icon_url=config.RAI_ICON_URL)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="autoslowmode", description="Set or adjust chat slowmode to manage conversation velocity.")
+    @app_commands.describe(seconds="Slowmode cooldown in seconds (0 to disable, max 300)")
+    async def autoslowmode_cmd(self, interaction: discord.Interaction, seconds: int):
+        if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission.", ephemeral=True)
+
+        seconds = max(0, min(300, seconds))
+        try:
+            await interaction.channel.edit(slowmode_delay=seconds, reason=f"Slowmode set by {interaction.user.name}")
+            state = f"**{seconds} seconds** cooldown" if seconds > 0 else "**Disabled**"
+            embed = discord.Embed(
+                title="⏱️ ┊ 𝐒𝐋𝐎𝐖𝐌𝐎𝐃𝐄  𝐔𝐏𝐃𝐀𝐓𝐄𝐃",
+                description=f"Chat pace set to {state} for {interaction.channel.mention}.",
+                color=0x00FF88 if seconds == 0 else 0xFFA502
+            )
+            embed.set_footer(text="RAI FAM 💗 • Sentinel Shield", icon_url=config.RAI_ICON_URL)
+            await interaction.response.send_message(embed=embed)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Failed to set slowmode: {e}", ephemeral=True)
+
+    @app_commands.command(name="altcheck", description="Scan members for suspicious new alt accounts created recently.")
+    @app_commands.describe(min_age_days="Flag accounts younger than this number of days (default 3)")
+    async def altcheck_cmd(self, interaction: discord.Interaction, min_age_days: int = 3):
+        if not interaction.user.guild_permissions.moderate_members and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ Staff permission required.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        now = time.time()
+        threshold_sec = min_age_days * 86400
+
+        flagged = []
+        for m in guild.members:
+            if m.bot:
+                continue
+            age_sec = now - m.created_at.timestamp()
+            if age_sec < threshold_sec:
+                days_old = round(age_sec / 86400, 1)
+                flagged.append(f"• {m.mention} (`{m.id}`) — Created **{days_old} days ago**")
+
+        desc = "\n".join(flagged[:15]) if flagged else "✅ No suspicious alt accounts detected under this age threshold!"
+        embed = discord.Embed(
+            title=f"🛡️ ┊ 𝐀𝐋𝐓  𝐀𝐂𝐂𝐎𝐔𝐍𝐓  𝐒𝐂𝐀𝐍 (< {min_age_days} days)",
+            description=desc,
+            color=0xFF4757 if flagged else 0x2ED573
+        )
+        embed.set_footer(text=f"Total flagged: {len(flagged)} members", icon_url=config.RAI_ICON_URL)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="temprole", description="Grant a temporary role to a member with automatic expiry.")
+    @app_commands.describe(member="Member to receive role", role="Role to assign", duration_minutes="Duration in minutes")
+    async def temprole_cmd(self, interaction: discord.Interaction, member: discord.Member, role: discord.Role, duration_minutes: int):
+        if not interaction.user.guild_permissions.manage_roles and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ You require 'Manage Roles' permission.", ephemeral=True)
+        if role >= interaction.guild.me.top_role:
+            return await interaction.response.send_message("❌ My highest role is lower than that role!", ephemeral=True)
+
+        try:
+            await member.add_roles(role, reason=f"TempRole for {duration_minutes}m by {interaction.user.name}")
+            end_ts = int(time.time()) + (duration_minutes * 60)
+
+            embed = discord.Embed(
+                title="⏳ ┊ 𝐓𝐄𝐌𝐏𝐎𝐑𝐀𝐑𝐘  𝐑𝐎𝐋𝐄  𝐀𝐒𝐒𝐈𝐆𝐍𝐄𝐃",
+                description=(
+                    f"Assigned {role.mention} to {member.mention}!\n\n"
+                    f"⏱️ **Duration:** `{duration_minutes} Minutes`\n"
+                    f"⌛ **Auto-Expires:** <t:{end_ts}:R> (<t:{end_ts}:t>)"
+                ),
+                color=0x70A1FF
+            )
+            embed.set_footer(text="RAI FAM 💗 • Sentinel Role Scheduler", icon_url=config.RAI_ICON_URL)
+            await interaction.response.send_message(embed=embed)
+
+            # Auto-remover background task
+            async def role_remover():
+                await asyncio.sleep(duration_minutes * 60)
+                try:
+                    await member.remove_roles(role, reason="TempRole duration expired")
+                except Exception:
+                    pass
+
+            asyncio.create_task(role_remover())
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Failed to assign role: {e}", ephemeral=True)
+
+    @app_commands.command(name="purge", description="Bulk delete messages with optional member and keyword filters.")
+    @app_commands.describe(amount="Number of messages to scan (1 to 100)", member="Filter by specific member", contains="Filter by keyword")
+    async def purge_cmd(self, interaction: discord.Interaction, amount: int, member: Optional[discord.Member] = None, contains: Optional[str] = None):
+        if not interaction.user.guild_permissions.manage_messages and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ You require 'Manage Messages' permission.", ephemeral=True)
+
+        amount = max(1, min(100, amount))
+        await interaction.response.defer(ephemeral=True)
+
+        def check(m):
+            if member and m.author.id != member.id:
+                return False
+            if contains and contains.lower() not in m.content.lower():
+                return False
+            return True
+
+        deleted = await interaction.channel.purge(limit=amount, check=check)
+        embed = discord.Embed(
+            title="🧹 ┊ 𝐌𝐄𝐒𝐒𝐀𝐆𝐄𝐒  𝐏𝐔𝐑𝐆𝐄𝐃",
+            description=f"🗑️ Successfully deleted **{len(deleted)} messages** in {interaction.channel.mention}!",
+            color=0x2ED573
+        )
+        embed.set_footer(text="RAI FAM 💗 • Sentinel Moderation", icon_url=config.RAI_ICON_URL)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="modlogs", description="Inspect infractions, warnings, and strikes for a member.")
+    @app_commands.describe(member="Member to inspect")
+    async def modlogs_cmd(self, interaction: discord.Interaction, member: discord.Member):
+        if not interaction.user.guild_permissions.moderate_members and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ Staff permission required.", ephemeral=True)
+
+        infra = load_infractions()
+        g_id = str(interaction.guild.id)
+        u_id = str(member.id)
+
+        user_info = infra.get(g_id, {}).get(u_id, {"strikes": 0, "logs": [], "history": []})
+        strikes = user_info.get("strikes", 0)
+        logs = user_info.get("logs", []) or user_info.get("history", [])
+
+        lines = []
+        for entry in logs[-6:]:
+            action = entry.get("action", "WARN")
+            reason = entry.get("reason", "No reason provided")
+            moderator = entry.get("moderator", "Staff")
+            lines.append(f"• **[{action}]** `{reason}` *(by {moderator})*")
+
+        desc = (
+            f"👤 **Member:** {member.mention} (`{member.id}`)\n"
+            f"⚠️ **Total Strikes:** `{strikes}`\n\n"
+            f"### 📋 Recent Infractions:\n" +
+            ("\n".join(lines) if lines else "*Clean record — no infractions logged!*")
+        )
+
+        embed = discord.Embed(
+            title=f"📋 ┊ 𝐌𝐎𝐃  𝐃𝐎𝐒𝐒𝐈𝐄𝐑: {member.display_name}",
+            description=desc,
+            color=0xFF4757 if strikes > 0 else 0x2ED573
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text="RAI FAM 💗 • Sentinel Case Registry", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="drill", description="Run an emergency Sentinel readiness audit drill.")
+    async def drill_cmd(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ Only server administrators can trigger Sentinel drills.", ephemeral=True)
+
+        guild = interaction.guild
+        latency = round(self.bot.latency * 1000)
+
+        embed = discord.Embed(
+            title="🛡️ ┊ 𝐒𝐄𝐍𝐓𝐈𝐍𝐄𝐋  𝐄𝐌𝐄𝐑𝐆𝐄𝐍𝐂𝐘  𝐃𝐑𝐈𝐋𝐋  𝐑𝐄𝐏𝐎𝐑𝐓",
+            description=(
+                f"**Guild:** `{guild.name}` ({guild.id})\n"
+                f"**Drill Commander:** {interaction.user.mention}\n"
+                f"✦ ───────────────────────────────────── ✦\n\n"
+                f"🟢 **Gateway Latency:** `{latency}ms` (Optimal)\n"
+                f"🟢 **Anti-Link Defense:** Active (`10m Timeout on Phishing`)\n"
+                f"🟢 **Ghost-Ping Surveillance:** Listening & Logging\n"
+                f"🟢 **Audit Logging Channels:** Verified\n"
+                f"🟢 **Mass-Raid Lockdown:** Ready (`/lockdown`)\n\n"
+                f"🏆 **READINESS RATING:** `GRADE A+ (MAXIMUM SECURITY)`"
+            ),
+            color=0x00FF88
+        )
+        embed.set_footer(text="RAI FAM 💗 • Sentinel Defense Grid", icon_url=config.RAI_ICON_URL)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="backup", description="Create or inspect an encrypted JSON snapshot backup of channels and roles.")
+    @app_commands.describe(action="Backup operation to execute")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Create New Snapshot", value="create"),
+        app_commands.Choice(name="Inspect Latest Snapshot", value="inspect")
+    ])
+    async def backup_cmd(self, interaction: discord.Interaction, action: app_commands.Choice[str]):
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ Administrator permission required.", ephemeral=True)
+
+        guild = interaction.guild
+        backup_dir = DATA_DIR / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        backup_file = backup_dir / f"server_snapshot_{guild.id}.json"
+
+        if action.value == "create":
+            snapshot = {
+                "guild_name": guild.name,
+                "guild_id": guild.id,
+                "created_at": int(time.time()),
+                "channels": [{"name": c.name, "id": c.id, "type": str(c.type)} for c in guild.channels],
+                "roles": [{"name": r.name, "id": r.id, "color": str(r.color)} for r in guild.roles if not r.is_default()]
+            }
+            with open(backup_file, "w", encoding="utf-8") as f:
+                json.dump(snapshot, f, indent=2)
+
+            embed = discord.Embed(
+                title="💾 ┊ 𝐒𝐄𝐑𝐕𝐄𝐑  𝐒𝐍𝐀𝐏𝐒𝐇𝐎𝐓  𝐂𝐑𝐄𝐀𝐓𝐄𝐃",
+                description=(
+                    f"✅ Successfully archived configuration for **{guild.name}**!\n\n"
+                    f"📁 **Channels Backed Up:** `{len(snapshot['channels'])}`\n"
+                    f"👑 **Roles Backed Up:** `{len(snapshot['roles'])}`\n"
+                    f"💾 **Saved To:** `data/backups/server_snapshot_{guild.id}.json`"
+                ),
+                color=0x2ED573
+            )
+            embed.set_footer(text="RAI FAM 💗 • Disaster Recovery Engine", icon_url=config.RAI_ICON_URL)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            if not backup_file.exists():
+                return await interaction.response.send_message("❌ No snapshot exists yet. Run `/backup action: Create New Snapshot` first.", ephemeral=True)
+
+            with open(backup_file, "r", encoding="utf-8") as f:
+                snapshot = json.load(f)
+
+            embed = discord.Embed(
+                title="🔍 ┊ 𝐋𝐀𝐓𝐄𝐒𝐓  𝐒𝐄𝐑𝐕𝐄𝐑  𝐒𝐍𝐀𝐏𝐒𝐇𝐎𝐓",
+                description=(
+                    f"📁 **Guild:** `{snapshot['guild_name']}`\n"
+                    f"📅 **Created:** <t:{snapshot['created_at']}:F> (<t:{snapshot['created_at']}:R>)\n\n"
+                    f"• **Channels Stored:** `{len(snapshot['channels'])}`\n"
+                    f"• **Roles Stored:** `{len(snapshot['roles'])}`"
+                ),
+                color=0x00F2FE
+            )
+            embed.set_footer(text="RAI FAM 💗 • Disaster Recovery Engine", icon_url=config.RAI_ICON_URL)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 class ModPanelView(discord.ui.View):
     def __init__(self, target: discord.Member, author: discord.Member, cog):

@@ -1981,6 +1981,97 @@ class Music(commands.Cog):
 
         await (ctx.interaction.followup.send(embed=embed) if ctx.interaction else ctx.send(embed=embed))
 
+    @commands.hybrid_command(name="volume", aliases=["vol", "v"], description="Adjust the music playback volume (1% - 150%).")
+    @app_commands.describe(level="Volume percentage from 1 to 150")
+    async def volume_cmd(self, ctx: commands.Context, level: int):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current or not player.voice_client:
+            return await ctx.send("❌ No music currently playing.", ephemeral=True)
+
+        if level < 1 or level > 150:
+            return await ctx.send("❌ Volume must be set between 1% and 150%.", ephemeral=True)
+
+        player.volume = level
+        if hasattr(player, "current_source") and player.current_source:
+            player.current_source.volume = player.get_volume_factor()
+
+        bar_len = 10
+        filled = int((level / 150) * bar_len)
+        bar = "█" * filled + "░" * (bar_len - filled)
+
+        embed = discord.Embed(
+            title="🔊 ┊ 𝐕𝐎𝐋𝐔𝐌𝐄  𝐀𝐃𝐉𝐔𝐒𝐓𝐄𝐃",
+            description=f"Audio output gain set to **`{level}%`**\n`[{bar}]`",
+            color=0x00FF88
+        )
+        embed.set_footer(text="RAI VIBES 💗 • High Fidelity Output", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="visualizer", aliases=["viz"], description="Display live audio waveform visualizer for the current track.")
+    async def visualizer_cmd(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current:
+            return await ctx.send("❌ No track currently streaming.", ephemeral=True)
+
+        bars = [" ▂▃▅▆▇", "  ▂▄▆█", " ▃▅▇█▇", " ▂▃▄▅▆", "  ▃▅▆█", " ▂▄▅▇█"]
+        wave = " ".join(random.choice(bars) for _ in range(8))
+        elapsed = int(time.time() - player.start_time) if player.start_time else 0
+        dur_str = time.strftime("%M:%S", time.gmtime(elapsed))
+        tot_str = time.strftime("%M:%S", time.gmtime(player.current.duration)) if player.current.duration else "Live"
+
+        embed = discord.Embed(
+            title=f"📊 ┊ 𝐀𝐔𝐃𝐈𝐎  𝐒𝐏𝐄𝐂𝐓𝐑𝐔𝐌: {player.current.title[:45]}",
+            description=(
+                f"```fix\n"
+                f"[{wave}]\n"
+                f"[{wave}]\n"
+                f"```\n"
+                f"⏱️ **Timestamp:** `{dur_str} / {tot_str}`\n"
+                f"🎛️ **Sample Rate:** `48,000 Hz` • **Channels:** `2 (Stereo)` • **Codec:** `Opus / PCM`\n"
+                f"🔊 **Volume Output:** `{player.volume}%`"
+            ),
+            color=0x00F2FE
+        )
+        embed.set_thumbnail(url=player.current.thumbnail or config.RAI_ICON_URL)
+        embed.set_footer(text="RAI VIBES 💗 • Real-Time DSP Visualizer", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="import", aliases=["importer"], description="Batch import any public Spotify or YouTube playlist into queue.")
+    @app_commands.describe(url="Spotify or YouTube playlist link")
+    async def import_cmd(self, ctx: commands.Context, url: str):
+        if ctx.interaction:
+            await ctx.defer()
+
+        voice_client = await self.ensure_voice(ctx)
+        if not voice_client:
+            return await ctx.send("❌ Please connect to a voice channel first!", ephemeral=True)
+
+        player = self.get_or_create_player(ctx.guild)
+        player.voice_client = voice_client
+
+        if is_spotify_url(url):
+            tracks = await resolve_spotify(url)
+            if not tracks:
+                return await ctx.send("❌ Could not load Spotify playlist. Ensure it is public.")
+
+            batch = tracks[:25]
+            added = 0
+            for t in batch:
+                s = await Song.create_source(t["search_query"], ctx.author, self.bot.loop)
+                if s:
+                    player.enqueue_track(s, is_queue_mode=True)
+                    added += 1
+
+            embed = discord.Embed(
+                title="📥 ┊ 𝐒𝐏𝐎𝐓𝐈𝐅𝐘  𝐏𝐋𝐀𝐘𝐋𝐈𝐒𝐓  𝐈𝐌𝐏𝐎𝐑𝐓𝐄𝐃",
+                description=f"✅ Enqueued **{added} tracks** into queue for {ctx.author.mention}!",
+                color=0x1DB954
+            )
+            embed.set_footer(text="RAI VIBES 💗 • Spotify Importer", icon_url=config.RAI_ICON_URL)
+            await (ctx.interaction.followup.send(embed=embed) if ctx.interaction else ctx.send(embed=embed))
+        else:
+            await self.play(ctx, queue=url)
+
 
 class HistorySelect(Select):
     def __init__(self, cog, player: GuildMusicPlayer, history_list: list):

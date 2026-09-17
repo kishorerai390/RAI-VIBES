@@ -521,6 +521,100 @@ class Favorites(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="shareplaylist", description="Share your custom playlist publicly with the server community.")
+    @app_commands.describe(name="Name of your saved playlist to share")
+    async def share_playlist_cmd(self, ctx: commands.Context, *, name: str):
+        user_id = str(ctx.author.id)
+        data = load_playlists()
+        user_lists = data.get(user_id, {})
+
+        matched_name = next((k for k in user_lists if k.lower() == name.lower().strip()), None)
+        if not matched_name:
+            return await ctx.send(f"❌ You don't have a playlist named `{name}`.", ephemeral=True)
+
+        tracks = user_lists[matched_name]
+        if not tracks:
+            return await ctx.send(f"❌ Playlist `{matched_name}` is empty.", ephemeral=True)
+
+        import hashlib
+        share_code = hashlib.md5(f"{user_id}-{matched_name}".encode()).hexdigest()[:8].upper()
+        shared_file = Path(__file__).resolve().parent.parent / "data" / "shared_playlists.json"
+        shared_data = {}
+        if shared_file.exists():
+            try:
+                with open(shared_file, "r", encoding="utf-8") as f:
+                    shared_data = json.load(f)
+            except Exception:
+                pass
+
+        shared_data[share_code] = {
+            "creator": ctx.author.name,
+            "creator_id": ctx.author.id,
+            "name": matched_name,
+            "tracks": tracks,
+            "created_at": int(time.time())
+        }
+        with open(shared_file, "w", encoding="utf-8") as f:
+            json.dump(shared_data, f, indent=2)
+
+        embed = discord.Embed(
+            title="🌐 ┊ 𝐂𝐎𝐌𝐌𝐔𝐍𝐈𝐓𝐘  𝐏𝐋𝐀𝐘𝐋𝐈𝐒𝐓  𝐒𝐇𝐀𝐑𝐄𝐃!",
+            description=(
+                f"🎉 **{ctx.author.mention} published a playlist!**\n\n"
+                f"📁 **Playlist:** `{matched_name}`\n"
+                f"🎵 **Total Tracks:** `{len(tracks)} Songs`\n"
+                f"🔑 **Share Code:** `RAI-{share_code}`\n\n"
+                f"👉 Anyone can import this with:\n"
+                f"`/loadplaylist code: RAI-{share_code}`"
+            ),
+            color=0x00FFCC
+        )
+        embed.set_thumbnail(url=ctx.author.display_avatar.url)
+        embed.set_footer(text="RAI VIBES 💗 • Collaborative Audio", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="loadplaylist", description="Load a shared community playlist by share code.")
+    @app_commands.describe(code="The share code (e.g. RAI-ABCD1234)")
+    async def load_playlist_cmd(self, ctx: commands.Context, code: str):
+        clean_code = code.replace("RAI-", "").replace("rai-", "").strip().upper()
+        shared_file = Path(__file__).resolve().parent.parent / "data" / "shared_playlists.json"
+        if not shared_file.exists():
+            return await ctx.send("❌ No shared playlists found.", ephemeral=True)
+
+        try:
+            with open(shared_file, "r", encoding="utf-8") as f:
+                shared_data = json.load(f)
+        except Exception:
+            return await ctx.send("❌ Could not read shared playlist registry.", ephemeral=True)
+
+        if clean_code not in shared_data:
+            return await ctx.send(f"❌ Shared playlist code `{code}` not found or expired.", ephemeral=True)
+
+        entry = shared_data[clean_code]
+        tracks = entry["tracks"]
+        p_name = entry["name"]
+
+        # Save to user's playlists
+        user_id = str(ctx.author.id)
+        data = load_playlists()
+        user_lists = data.setdefault(user_id, {})
+        dest_name = f"{p_name} (by {entry['creator']})"
+        user_lists[dest_name] = tracks
+        save_playlists(data)
+
+        embed = discord.Embed(
+            title="📥 ┊ 𝐏𝐋𝐀𝐘𝐋𝐈𝐒𝐓  𝐈𝐌𝐏𝐎𝐑𝐓𝐄𝐃!",
+            description=(
+                f"✅ Successfully imported **`{dest_name}`**!\n\n"
+                f"👤 **Original Creator:** {entry['creator']}\n"
+                f"🎵 **Tracks Loaded:** `{len(tracks)}`\n\n"
+                f"Play anytime with `/playlist play {dest_name}`!"
+            ),
+            color=0x2ED573
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Collaborative Playlists", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Favorites(bot))

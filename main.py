@@ -409,6 +409,10 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.tickets",
         "cogs.antilink",
         "cogs.moderation",
+        "cogs.antispam",
+        "cogs.antiraid",
+        "cogs.antinuke",
+        "cogs.whitelist",
     ]
 
     for extension in initial_extensions:
