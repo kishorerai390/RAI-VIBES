@@ -4,6 +4,10 @@ import asyncio
 import discord
 from dotenv import load_dotenv
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -59,13 +63,24 @@ async def deploy_guide(client: discord.Client):
         print(f"[Success] Deployed new guide embed ({new_msg.id}) in #{chan.name}!")
 
 
+import requests
+import json
 from utils.canvas import generate_channel_header
 
-async def deploy_headers(client: discord.Client):
-    guild = client.get_guild(GUILD_ID)
-    if not guild:
-        print(f"[Error] Guild {GUILD_ID} not found.")
+def deploy_headers_rest():
+    print(f"Deploying studio channel headers via Discord REST API...")
+    headers = {
+        "Authorization": f"Bot {TOKEN}",
+        "User-Agent": "DiscordBot (https://github.com, 1.0)"
+    }
+
+    # Fetch guild channels via REST
+    res = requests.get(f"https://discord.com/api/v10/guilds/{GUILD_ID}/channels", headers=headers, timeout=10)
+    if res.status_code != 200:
+        print(f"[Error] Failed to fetch channels via REST API: {res.status_code} {res.text}")
         return
+
+    all_channels = res.json()
 
     headers_config = [
         {
@@ -93,12 +108,12 @@ async def deploy_headers(client: discord.Client):
             "embed_desc": "Queue for squads (`/lfg`), split teams (`/teams`), or generate tournament brackets (`/bracket`)."
         },
         {
-            "channel_names": ["🌧️・ʟᴏ-ꜰɪ-ᴢᴏɴᴇ", "lo-fi-zone", "lofi"],
-            "title": "24/7 LO-FI SANCTUARY",
-            "subtitle": "High-Fidelity Ambient Beats • Study & Chill",
-            "icon": "🌧️",
+            "channel_names": ["🎵・ꜱᴏɴɢ-ʀᴇǫᴜᴇꜱᴛꜱ", "song-requests", "music"],
+            "title": "AUDIO & MUSIC STUDIO",
+            "subtitle": "Zero-Prefix Requests • Lossless 384kbps • Live Equalizer",
+            "icon": "🎵",
             "accent": (155, 89, 182),
-            "embed_desc": "Continuous 24/7 aesthetic lo-fi audio stream. Grab a coffee and rest easy."
+            "embed_desc": "Drop any song link or title here to play instantly. Control playback with interactive buttons below."
         },
         {
             "channel_names": ["🚨・ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ", "sentinel-logs", "security-logs"],
@@ -113,34 +128,62 @@ async def deploy_headers(client: discord.Client):
     for cfg in headers_config:
         target_chan = None
         for name in cfg["channel_names"]:
-            ch = discord.utils.get(guild.text_channels, name=name)
-            if ch:
-                target_chan = ch
+            for ch in all_channels:
+                if ch.get("name") == name:
+                    target_chan = ch
+                    break
+            if target_chan:
                 break
 
         if not target_chan:
             print(f"[-] Channel for {cfg['title']} not found, skipping.")
             continue
 
-        print(f"[+] Generating studio banner for #{target_chan.name}...")
+        cid = target_chan["id"]
+        cname = target_chan["name"]
+        print(f"[+] Generating 1920x450 studio banner for #{cname} ({cid})...")
         buf = generate_channel_header(cfg["title"], cfg["subtitle"], cfg["icon"], cfg["accent"])
-        file = discord.File(fp=buf, filename="header.png")
-
         hex_color = (cfg["accent"][0] << 16) + (cfg["accent"][1] << 8) + cfg["accent"][2]
-        embed = discord.Embed(
-            title=f"{cfg['icon']} {cfg['title']}",
-            description=cfg["embed_desc"],
-            color=hex_color
-        )
-        embed.set_image(url="attachment://header.png")
-        embed.set_footer(text="RAI VIBES 💗 • Studio Channel Identity", icon_url=config.RAI_ICON_URL)
+
+        payload_json = {
+            "embeds": [
+                {
+                    "title": f"{cfg['icon']} {cfg['title']}",
+                    "description": cfg["embed_desc"],
+                    "color": hex_color,
+                    "image": {
+                        "url": "attachment://header.png"
+                    },
+                    "footer": {
+                        "text": "RAI VIBES 💗 • Studio Channel Identity",
+                        "icon_url": config.RAI_ICON_URL
+                    }
+                }
+            ],
+            "attachments": [
+                {
+                    "id": 0,
+                    "filename": "header.png"
+                }
+            ]
+        }
+
+        files = {
+            "files[0]": ("header.png", buf.getvalue(), "image/png")
+        }
+        data = {
+            "payload_json": json.dumps(payload_json)
+        }
 
         try:
-            msg = await target_chan.send(embed=embed, file=file)
-            print(f" [Success] Deployed header in #{target_chan.name} (Msg ID: {msg.id})")
+            post_res = requests.post(f"https://discord.com/api/v10/channels/{cid}/messages", headers=headers, data=data, files=files, timeout=15)
+            if post_res.status_code in [200, 201]:
+                msg_id = post_res.json().get("id")
+                print(f" [Success] Deployed header in #{cname} (Msg ID: {msg_id})")
+            else:
+                print(f" [Error] HTTP {post_res.status_code} deploying to #{cname}: {post_res.text}")
         except Exception as e:
-            print(f" [Error] Could not post header to #{target_chan.name}: {e}")
-
+            print(f" [Error] Could not post header to #{cname}: {e}")
 
 def print_help():
     print("""
@@ -160,6 +203,10 @@ async def main():
         print_help()
         return
 
+    if cmd == "headers":
+        deploy_headers_rest()
+        return
+
     intents = discord.Intents.default()
     intents.guilds = True
 
@@ -169,8 +216,6 @@ async def main():
     async def on_ready():
         if cmd == "guide":
             await deploy_guide(client)
-        elif cmd == "headers":
-            await deploy_headers(client)
         await client.close()
 
     await client.start(TOKEN)
@@ -179,6 +224,9 @@ async def main():
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] in ["--help", "-h", "help"]:
         print_help()
+    elif len(sys.argv) > 1 and sys.argv[1] == "headers":
+        deploy_headers_rest()
     else:
         asyncio.run(main())
+
 

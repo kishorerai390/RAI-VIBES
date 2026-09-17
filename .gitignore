@@ -31,7 +31,9 @@ bin/ffprobe.exe
 *.db
 *.sqlite
 *.sqlite3
+data/*.json
 scratch/
 .system_generated/
 .idea/
 .vscode/
+
