@@ -90,7 +90,11 @@ class VerifyButtonView(View):
     @button(label="Verify & Enter Community", emoji="✅", style=discord.ButtonStyle.success, custom_id="verify_member_btn")
     async def verify_button(self, interaction: discord.Interaction, btn: Button):
         # 1. Defer immediately to guarantee sub-50ms response to Discord
-        await interaction.response.defer(ephemeral=True)
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
 
         guild = interaction.guild
         if not guild:
@@ -180,7 +184,6 @@ class Verification(commands.Cog):
     """Server Verification Gate with Persistent UI Views."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.bot.add_view(VerifyButtonView())
 
     @commands.hybrid_command(name="setup_verify", description="Post the official Verification Gate embed in current channel.")
     @commands.has_permissions(administrator=True)

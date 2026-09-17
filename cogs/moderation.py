@@ -1282,7 +1282,7 @@ class Moderation(commands.Cog):
         view = ModPanelView(member, ctx.author, self)
         await ctx.send(embed=embed, view=view, ephemeral=True)
 
-    @app_commands.command(name="lockdown", description="Lockdown the channel to prevent raids or spam breaches.")
+    @app_commands.command(name="channellockdown", description="Lockdown the channel to prevent raids or spam breaches.")
     @app_commands.describe(channel="Channel to lockdown (defaults to current)", reason="Reason for emergency lockdown")
     async def lockdown_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None, reason: Optional[str] = "Emergency Sentinel Lockdown"):
         if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:

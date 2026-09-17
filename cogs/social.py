@@ -88,7 +88,7 @@ class Social(commands.Cog):
     # -------------------------------------------------------------
     # 🌟 REPUTATION SYSTEM
     # -------------------------------------------------------------
-    @app_commands.command(name="rep", description="Give +1 community reputation/respect to a helpful server member.")
+    @app_commands.command(name="giverep", description="Give +1 community reputation/respect to a helpful server member.")
     @app_commands.describe(member="The member who helped you or deserves respect")
     async def rep_command(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:

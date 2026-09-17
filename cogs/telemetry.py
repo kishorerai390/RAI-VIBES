@@ -208,7 +208,7 @@ class Telemetry(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Real-Time Voice Telemetry", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="milestones", description="View server-wide community milestones & Hall of Fame achievements.")
+    @app_commands.command(name="servermilestones", description="View server-wide community milestones & Hall of Fame achievements.")
     async def milestones(self, interaction: discord.Interaction):
         data = load_telemetry()
         users = data.get("users", {})
