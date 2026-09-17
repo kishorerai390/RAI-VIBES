@@ -44,14 +44,43 @@ def award_welcome_bonus(user_id: str):
         logger.warning(f"Could not award levels XP to {user_id}: {e}")
 
 
+SMALL_CAPS_MAP = str.maketrans("ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ", "abcdefghijklmnopqrstuvwxyz")
+
+def clean_str(s: str) -> str:
+    """Normalize and convert unicode small-caps characters to standard ascii lowercase."""
+    return s.translate(SMALL_CAPS_MAP).lower()
+
+
 class VerifiedNextStepsView(View):
-    """Direct quick-action navigation buttons for verified members."""
-    def __init__(self, guild_id: int):
+    """Direct quick-action navigation buttons for verified members, dynamically resolved per guild."""
+    def __init__(self, guild: discord.Guild):
         super().__init__(timeout=None)
-        self.add_item(Button(label="💬 Say Hello", url=f"https://discord.com/channels/{guild_id}/1545502730699808768", style=discord.ButtonStyle.link))
-        self.add_item(Button(label="🏷️ Role Info", url=f"https://discord.com/channels/{guild_id}/1545502722739150898", style=discord.ButtonStyle.link))
-        self.add_item(Button(label="📜 Server Rules", url=f"https://discord.com/channels/{guild_id}/1545502710101704714", style=discord.ButtonStyle.link))
-        self.add_item(Button(label="🎵 Vibe Studio", url=f"https://discord.com/channels/{guild_id}/1545534637122527332", style=discord.ButtonStyle.link))
+        
+        chat_ch = None
+        roles_ch = None
+        rules_ch = guild.rules_channel
+        hub_ch = None
+
+        for ch in guild.text_channels:
+            c = clean_str(ch.name)
+            if any(k in c for k in ["chats", "general", "main", "chat"]) and not chat_ch:
+                if "ff-" not in c and "owo" not in c and "bot" not in c:
+                    chat_ch = ch
+            if any(k in c for k in ["role", "roles"]) and not roles_ch:
+                roles_ch = ch
+            if any(k in c for k in ["rule", "info"]) and not rules_ch:
+                rules_ch = ch
+            if any(k in c for k in ["lfg", "gaming", "bot-cmd", "music", "cinema"]) and not hub_ch:
+                hub_ch = ch
+
+        if chat_ch:
+            self.add_item(Button(label="💬 Say Hello", url=chat_ch.jump_url, style=discord.ButtonStyle.link))
+        if roles_ch:
+            self.add_item(Button(label="🏷️ Role Info", url=roles_ch.jump_url, style=discord.ButtonStyle.link))
+        if rules_ch:
+            self.add_item(Button(label="📜 Server Rules", url=rules_ch.jump_url, style=discord.ButtonStyle.link))
+        if hub_ch:
+            self.add_item(Button(label="🎮 Community Hub", url=hub_ch.jump_url, style=discord.ButtonStyle.link))
 
 
 class VerifyButtonView(View):
@@ -69,18 +98,26 @@ class VerifyButtonView(View):
 
         role_ver = None
         role_mem = None
+        
+        # Dynamic search using small-caps normalizer
         for r in guild.roles:
-            norm = unicodedata.normalize('NFKD', r.name).upper()
-            if "VERIFIED" in norm and not role_ver:
+            c = clean_str(r.name)
+            if "verified" in c and not role_ver:
                 role_ver = r
-            if ("MEMBER" in norm or "RAI FAM" in norm) and not role_mem:
+            if ("member" in c or "rai fam" in c) and not role_mem:
                 role_mem = r
 
         # Fallback to known IDs if available
         if not role_ver:
-            role_ver = discord.utils.get(guild.roles, id=1549504522953695269)
+            if guild.id == 1457382179981099090:  # RAI FAM
+                role_ver = discord.utils.get(guild.roles, id=1549504522953695269)
+            elif guild.id == 1428058914141900860:  # ABIJITH 777
+                role_ver = discord.utils.get(guild.roles, id=1550205910218182696)
         if not role_mem:
-            role_mem = discord.utils.get(guild.roles, id=1545494584203673740)
+            if guild.id == 1457382179981099090:  # RAI FAM
+                role_mem = discord.utils.get(guild.roles, id=1545494584203673740)
+            elif guild.id == 1428058914141900860:  # ABIJITH 777
+                role_mem = discord.utils.get(guild.roles, id=1550205915398152364)
 
         role_unver = None
 
@@ -96,7 +133,7 @@ class VerifyButtonView(View):
 
         # 3. Check if already verified
         if not roles_to_add and ((role_mem and role_mem in member.roles) or (role_ver and role_ver in member.roles)):
-            view = VerifiedNextStepsView(guild.id)
+            view = VerifiedNextStepsView(guild)
             return await interaction.followup.send(
                 "✨ **You are already verified!** All community channels & voice lounges are open to you. 🌸 Enjoy your stay!\n\n"
                 "Use the quick buttons below to jump into the community:",
@@ -127,13 +164,13 @@ class VerifyButtonView(View):
                     color=0x2ECC71  # Bright Emerald Green
                 )
                 embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
-                embed.set_footer(text="RAI FAM 💗 • Verified Member Guide", icon_url=guild.icon.url if guild.icon else None)
+                embed.set_footer(text=f"{guild.name} • Verified Member Guide", icon_url=guild.icon.url if guild.icon else None)
 
-                view = VerifiedNextStepsView(guild.id)
+                view = VerifiedNextStepsView(guild)
                 await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-                logger.info(f"Verified {interaction.user.name} ({interaction.user.id}) and granted {[r.name for r in roles_to_add]}")
+                logger.info(f"Verified {interaction.user.name} ({interaction.user.id}) in {guild.name} and granted {[r.name for r in roles_to_add]}")
             except Exception as e:
-                logger.error(f"Error granting role to {interaction.user.id}: {e}")
+                logger.error(f"Error granting role to {interaction.user.id} in {guild.name}: {e}")
                 await interaction.followup.send(f"❌ Failed to assign member role: {e}", ephemeral=True)
         else:
             await interaction.followup.send("❌ Verification role not configured on server. Please contact an admin.", ephemeral=True)
