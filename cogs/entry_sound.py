@@ -535,10 +535,11 @@ class EntrySoundSelect(Select):
         options = []
         # If custom equipped
         if mode == "entry" and prof.get("custom_url"):
+            custom_title = prof.get("custom_name") or "Personal Custom File"
             options.append(discord.SelectOption(
-                label="🔮 Custom Audio Stream" + (" [EQUIPPED]" if current_eq == "custom" else ""),
+                label=f"🔮 {custom_title[:20]}" + (" [EQUIPPED]" if current_eq == "custom" else ""),
                 value=f"{mode}:custom",
-                description="Your personal custom audio link",
+                description="Your personal custom audio theme"[:95],
                 emoji="🔮",
                 default=(current_eq == "custom")
             ))
@@ -699,7 +700,14 @@ class EntrySoundControlView(View):
         prof = get_user_entry_profile(interaction.user.id)
         equipped = prof.get("equipped", "airhorn")
         if equipped == "custom" and prof.get("custom_url"):
-            sfx = {"name": "🔮 Custom Audio Stream", "url": prof["custom_url"], "duration": 4.0, "category": "Custom", "emoji": "🔮"}
+            sfx = {
+                "name": prof.get("custom_name", "🔮 Custom Theme"),
+                "url": prof["custom_url"],
+                "attachment_url": prof.get("attachment_url"),
+                "duration": prof.get("custom_duration", 6.0),
+                "category": "Custom",
+                "emoji": "🔮"
+            }
         else:
             sfx = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
 
@@ -904,43 +912,115 @@ class EntrySound(commands.Cog):
         self.bot = bot
 
     async def play_sound_in_channel(self, guild: discord.Guild, channel: discord.VoiceChannel, sfx_data: dict, volume_factor: float = 0.85) -> tuple[bool, str]:
-        """Plays sound in specified channel using FFmpeg with proper browser referer headers."""
+        """Plays sound in specified channel using FFmpeg, intelligently coexisting with 24/7 radio."""
         try:
             music_cog = self.bot.get_cog("Music")
+            radio_cog = self.bot.get_cog("Radio")
             voice_client: Optional[discord.VoiceClient] = guild.voice_client
 
-            # If music is actively playing in another channel, don't interrupt
-            if voice_client and voice_client.channel and voice_client.channel.id != channel.id:
-                if voice_client.is_playing():
-                    return False, f"Bot is currently playing music in {voice_client.channel.mention}."
+            radio_channel_ids = {1545781986193309789, 1545502782268772453}
+            is_radio_stream = False
+            if voice_client and voice_client.channel and voice_client.channel.id in radio_channel_ids:
+                is_radio_stream = True
+            elif music_cog:
+                player = music_cog.get_player(guild.id)
+                if player and player.is_radio_playing():
+                    is_radio_stream = True
 
-            connected_fresh = False
+            # If real music is actively playing in another channel for human listeners, don't interrupt
+            if voice_client and voice_client.channel and voice_client.channel.id != channel.id:
+                human_listeners = [m for m in voice_client.channel.members if not m.bot]
+                if voice_client.is_playing() and not is_radio_stream and len(human_listeners) > 0:
+                    return False, f"Bot is currently playing music for {len(human_listeners)} listeners in {voice_client.channel.mention}."
+
+            original_channel = voice_client.channel if (voice_client and voice_client.is_connected()) else None
+            was_in_radio = bool(original_channel and (original_channel.id in radio_channel_ids or is_radio_stream))
+
+            # Connect or move to target channel
             if not voice_client or not voice_client.is_connected():
                 voice_client = await channel.connect(reconnect=True, timeout=10.0)
-                connected_fresh = True
             elif voice_client.channel.id != channel.id:
                 await voice_client.move_to(channel)
 
             if voice_client.is_playing():
                 voice_client.stop()
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.15)
+
+            url_str = str(sfx_data.get("url", "")).strip()
+            if not url_str:
+                return False, "Audio file path or URL is empty."
+
+            is_remote = url_str.startswith("http://") or url_str.startswith("https://")
+            if is_remote:
+                before_opts = FFMPEG_BEFORE_OPTIONS
+            else:
+                # Local file path
+                local_path = Path(url_str)
+                # Check directly, or if relative/name only in CUSTOM_SOUNDS_DIR
+                if not local_path.exists():
+                    candidate = CUSTOM_SOUNDS_DIR / local_path.name
+                    if candidate.exists():
+                        local_path = candidate
+                        url_str = str(local_path)
+
+                # Fallback: if file missing on container restart, try auto-downloading from attachment_url
+                if not local_path.exists() and sfx_data.get("attachment_url"):
+                    try:
+                        import urllib.request
+                        CUSTOM_SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
+                        urllib.request.urlretrieve(sfx_data["attachment_url"], local_path)
+                        url_str = str(local_path)
+                    except Exception as dl_err:
+                        logger.warning(f"Failed to auto-redownload attachment: {dl_err}")
+
+                if not local_path.exists():
+                    return False, f"Sound file `{local_path.name}` not found on server disk. Please re-upload via `/entrysound upload`."
+
+                before_opts = "-nostdin"
 
             ffmpeg_bin = get_ffmpeg_executable()
             raw_source = discord.FFmpegPCMAudio(
-                sfx_data["url"],
+                url_str,
                 executable=ffmpeg_bin,
-                before_options=FFMPEG_BEFORE_OPTIONS,
+                before_options=before_opts,
                 options="-vn -bufsize 1024k"
             )
             transformed = discord.PCMVolumeTransformer(raw_source, volume=volume_factor)
-            voice_client.play(transformed)
 
-            duration = sfx_data.get("duration", 3.0)
-            await asyncio.sleep(duration + 0.5)
+            playback_error = []
+            def _after_play(err):
+                if err:
+                    logger.error(f"[EntrySound] FFmpeg error: {err}")
+                    playback_error.append(err)
 
-            if connected_fresh:
+            voice_client.play(transformed, after=_after_play)
+
+            # Wait dynamically while audio is playing (up to max duration, default 6s)
+            target_duration = min(float(sfx_data.get("duration", 6.0)) + 1.0, 10.0)
+            waited = 0.0
+            await asyncio.sleep(0.5)
+            while voice_client and voice_client.is_playing() and waited < target_duration:
+                await asyncio.sleep(0.25)
+                waited += 0.25
+
+            if playback_error:
+                return False, f"FFmpeg error: {playback_error[0]}"
+
+            # Post-playback: Restore 24/7 radio or disconnect cleanly
+            if was_in_radio and original_channel and channel.id != original_channel.id:
+                if voice_client and voice_client.is_connected():
+                    try:
+                        await voice_client.disconnect(force=True)
+                    except Exception:
+                        pass
+                if radio_cog:
+                    asyncio.create_task(radio_cog.start_radio_in_channel(original_channel, notify=False))
+            elif was_in_radio and original_channel and channel.id == original_channel.id:
+                if radio_cog and voice_client and voice_client.is_connected():
+                    asyncio.create_task(radio_cog.start_radio_in_channel(channel, notify=False))
+            elif not original_channel:
                 if voice_client and voice_client.is_connected() and not voice_client.is_playing():
-                    await voice_client.disconnect()
+                    await voice_client.disconnect(force=True)
 
             return True, "Played successfully"
         except Exception as e:
@@ -966,7 +1046,14 @@ class EntrySound(commands.Cog):
                 USER_ENTRY_COOLDOWNS[member.id] = now
                 eq_key = prof.get("equipped", "airhorn")
                 if eq_key == "custom" and prof.get("custom_url"):
-                    sfx = {"name": "🔮 Custom Theme", "url": prof["custom_url"], "duration": 4.0, "category": "Custom", "emoji": "🔮"}
+                    sfx = {
+                        "name": prof.get("custom_name", "🔮 Custom Theme"),
+                        "url": prof["custom_url"],
+                        "attachment_url": prof.get("attachment_url"),
+                        "duration": prof.get("custom_duration", 6.0),
+                        "category": "Custom",
+                        "emoji": "🔮"
+                    }
                 else:
                     sfx = ENTRY_SOUNDS.get(eq_key)
 
@@ -1035,7 +1122,8 @@ class EntrySound(commands.Cog):
         unlocked = prof.get("unlocked", ["airhorn", "bye_great_time"])
 
         if equipped == "custom" and prof.get("custom_url"):
-            sfx_in_name = "🔮 Custom Stream URL"
+            c_name = prof.get("custom_name") or "Personal Custom File"
+            sfx_in_name = f"🔮 {c_name}"
             sfx_in_emoji = "🔮"
         else:
             sfx_in = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
@@ -1099,13 +1187,22 @@ class EntrySound(commands.Cog):
         prof = get_user_entry_profile(ctx.author.id)
         equipped = prof.get("equipped", "airhorn")
         if equipped == "custom" and prof.get("custom_url"):
-            sfx = {"name": "🔮 Custom Theme", "url": prof["custom_url"], "duration": 4.0, "category": "Custom", "emoji": "🔮"}
+            sfx = {
+                "name": prof.get("custom_name", "🔮 Custom Theme"),
+                "url": prof["custom_url"],
+                "attachment_url": prof.get("attachment_url"),
+                "duration": prof.get("custom_duration", 6.0),
+                "category": "Custom",
+                "emoji": "🔮"
+            }
         else:
             sfx = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
 
         vol = prof.get("volume", 85) / 100.0
         await ctx.send(f"🎧 Previewing **{sfx['name']}** in {ctx.author.voice.channel.mention} at `{int(vol*100)}%` volume...", ephemeral=True)
-        await self.play_sound_in_channel(ctx.guild, ctx.author.voice.channel, sfx, volume_factor=vol)
+        success, reason = await self.play_sound_in_channel(ctx.guild, ctx.author.voice.channel, sfx, volume_factor=vol)
+        if not success:
+            await ctx.send(f"⚠️ **Could not play audio preview:** {reason}", ephemeral=True)
 
     @entrysound_group.command(name="toggle", description="Turn your entrance and exit sounds ON or OFF.")
     async def toggle_cmd(self, ctx: commands.Context):
@@ -1187,6 +1284,10 @@ class EntrySound(commands.Cog):
             data = load_entry_data()
             u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {})
             u_prof["custom_url"] = str(dest_file.resolve())
+            u_prof["custom_path"] = str(dest_file)
+            u_prof["custom_name"] = file.filename
+            u_prof["attachment_url"] = file.url
+            u_prof["custom_duration"] = 6.0
             u_prof["equipped"] = "custom"
             u_prof["enabled"] = True
             u_prof["custom_unlocked"] = True
@@ -1292,7 +1393,14 @@ class EntrySound(commands.Cog):
         if target_key == "custom":
             prof = get_user_entry_profile(ctx.author.id)
             if prof.get("custom_url"):
-                sfx = {"name": "🔮 Custom Audio Stream", "url": prof["custom_url"], "duration": 4.0, "category": "Custom", "emoji": "🔮"}
+                sfx = {
+                    "name": prof.get("custom_name", "🔮 Custom Theme"),
+                    "url": prof["custom_url"],
+                    "attachment_url": prof.get("attachment_url"),
+                    "duration": prof.get("custom_duration", 6.0),
+                    "category": "Custom",
+                    "emoji": "🔮"
+                }
         else:
             sfx = ENTRY_SOUNDS.get(target_key)
             if not sfx:
@@ -1309,7 +1417,9 @@ class EntrySound(commands.Cog):
         if ctx.author.voice and ctx.author.voice.channel:
             vol = get_user_entry_profile(ctx.author.id).get("volume", 85) / 100.0
             await ctx.send(f"🎧 Previewing **{sfx.get('emoji', '🎵')} {sfx['name']}** in {ctx.author.voice.channel.mention} at `{int(vol*100)}%` volume...", ephemeral=True)
-            await self.play_sound_in_channel(ctx.guild, ctx.author.voice.channel, sfx, volume_factor=vol)
+            success, reason = await self.play_sound_in_channel(ctx.guild, ctx.author.voice.channel, sfx, volume_factor=vol)
+            if not success:
+                await ctx.send(f"⚠️ **Could not play preview:** {reason}", ephemeral=True)
         else:
             embed = discord.Embed(
                 title=f"🎧 Sound Preview: {sfx.get('emoji', '🎵')} {sfx['name']}",
