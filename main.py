@@ -62,11 +62,11 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         logger.info(f"Logged in as: {b.user.name}#{b.user.discriminator} (ID: {b.user.id})")
         logger.info(f"Connected to {len(b.guilds)} Discord server(s)")
         
-        activity = discord.Activity(
-            type=discord.ActivityType.listening,
-            name=f"{config.BOT_NAME} | /play & /help"
+        activity = discord.Streaming(
+            name="🌸 24/7 Lo-Fi Chill Hop • /help",
+            url="https://twitch.tv/lofigirl"
         )
-        await b.change_presence(status=discord.Status.online, activity=activity)
+        await b.change_presence(activity=activity)
 
         # Automatically update server nickname to match RAI VIBES
         for guild in b.guilds:
@@ -352,6 +352,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.counting",
         "cogs.confessions",
         "cogs.social",
+        "cogs.wyr",
     ]
 
     for extension in initial_extensions:
