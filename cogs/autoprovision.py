@@ -65,12 +65,11 @@ class AutoProvision(commands.Cog):
             log_channel = guild.get_channel(log_id)
 
         if not log_channel:
-            # Look for existing named channels
-            for name in ["security-logs", "mod-logs", "audit-logs"]:
-                found = discord.utils.get(guild.text_channels, name=name)
-                if found:
-                    log_channel = found
-                    await database.update_guild_setting(guild.id, "log_channel_id", found.id)
+            # Look for existing named channels including small-caps
+            for ch in guild.text_channels:
+                if ch.id == 1546593526073135107 or "sentinel" in ch.name.lower() or "ꜱᴇɴᴛɪɴᴇʟ" in ch.name or "audit" in ch.name.lower() or "ᴀᴜᴅɪᴛ" in ch.name or "security-logs" in ch.name.lower():
+                    log_channel = ch
+                    await database.update_guild_setting(guild.id, "log_channel_id", ch.id)
                     break
 
         # Auto-create if not found and permissions allow
