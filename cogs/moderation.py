@@ -201,6 +201,7 @@ class Moderation(commands.Cog):
     Automatically detects inappropriate content, toxicity, spam, slurs, phishing links,
     and applies Server Mute, Timeout, Auto-Kick, or Auto-Ban based on strikes!
     """
+    admin = app_commands.Group(name="admin", description="Sentinel administration, backups & server audit controls")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
