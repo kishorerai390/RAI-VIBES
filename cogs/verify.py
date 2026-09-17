@@ -185,7 +185,7 @@ class Verification(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="setup_verify", description="Post the official Verification Gate embed in current channel.")
+    @commands.command(name="setup_verify", description="Post the official Verification Gate embed in current channel.")
     @commands.has_permissions(administrator=True)
     async def setup_verify(self, ctx: commands.Context):
         embed = discord.Embed(
