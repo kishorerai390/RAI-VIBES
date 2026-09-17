@@ -374,6 +374,15 @@ async def get_user_level_data(guild_id: int, user_id: int) -> dict:
             "current_level_base_xp": xp_for_level(level)
         }
 
+async def get_user_xp(guild_id: int, user_id: int) -> dict:
+    """Alias for get_user_level_data."""
+    return await get_user_level_data(guild_id, user_id)
+
+def get_xp_for_level(level: int) -> int:
+    """Alias for xp_for_level."""
+    return xp_for_level(level)
+
+
 async def get_leaderboard(guild_id: int, limit: int = 10) -> list:
     async with get_db() as db:
         cur = await db.execute(

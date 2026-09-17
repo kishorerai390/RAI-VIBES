@@ -293,12 +293,16 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
 
     @b.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-        logger.error(f"Slash command error ({interaction.command.name if interaction.command else 'Unknown'}): {error}")
-        msg = "❌ An error occurred while running this command. Make sure you are connected to a voice channel!"
+        cmd_name = interaction.command.name if interaction.command else "Unknown"
+        logger.error(f"Slash command error ({cmd_name}): {error}")
         if isinstance(error, discord.app_commands.CommandOnCooldown):
-            msg = f"⏳ Command is on cooldown. Try again in `{error.retry_after:.1f}s`."
+            msg = f"⏳ Command `{cmd_name}` is on cooldown. Try again in `{error.retry_after:.1f}s`."
         elif isinstance(error, discord.app_commands.MissingPermissions):
             msg = "❌ You lack the required permissions to execute this command."
+        elif "voice" in str(error).lower() and cmd_name in ["play", "radio", "join", "stop", "pause", "resume", "skip", "equalizer", "eq"]:
+            msg = "❌ Make sure you are connected to an active voice channel!"
+        else:
+            msg = f"❌ An error occurred while executing `/{cmd_name}`: `{error}`"
 
         try:
             if not interaction.response.is_done():

@@ -382,16 +382,21 @@ class Leveling(commands.Cog):
         uid = str(target.id)
 
         # 1. Level & XP
-        xp_data = await database.get_user_xp(interaction.guild.id, target.id)
-        lvl = xp_data.get("level", 1)
-        xp = xp_data.get("xp", 0)
-        req_xp = database.get_xp_for_level(lvl)
-        pct = min(100, round((xp / req_xp * 100))) if req_xp > 0 else 0
+        data = await database.get_user_level_data(interaction.guild.id, target.id)
+        lvl = data.get("level", 0)
+        xp = data.get("xp", 0)
+        req_xp = data.get("next_level_xp", 100)
+        base_xp = data.get("current_level_base_xp", 0)
+        xp_in_level = max(0, xp - base_xp)
+        xp_needed = max(1, req_xp - base_xp)
+        pct = min(100, round((xp_in_level / xp_needed * 100))) if xp_needed > 0 else 0
         filled = int(round(10 * pct / 100))
         xp_bar = "▰" * filled + "▱" * (10 - filled)
 
         # 2. Economy & Rep
-        coins = get_user_coins(target.id)
+        from cogs.economy import OWNER_ID
+        raw_coins = get_user_coins(target.id)
+        coins = "∞ (Owner Vault)" if target.id == OWNER_ID else raw_coins
         rep = get_user_rep(target.id)
 
         # 3. Voice Lounge Hours
@@ -437,6 +442,9 @@ class Leveling(commands.Cog):
                 pass
 
         joined_str = f"<t:{int(target.joined_at.timestamp())}:D>" if target.joined_at else "Unknown"
+        canvas_date_str = target.joined_at.strftime("%b %d, %Y") if target.joined_at else "Recent Citizen"
+
+        coin_display_embed = coins if isinstance(coins, str) else f"{coins:,} Coins"
 
         embed = discord.Embed(
             title=f"💳 SERVER PROFILE CODEX • {target.display_name.upper()}",
@@ -452,7 +460,7 @@ class Leveling(commands.Cog):
         )
         embed.add_field(
             name="🪙 Vault & Influence",
-            value=f"💰 `{coins:,}` Coins • ✨ `{rep}` Rep Points",
+            value=f"💰 `{coin_display_embed}` • ✨ `{rep}` Rep Points",
             inline=True
         )
         embed.add_field(
@@ -484,23 +492,26 @@ class Leveling(commands.Cog):
         except Exception:
             pass
 
-        card_buf = generate_profile_codex(
-            avatar_bytes=avatar_bytes,
-            username=target.display_name,
-            level=lvl,
-            current_xp=xp,
-            req_xp=req_xp,
-            coins=coins,
-            rep=rep,
-            voice_hrs=voice_hrs,
-            pet_str=pet_str,
-            clan_str=clan_str,
-            join_date_str=joined_str
-        )
-        file = discord.File(fp=card_buf, filename="profile.png")
-        embed.set_image(url="attachment://profile.png")
-
-        await interaction.response.send_message(embed=embed, file=file)
+        try:
+            card_buf = generate_profile_codex(
+                avatar_bytes=avatar_bytes,
+                username=target.display_name,
+                level=lvl,
+                current_xp=xp,
+                req_xp=req_xp,
+                coins=coins,
+                rep=rep,
+                voice_hrs=voice_hrs,
+                pet_str=pet_str,
+                clan_str=clan_str,
+                join_date_str=canvas_date_str
+            )
+            file = discord.File(fp=card_buf, filename="profile.png")
+            embed.set_image(url="attachment://profile.png")
+            await interaction.response.send_message(embed=embed, file=file)
+        except Exception as e:
+            logger.warning(f"Failed to generate profile codex canvas: {e}")
+            await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):

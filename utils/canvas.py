@@ -1,7 +1,7 @@
 import io
 import math
 import random
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
 def _get_font(name: str, size: int):
@@ -127,7 +127,7 @@ def generate_profile_codex(
     level: int,
     current_xp: int,
     req_xp: int,
-    coins: int,
+    coins: Union[int, str],
     rep: int,
     voice_hrs: float,
     pet_str: str,
@@ -176,17 +176,26 @@ def generate_profile_codex(
     draw.text((80, 328), "🛡️ VERIFIED CITIZEN", font=font_small, fill=(0, 240, 255, 255))
 
     # User Header
-    draw.text((300, 95), username[:20], font=font_head, fill=(255, 255, 255, 255))
+    draw.text((300, 95), str(username or "RAI Citizen")[:20], font=font_head, fill=(255, 255, 255, 255))
     draw.text((300, 145), f"Level {level} Elite Citizen • Member Since: {join_date_str}", font=font_small, fill=(180, 180, 210, 255))
+
+    if isinstance(coins, str):
+        coin_display = coins
+    elif isinstance(coins, (int, float)) and coins >= 999999999:
+        coin_display = "∞ (Owner Vault)"
+    elif isinstance(coins, (int, float)):
+        coin_display = f"{int(coins):,} Coins"
+    else:
+        coin_display = str(coins)
 
     # Stats Grid Boxes
     boxes = [
         ("⭐ LEVEL & XP", f"Level {level} ({current_xp:,}/{req_xp:,})", 300, 190, 410, 90),
-        ("🪙 VAULT COINS", f"{coins:,} Coins", 740, 190, 400, 90),
+        ("🪙 VAULT COINS", coin_display, 740, 190, 400, 90),
         ("🎙️ VOICE PRESENCE", f"{voice_hrs} Hours Logged", 300, 300, 410, 90),
         ("💖 INFLUENCE REP", f"+{rep} Rep Points", 740, 300, 400, 90),
-        ("🐾 PET COMPANION", pet_str[:28], 300, 410, 410, 90),
-        ("⚔️ SQUAD / CLAN", clan_str[:28], 740, 410, 400, 90),
+        ("🐾 PET COMPANION", str(pet_str or 'None')[:28], 300, 410, 410, 90),
+        ("⚔️ SQUAD / CLAN", str(clan_str or 'Solo')[:28], 740, 410, 400, 90),
     ]
 
     for label, val, bx, by, bw, bh in boxes:
