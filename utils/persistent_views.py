@@ -7,26 +7,32 @@ ROLE_ID_MAP = {
     "Free Fire": 1545516397034078269,
     "BGMI": 1545516399663779871,
     "Roblox": 1545516402188881991,
-    "PC Gaming": 1546062595293978694,
+    "GTA RP": 1546062595293978694,
 
     # Notifications & Pings
-    "Announcements": 1546088542885642324,
-    "Giveaways": 1546088546555924534,
-    "Tournaments": 1546088548913119323,
+    "Announcements": 1550042139134529559,
+    "Giveaways": 1550042142339235903,
+    "Tournaments": 1550042146310983750,
     "Movie Nights": 1546062599253135420,
 
     # Member Identification
     "Male": 1546095934935531520,
-    "Female": 1546095937015910434,
+    "Female": 1550042132067389490,
     "18+ Adult": 1546095939582828616,
-    "Under 18": 1546095941818392647,
+    "Under 18": 1550042135376699463,
+
+    # Color Styling
+    "Sakura Pink": 1550042149465227284,
+    "Neon Purple": 1550042152141193249,
+    "Cyber Cyan": 1550042155043651675,
+    "Royal Gold": 1550042157942050867,
 }
 
 COLOR_ROLE_IDS = [
-    1546088552293728268, # Sakura Pink
-    1546088554747142174, # Neon Purple
-    1546088557742129232, # Cyber Cyan
-    1546088559830634586, # Royal Gold
+    1550042149465227284,  # 🌸・Sakura Pink
+    1550042152141193249,  # 💜・Neon Purple
+    1550042155043651675,  # 🩵・Cyber Cyan
+    1550042157942050867,  # 💛・Royal Gold
 ]
 
 def find_role_by_key(guild: discord.Guild, key: str) -> discord.Role | None:

@@ -64,9 +64,9 @@ class Profile(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Aesthetic Profiles", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="profile", description="Inspect an aesthetic server profile card with badges, wallet, and audio presence.")
-    @app_commands.describe(member="Member whose profile you want to view (Defaults to you)")
-    async def profile_command(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+    @app_commands.command(name="badges", description="Inspect member showcase badges, wallet standing, and audio presence.")
+    @app_commands.describe(member="Member whose badges you want to view (Defaults to you)")
+    async def badges_command(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         target = member or interaction.user
         if isinstance(target, discord.User):
             target = interaction.guild.get_member(target.id) or target
@@ -142,7 +142,7 @@ class Profile(commands.Cog):
             embed.set_image(url=target.banner.url)
         embed.set_footer(text="RAI FAM 💗 • Use /setbio to personalize your profile", icon_url=config.RAI_ICON_URL)
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

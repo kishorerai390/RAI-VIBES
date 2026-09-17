@@ -331,7 +331,7 @@ class Leveling(commands.Cog):
         file = discord.File(fp=card_buf, filename="rank.png")
         embed.set_image(url="attachment://rank.png")
 
-        await interaction.response.send_message(embed=embed, file=file)
+        await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
 
     @app_commands.command(name="coins", description="Check your current coin balance and economy status.")
     @app_commands.describe(member="Member to inspect (defaults to you)")
@@ -348,7 +348,7 @@ class Leveling(commands.Cog):
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.set_footer(text="RAI FAM 💗 • Economy System", icon_url=config.RAI_ICON_URL)
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="leaderboard", description="View the Top 10 most active members on the server.")
     async def leaderboard_command(self, interaction: discord.Interaction):
@@ -376,10 +376,16 @@ class Leveling(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="profile", description="View your luxury unified server profile codex.")
-    @app_commands.describe(member="Member whose profile to view (defaults to you)")
-    async def profile_command(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+    @app_commands.describe(
+        member="Member whose profile to view (defaults to you)",
+        visible="Share profile publicly in channel (Defaults to False - only you can see it)"
+    )
+    async def profile_command(self, interaction: discord.Interaction, member: Optional[discord.Member] = None, visible: bool = False):
         target = member or interaction.user
         uid = str(target.id)
+
+        from cogs.profile import get_user_bio
+        bio = get_user_bio(target.id)
 
         # 1. Level & XP
         data = await database.get_user_level_data(interaction.guild.id, target.id)
@@ -448,7 +454,7 @@ class Leveling(commands.Cog):
 
         embed = discord.Embed(
             title=f"💳 SERVER PROFILE CODEX • {target.display_name.upper()}",
-            description=f"Unified identity record for {target.mention} in **{interaction.guild.name}**\n",
+            description=f"Unified identity record for {target.mention} in **{interaction.guild.name}**\n\n💬 *\"{bio}\"*\n",
             color=0xFF007F
         )
         embed.set_thumbnail(url=target.display_avatar.url)
@@ -508,10 +514,10 @@ class Leveling(commands.Cog):
             )
             file = discord.File(fp=card_buf, filename="profile.png")
             embed.set_image(url="attachment://profile.png")
-            await interaction.response.send_message(embed=embed, file=file)
+            await interaction.response.send_message(embed=embed, file=file, ephemeral=(not visible))
         except Exception as e:
             logger.warning(f"Failed to generate profile codex canvas: {e}")
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message(embed=embed, ephemeral=(not visible))
 
 
 async def setup(bot: commands.Bot):

@@ -270,14 +270,14 @@ class VoiceControlView(discord.ui.View):
         if is_hidden:
             # Un-ghost (make visible to @everyone again)
             await vc.set_permissions(interaction.guild.default_role, view_channel=None)
-            verified_role = discord.utils.get(interaction.guild.roles, name="Verified")
+            verified_role = discord.utils.get(interaction.guild.roles, id=1549504522953695269) or discord.utils.get(interaction.guild.roles, name="✨・Verified") or discord.utils.get(interaction.guild.roles, name="Verified")
             if verified_role:
                 await vc.set_permissions(verified_role, view_channel=None)
             await interaction.response.send_message("👁️ **Voice room is now VISIBLE to everyone in the server!**", ephemeral=True)
         else:
             # Ghost / Hide from @everyone
             await vc.set_permissions(interaction.guild.default_role, view_channel=False)
-            verified_role = discord.utils.get(interaction.guild.roles, name="Verified")
+            verified_role = discord.utils.get(interaction.guild.roles, id=1549504522953695269) or discord.utils.get(interaction.guild.roles, name="✨・Verified") or discord.utils.get(interaction.guild.roles, name="Verified")
             if verified_role:
                 await vc.set_permissions(verified_role, view_channel=False)
             # Ensure owner can always see & connect
@@ -584,7 +584,7 @@ class VoiceHub(commands.Cog):
                         guild.default_role: discord.PermissionOverwrite(view_channel=False, connect=False),
                         member: discord.PermissionOverwrite(view_channel=True, connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
                     }
-                    verified_role = discord.utils.get(guild.roles, name="Verified")
+                    verified_role = discord.utils.get(guild.roles, id=1549504522953695269) or discord.utils.get(guild.roles, name="✨・Verified") or discord.utils.get(guild.roles, name="Verified")
                     if verified_role:
                         overwrites[verified_role] = discord.PermissionOverwrite(view_channel=False, connect=False)
                 else:

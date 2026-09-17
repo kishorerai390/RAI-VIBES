@@ -67,9 +67,9 @@ class VerifyButtonView(View):
         if not guild:
             return await interaction.followup.send("❌ Server error.", ephemeral=True)
 
-        role_rai = discord.utils.get(guild.roles, id=1545494584203673740) or discord.utils.get(guild.roles, name="🌸 ✧ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘")
-        role_ver = discord.utils.get(guild.roles, id=1546540194310782976) or discord.utils.get(guild.roles, name="Verified")
-        role_unver = discord.utils.get(guild.roles, id=1546540195724140574) or discord.utils.get(guild.roles, name="Unverified")
+        role_rai = discord.utils.get(guild.roles, id=1545494584203673740) or discord.utils.get(guild.roles, name="🌸・Rai Fam") or discord.utils.get(guild.roles, name="🌸 ✧ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘")
+        role_ver = discord.utils.get(guild.roles, id=1549504522953695269) or discord.utils.get(guild.roles, name="✨・Verified") or discord.utils.get(guild.roles, name="Verified")
+        role_unver = discord.utils.get(guild.roles, id=1549504525591908482) or discord.utils.get(guild.roles, name="⏳・Unverified") or discord.utils.get(guild.roles, name="Unverified")
 
         member = interaction.user
         if isinstance(member, discord.User):
