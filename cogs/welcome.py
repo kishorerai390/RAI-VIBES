@@ -348,7 +348,7 @@ class Welcome(commands.Cog):
                     f"**Get started with below:** <#1545502710101704714>\n\n"
                     f"**Follow The Server Guidelines:** <#1545502710101704714>\n\n"
                     f"**Verify For Full Access:** <#1545502700840427702>\n\n"
-                    f"**Claim Your Roles:** <#1545502722739150898>\n\n"
+                    f"**Role Hierarchy & Codex:** <#1545502722739150898>\n\n"
                     f"**Share Media & Fun:** <#1546097792915873842>\n\n"
                     f"**Gaming Zone:** <#1545803554550190212>\n\n"
                     f"**24/7 Lo-Fi & Beats:** <#1545781986193309789>\n\n"

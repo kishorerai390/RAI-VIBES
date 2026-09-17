@@ -49,7 +49,7 @@ class VerifiedNextStepsView(View):
     def __init__(self, guild_id: int):
         super().__init__(timeout=None)
         self.add_item(Button(label="💬 Say Hello", url=f"https://discord.com/channels/{guild_id}/1545502730699808768", style=discord.ButtonStyle.link))
-        self.add_item(Button(label="🎭 Pick Roles", url=f"https://discord.com/channels/{guild_id}/1545502722739150898", style=discord.ButtonStyle.link))
+        self.add_item(Button(label="🏷️ Role Info", url=f"https://discord.com/channels/{guild_id}/1545502722739150898", style=discord.ButtonStyle.link))
         self.add_item(Button(label="📜 Server Rules", url=f"https://discord.com/channels/{guild_id}/1545502710101704714", style=discord.ButtonStyle.link))
         self.add_item(Button(label="🎵 Vibe Studio", url=f"https://discord.com/channels/{guild_id}/1545534637122527332", style=discord.ButtonStyle.link))
 
