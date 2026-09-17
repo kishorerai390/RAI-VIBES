@@ -114,51 +114,17 @@ class AutoProvision(commands.Cog):
             except Exception as e:
                 logger.error(f"Could not auto-create security-logs channel: {e}")
 
-        # 3. Check or Create Verified / Unverified Roles
+        # 3. Check Roles
         if guild.me.guild_permissions.manage_roles:
             # Check Verified Role
-            verified_role = None
-            for name in ["Verified", "🌸 ┊ 𝐑𝐀𝐈 𝐅𝐀𝐌𝐈𝐋𝐘", "Member"]:
-                found = discord.utils.get(guild.roles, name=name)
-                if found:
-                    verified_role = found
-                    break
+            verified_role = discord.utils.get(guild.roles, id=1549504522953695269)
             if not verified_role:
-                try:
-                    verified_role = await guild.create_role(
-                        name="Verified",
-                        color=discord.Color.green(),
-                        reason="[Auto-Provision] Created default Verified Member role"
-                    )
-                    await database.update_guild_setting(guild.id, "verified_role_id", verified_role.id)
-                    logger.info(f"✅ Auto-created Verified role in {guild.name}")
-                except Exception as e:
-                    logger.debug(f"Verified role creation note: {e}")
-            else:
+                for r in guild.roles:
+                    if "verified" in r.name.lower() or "member" in r.name.lower():
+                        verified_role = r
+                        break
+            if verified_role:
                 await database.update_guild_setting(guild.id, "verified_role_id", verified_role.id)
-
-            # Check Unverified / Quarantine Role
-            unverified_role = None
-            for name in ["Unverified", "Quarantined", "Muted"]:
-                found = discord.utils.get(guild.roles, name=name)
-                if found:
-                    unverified_role = found
-                    break
-            if not unverified_role:
-                try:
-                    unverified_role = await guild.create_role(
-                        name="Unverified",
-                        color=discord.Color.dark_grey(),
-                        reason="[Auto-Provision] Created default Unverified / Quarantine role"
-                    )
-                    await database.update_guild_setting(guild.id, "unverified_role_id", unverified_role.id)
-                    await database.update_guild_setting(guild.id, "quarantine_role_id", unverified_role.id)
-                    logger.info(f"✅ Auto-created Unverified role in {guild.name}")
-                except Exception as e:
-                    logger.debug(f"Unverified role creation note: {e}")
-            else:
-                await database.update_guild_setting(guild.id, "unverified_role_id", unverified_role.id)
-                await database.update_guild_setting(guild.id, "quarantine_role_id", unverified_role.id)
 
     # -------------------------------------------------------------
     # REAL-TIME SQLITE STRUCTURE BACKUPS

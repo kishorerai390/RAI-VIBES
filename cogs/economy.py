@@ -22,49 +22,9 @@ SHOP_ITEMS = {
         "name": "🎧 DJ Pass Role",
         "description": "Unlock DJ controls, skip bypass, and audio filter privileges",
         "price": 1000,
-        "role_id": 1545834928221069522,  # 🎧・DJ
-        "role_name": "🎧・DJ",
+        "role_id": 1545834928221069522,  # ✦ dj
+        "role_name": "✦ dj",
         "emoji": "🎧"
-    },
-    "vip_elite": {
-        "name": "💎 VIP Elite Prestige",
-        "description": "Gain the prestigious VIP role with exclusive lounge & VC access",
-        "price": 2500,
-        "role_id": 1550042452482723863,  # 💎・VIP Elite
-        "role_name": "💎・VIP Elite",
-        "emoji": "💎"
-    },
-    "sakura_pink": {
-        "name": "🌸 Sakura Pink Name Color",
-        "description": "Shine in chat with the aesthetic Sakura Pink username color",
-        "price": 800,
-        "role_id": 1550042149465227284,  # 🌸・Sakura Pink
-        "role_name": "🌸・Sakura Pink",
-        "emoji": "🌸"
-    },
-    "neon_purple": {
-        "name": "💜 Neon Purple Name Color",
-        "description": "Vibrant glowing neon purple name in all server channels",
-        "price": 800,
-        "role_id": 1550042152141193249,  # 💜・Neon Purple
-        "role_name": "💜・Neon Purple",
-        "emoji": "💜"
-    },
-    "cyber_cyan": {
-        "name": "🩵 Cyber Cyan Name Color",
-        "description": "Futuristic neon cyan glow for your username",
-        "price": 800,
-        "role_id": 1550042155043651675,  # 🩵・Cyber Cyan
-        "role_name": "🩵・Cyber Cyan",
-        "emoji": "🩵"
-    },
-    "royal_gold": {
-        "name": "💛 Royal Gold Name Color",
-        "description": "Prestigious shimmering gold name in server chat",
-        "price": 800,
-        "role_id": 1550042157942050867,  # 💛・Royal Gold
-        "role_name": "💛・Royal Gold",
-        "emoji": "💛"
     },
     "vip_sound_pass": {
         "name": "🔊 VIP Entrance Themes Pass",
