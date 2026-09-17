@@ -97,7 +97,7 @@ async def run_diagnostics():
     expected_cogs = [
         "cogs.music", "cogs.radio", "cogs.filters", "cogs.lyrics", "cogs.favorites",
         "cogs.general", "cogs.voicehub", "cogs.levels", "cogs.minigames", "cogs.giveaways",
-        "cogs.polls", "cogs.welcome", "cogs.qotd", "cogs.counting", "cogs.starboard",
+        "cogs.polls", "cogs.welcome", "cogs.qotd", "cogs.starboard",
         "cogs.moderation", "cogs.verify"
     ]
     print(f"  ✅ All {len(expected_cogs)} modular extensions verified & loaded.")
