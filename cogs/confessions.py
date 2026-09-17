@@ -37,9 +37,9 @@ def save_confession_data(data: dict):
 
 class ConfessionModal(Modal, title="💌 Submit Anonymous Confession"):
     confession = TextInput(
-        label="Your Secret Confession or Story",
+        label="Your Anonymous Thought or Story",
         style=discord.TextStyle.paragraph,
-        placeholder="Type your confession, crush, or story here... (100% anonymous)",
+        placeholder="Share a funny story, anonymous thought, or secret shoutout... (100% anonymous)",
         max_length=1500,
         required=True
     )
@@ -63,7 +63,7 @@ class ConfessionModal(Modal, title="💌 Submit Anonymous Confession"):
             return await interaction.response.send_message("❌ Confessions channel could not be found.", ephemeral=True)
 
         embed = discord.Embed(
-            title=f"💌 ┊ 𝐀𝐍𝐎𝐍𝐘𝐌𝐎𝐔Ｓ  𝐂𝐎𝐍𝐅𝐄𝐒𝐒𝐈𝐎𝐍  #{confession_num}",
+            title=f"💌 ┊ 𝐀𝐍𝐎𝐍𝐘𝐌𝐎𝐔𝐒  𝐂𝐎𝐍𝐅𝐄𝐒𝐒𝐈𝐎𝐍  #{confession_num}",
             description=f">>> {self.confession.value}",
             color=0xFF69B4
         )
@@ -73,7 +73,7 @@ class ConfessionModal(Modal, title="💌 Submit Anonymous Confession"):
         try:
             msg = await channel.send(embed=embed)
             # Add reaction triggers
-            for emoji in ["❤️", "😂", "💀", "👀", "💔"]:
+            for emoji in ["💬", "😂", "💀", "👀", "🔥"]:
                 try:
                     await msg.add_reaction(emoji)
                 except Exception:
