@@ -108,6 +108,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.lfg import LFGView
         from cogs.party_games import PartyGamesView
         from cogs.arcade_panel import ArcadeStationView
+        from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
@@ -127,6 +128,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(LFGView())
         b.add_view(PartyGamesView())
         b.add_view(ArcadeStationView())
+        b.add_view(PersistentTicketLauncherView())
+        b.add_view(TicketChannelControlView())
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")

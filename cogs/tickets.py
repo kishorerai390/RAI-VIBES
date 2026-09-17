@@ -11,13 +11,18 @@ import config
 logger = logging.getLogger("Tickets")
 
 STAFF_ROLE_IDS = [
+    # RAI FAM Staff
     1545494610489643038,  # 👑 ┆ 𝐅𝐎𝐔𝐍𝐃𝐄𝐑 🍷
     1545506927788687470,  # ⚡ ┆ 𝐇𝐄𝐀𝐃 𝐀𝐃𝐌𝐈𝐍 ⚡
     1545494600347680918,  # 🛡️ ┆ 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐎𝐑 🛡️
+    # ABIJITH 777 Staff
+    1550205899069726810,  # 👑 ┆ 𝐅𝐎𝐔𝐍𝐃𝐄𝐑 🍷
+    1550205902706049214,  # ⚡ ┆ 𝐇𝐄𝐀𝐃 𝐀𝐃𝐌𝐈𝐍 ⚡
+    1550205905830682795,  # 🛡️ ┆ 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐎𝐑 🛡️
 ]
-SENTINEL_HQ_CAT_ID = 1545803487093456906  # ╭・𝗦𝗘𝗡𝗧𝗜𝗡𝗘𝗟 𝗛𝗤 ✧
-AUDIT_LOG_CHAN_ID = 1546540192343523399   # ・𝗮𝘂𝗱𝗶𝘁-𝗹𝗼𝗴𝘀・
-SECURITY_LOG_CHAN_ID = 1546593526073135107 # ・𝘀𝗲𝗰𝘂𝗿𝗶𝘁𝘆-𝗹𝗼𝗴𝘀・
+SENTINEL_HQ_CAT_ID = 1545803487093456906  # 🔱 VIP & SENTINEL HQ (RAI FAM)
+AUDIT_LOG_CHAN_ID = 1546540192343523399   # 📝｜ᴍᴏᴅᴇʀᴀᴛɪᴏɴ-ʟᴏɢꜱ / audit
+SECURITY_LOG_CHAN_ID = 1546593526073135107 # 🚨｜ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ
 
 
 class TicketCloseConfirmView(discord.ui.View):
@@ -57,6 +62,9 @@ class TicketCloseConfirmView(discord.ui.View):
 
         # 2. Send transcript to mod-logs / audit-logs
         log_chan = (
+            discord.utils.get(guild.text_channels, name="📝｜ᴍᴏᴅᴇʀᴀᴛɪᴏɴ-ʟᴏɢꜱ") or
+            discord.utils.get(guild.text_channels, name="📋｜ᴀᴜᴅɪᴛ-ʟᴏɢꜱ") or
+            discord.utils.get(guild.text_channels, name="🚨｜ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ") or
             guild.get_channel(AUDIT_LOG_CHAN_ID) or
             guild.get_channel(SECURITY_LOG_CHAN_ID) or
             discord.utils.get(guild.text_channels, name="・𝗮𝘂𝗱𝗶𝘁-𝗹𝗼𝗴𝘀・") or
@@ -169,6 +177,7 @@ class TicketCategorySelect(discord.ui.Select):
 
         # Staff Category & Overwrites
         staff_cat = (
+            discord.utils.get(guild.categories, name="🔱 VIP & SENTINEL HQ") or
             guild.get_channel(SENTINEL_HQ_CAT_ID) or
             discord.utils.get(guild.categories, id=SENTINEL_HQ_CAT_ID) or
             discord.utils.get(guild.categories, name="╭・𝗦𝗘𝗡𝗧𝗜𝗡𝗘𝗟 𝗛𝗤 ✧") or
