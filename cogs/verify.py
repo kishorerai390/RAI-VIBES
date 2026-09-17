@@ -67,8 +67,21 @@ class VerifyButtonView(View):
         if not guild:
             return await interaction.followup.send("❌ Server error.", ephemeral=True)
 
-        role_rai = discord.utils.get(guild.roles, id=1545494584203673740) or discord.utils.get(guild.roles, name="✦ member") or discord.utils.get(guild.roles, name="🌸・Rai Fam")
-        role_ver = discord.utils.get(guild.roles, id=1549504522953695269) or discord.utils.get(guild.roles, name="✦ verified") or discord.utils.get(guild.roles, name="✨・Verified")
+        role_ver = None
+        role_mem = None
+        for r in guild.roles:
+            norm = unicodedata.normalize('NFKD', r.name).upper()
+            if "VERIFIED" in norm and not role_ver:
+                role_ver = r
+            if ("MEMBER" in norm or "RAI FAM" in norm) and not role_mem:
+                role_mem = r
+
+        # Fallback to known IDs if available
+        if not role_ver:
+            role_ver = discord.utils.get(guild.roles, id=1549504522953695269)
+        if not role_mem:
+            role_mem = discord.utils.get(guild.roles, id=1545494584203673740)
+
         role_unver = None
 
         member = interaction.user
@@ -76,13 +89,13 @@ class VerifyButtonView(View):
             member = await guild.fetch_member(interaction.user.id)
 
         roles_to_add = []
-        if role_rai and role_rai not in member.roles:
-            roles_to_add.append(role_rai)
+        if role_mem and role_mem not in member.roles:
+            roles_to_add.append(role_mem)
         if role_ver and role_ver not in member.roles:
             roles_to_add.append(role_ver)
 
         # 3. Check if already verified
-        if not roles_to_add and (role_rai in member.roles or role_ver in member.roles):
+        if not roles_to_add and ((role_mem and role_mem in member.roles) or (role_ver and role_ver in member.roles)):
             view = VerifiedNextStepsView(guild.id)
             return await interaction.followup.send(
                 "✨ **You are already verified!** All community channels & voice lounges are open to you. 🌸 Enjoy your stay!\n\n"
