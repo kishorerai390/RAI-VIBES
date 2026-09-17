@@ -1571,8 +1571,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: SKIPTO / JUMP
     # =========================================================================
-    @commands.hybrid_command(name="skipto", aliases=["jump"], description="Skip directly to a specific track in the queue.")
-    @app_commands.describe(index="The track position to jump to (e.g. 3)")
+    @commands.command(name="skipto", aliases=["jump"])
     async def skipto(self, ctx: commands.Context, index: int):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
@@ -1733,8 +1732,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: REMOVE
     # =========================================================================
-    @commands.hybrid_command(name="remove", aliases=["rm"], description="Remove a specific song from queue by its position.")
-    @app_commands.describe(index="The track position number from /queue")
+    @commands.command(name="remove", aliases=["rm"])
     async def remove(self, ctx: commands.Context, index: int):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
@@ -1750,7 +1748,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: CLEAR QUEUE
     # =========================================================================
-    @commands.hybrid_command(name="clearqueue", aliases=["cq", "emptyqueue", "qclear"], description="Clear all upcoming songs from the queue.")
+    @commands.command(name="clearqueue", aliases=["cq", "emptyqueue", "qclear"])
     async def clearqueue(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
@@ -1763,7 +1761,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: REPLAY / RESTART
     # =========================================================================
-    @commands.hybrid_command(name="replay", aliases=["restart"], description="Replay the currently playing song from the beginning.")
+    @commands.command(name="replay", aliases=["restart"])
     async def replay(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.current or not player.voice_client:
@@ -1776,8 +1774,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: SEEK
     # =========================================================================
-    @commands.hybrid_command(name="seek", description="Seek to a specific timestamp in the current song (e.g. 1:30 or 90).")
-    @app_commands.describe(timestamp="Time position to jump to (e.g. 1:30 or seconds)")
+    @commands.command(name="seek")
     async def seek(self, ctx: commands.Context, timestamp: str):
         player = self.get_player(ctx.guild.id)
         if not player or not player.current or not player.voice_client:
@@ -1878,8 +1875,7 @@ class Music(commands.Cog):
         view = SearchResultView(self, ctx, results, message=msg)
         await msg.edit(embed=search_embed, view=view)
 
-    @commands.hybrid_command(name="sleeptimer", aliases=["sleep"], description="Set a countdown timer to automatically stop music.")
-    @app_commands.describe(minutes="Minutes until music stops (e.g. 15, 30, 45, 60, 90)")
+    @commands.command(name="sleeptimer", aliases=["sleep"])
     async def sleeptimer(self, ctx: commands.Context, minutes: int):
         if minutes <= 0 or minutes > 240:
             return await ctx.send("❌ Sleep timer must be between 1 and 240 minutes.", ephemeral=True)
@@ -1911,7 +1907,7 @@ class Music(commands.Cog):
 
         self.bot.loop.create_task(_sleep_countdown())
 
-    @commands.hybrid_command(name="history", aliases=["recent", "recentlyplayed"], description="View the last 15 songs played across the server with 1-click re-queue.")
+    @commands.command(name="history", aliases=["recent", "recentlyplayed"])
     async def history_cmd(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.history:
@@ -1936,8 +1932,7 @@ class Music(commands.Cog):
         view = HistoryRequeueView(self, player)
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="artist", description="Search artist profile, genre, and top 5 popular songs.")
-    @app_commands.describe(name="Name of the artist or band to inspect")
+    @commands.command(name="artist")
     async def artist_cmd(self, ctx: commands.Context, *, name: str):
         if ctx.interaction:
             await ctx.defer()

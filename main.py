@@ -90,6 +90,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.movie_party import MovieRSVPView
         from cogs.pets import PetCareView
         from cogs.lfg import LFGView
+        from cogs.party_games import PartyGamesView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
@@ -107,6 +108,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(MovieRSVPView())
         b.add_view(PetCareView(owner_id=0))
         b.add_view(LFGView())
+        b.add_view(PartyGamesView())
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")
@@ -176,6 +178,36 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                     await message.add_reaction("👎")
                 except Exception:
                     pass
+
+        # Media & Showcase Channels Automated Aesthetic Reactions
+        ch_name = message.channel.name.lower()
+        if any(k in ch_name for k in ["ꜱᴇᴛᴜᴘ", "setup", "desk"]):
+            if message.attachments or "http" in content:
+                try:
+                    await message.add_reaction("💻")
+                    await message.add_reaction("🔥")
+                except Exception:
+                    pass
+        elif any(k in ch_name for k in ["ᴄʀᴇᴀᴛɪᴠᴇ", "art", "creative"]):
+            if message.attachments or "http" in content:
+                try:
+                    await message.add_reaction("🎨")
+                    await message.add_reaction("⭐")
+                except Exception:
+                    pass
+        elif any(k in ch_name for k in ["ᴍᴜꜱɪᴄ-ꜱʜᴀʀɪɴɢ", "music-sharing"]):
+            if "http" in content or "spotify" in lower or "youtu" in lower or "soundcloud" in lower:
+                try:
+                    await message.add_reaction("🎧")
+                    await message.add_reaction("💜")
+                except Exception:
+                    pass
+        elif any(k in ch_name for k in ["ᴏᴜᴛ-ᴏꜰ-ᴄᴏɴᴛᴇxᴛ", "context"]):
+            try:
+                await message.add_reaction("💀")
+                await message.add_reaction("📸")
+            except Exception:
+                pass
 
         # 1. Dedicated Song Requests Channel Direct Queue (Zero-prefix)
         if message.channel.id == 1545534637122527332 or "song-request" in message.channel.name.lower() or "requests" in message.channel.name.lower() or "ꜱᴏɴɢ" in message.channel.name:
@@ -353,6 +385,10 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.confessions",
         "cogs.social",
         "cogs.wyr",
+        "cogs.anime",
+        "cogs.lottery",
+        "cogs.party_games",
+        "cogs.invites",
     ]
 
     for extension in initial_extensions:

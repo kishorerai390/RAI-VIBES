@@ -228,7 +228,7 @@ class General(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Command The Power", icon_url=config.RAI_ICON_URL)
         await msg.edit(content=None, embed=embed)
 
-    @commands.hybrid_command(name="c", aliases=["commands", "cmds", "help"], description="Browse all RAI VIBES 💗 commands (Rythm style).")
+    @commands.hybrid_command(name="c", aliases=["commands", "cmds"], description="Browse all RAI VIBES 💗 commands (Rythm style).")
     async def c_command(self, ctx: commands.Context):
         embed = discord.Embed(
             title="⚡ RAI VIBES 💗 • Command Directory",
@@ -278,7 +278,7 @@ class General(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • The Powerful Discord Bot", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="guardian", aliases=["sentinel", "health"], description="Check RAI GUARDIAN auto-healing status & uptime telemetry.")
+    @commands.command(name="guardian", aliases=["sentinel", "health"])
     async def guardian(self, ctx: commands.Context):
         import json
         from pathlib import Path
@@ -318,7 +318,7 @@ class General(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="cleartags", aliases=["removetags", "untag"], description="Remove 'RF | ' tag prefix from member nicknames.")
+    @commands.command(name="cleartags", aliases=["removetags", "untag"])
     async def cleartags(self, ctx: commands.Context):
         import re
         guild = ctx.guild
@@ -501,8 +501,7 @@ class General(commands.Cog):
         view = UserInfoButtonsView(member, self.bot)
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="avatar", aliases=["av", "pfp"], description="Display member avatar in full resolution.")
-    @discord.app_commands.describe(member="The member whose avatar you want to view (defaults to yourself)")
+    @commands.command(name="avatar", aliases=["av", "pfp"])
     async def avatar(self, ctx: commands.Context, member: discord.Member = None):
         member = member or ctx.author
         avatar_url = member.display_avatar.url
@@ -515,8 +514,7 @@ class General(commands.Cog):
         view.add_item(discord.ui.Button(label="Download", url=avatar_url, style=discord.ButtonStyle.link))
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="banner", aliases=["ubanner"], description="Display member's custom profile banner in full resolution.")
-    @discord.app_commands.describe(member="The member whose banner you want to view (defaults to yourself)")
+    @commands.command(name="banner", aliases=["ubanner"])
     async def banner(self, ctx: commands.Context, member: discord.Member = None):
         member = member or ctx.author
         user = await self.bot.fetch_user(member.id)
@@ -533,7 +531,7 @@ class General(commands.Cog):
         view.add_item(discord.ui.Button(label="Download", url=banner_url, style=discord.ButtonStyle.link))
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="membercount", aliases=["mc", "stats"], description="Display detailed server headcount telemetry.")
+    @commands.command(name="membercount", aliases=["mc", "stats"])
     async def membercount(self, ctx: commands.Context):
         guild = ctx.guild
         total = guild.member_count or len(guild.members)
@@ -555,7 +553,7 @@ class General(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Real-Time Census Telemetry", icon_url=guild.icon.url if guild.icon else None)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="coinflip", aliases=["flip", "coin"], description="Flip a coin (Heads or Tails).")
+    @commands.command(name="coinflip", aliases=["flip", "coin"])
     async def coinflip(self, ctx: commands.Context):
         import random
         result = random.choice(["Heads 🪙", "Tails 🪙"])
@@ -567,8 +565,7 @@ class General(commands.Cog):
         embed.set_footer(text=f"Flipped by {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="roll", aliases=["dice"], description="Roll a dice (default 1-6).")
-    @discord.app_commands.describe(sides="Number of sides on the dice (default: 6)")
+    @commands.command(name="roll")
     async def roll(self, ctx: commands.Context, sides: int = 6):
         import random
         if sides < 2 or sides > 1000:

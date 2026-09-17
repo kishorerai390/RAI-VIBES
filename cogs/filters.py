@@ -42,9 +42,44 @@ class Filters(commands.Cog):
             await player.restart_current_with_filters()
             return await ctx.send(f"⚡ **Audio filter activated:** `{display_name}`")
 
-    @commands.hybrid_command(name="bassboost", aliases=["bb", "bass"], description="Boost the sub-bass frequencies.")
-    @app_commands.describe(level="Bass boost intensity level")
-    async def bassboost(self, ctx: commands.Context, level: Optional[Literal["low", "medium", "high", "extreme", "off"]] = "medium"):
+    @app_commands.command(name="filter", description="Apply studio audio FX filters to the current music playback.")
+    @app_commands.describe(effect="Select an audio filter effect to toggle or activate")
+    @app_commands.choices(effect=[
+        app_commands.Choice(name="⚡ Bass Boost (Medium)", value="bassboost_medium"),
+        app_commands.Choice(name="💥 Bass Boost (Extreme)", value="bassboost_extreme"),
+        app_commands.Choice(name="🌙 Nightcore (Speed + Pitch)", value="nightcore"),
+        app_commands.Choice(name="☕ Slowed + Reverb (Lo-fi)", value="slowed"),
+        app_commands.Choice(name="🎧 8D Spatial Audio", value="8d"),
+        app_commands.Choice(name="🌆 Retro Vaporwave", value="vaporwave"),
+        app_commands.Choice(name="🎤 Karaoke (Vocal Cut)", value="karaoke"),
+        app_commands.Choice(name="🧹 Clear All Filters (Normal)", value="off"),
+    ])
+    async def filter_slash(self, interaction: discord.Interaction, effect: app_commands.Choice[str]):
+        player = self.bot.get_cog("Music").get_player(interaction.guild) if self.bot.get_cog("Music") else None
+        if not player or not player.is_connected or not player.current:
+            return await interaction.response.send_message("❌ RAI VIBES must be streaming music in a voice channel to apply filters.", ephemeral=True)
+
+        target = effect.value
+        display = effect.name
+        if target == "off":
+            player.active_filters.clear()
+            player.custom_speed = 1.0
+            await player.restart_current_with_filters()
+            return await interaction.response.send_message("🧹 **All audio filters deactivated:** Playback restored to studio normal.")
+
+        if target in player.active_filters:
+            player.active_filters.remove(target)
+            await player.restart_current_with_filters()
+            return await interaction.response.send_message(f"➡️ **Audio filter deactivated:** `{display}`")
+        else:
+            if target.startswith("bassboost_"):
+                player.active_filters = [f for f in player.active_filters if not f.startswith("bassboost_")]
+            player.active_filters.append(target)
+            await player.restart_current_with_filters()
+            return await interaction.response.send_message(f"⚡ **Audio filter activated:** `{display}`")
+
+    @commands.command(name="bassboost", aliases=["bb", "bass"])
+    async def bassboost(self, ctx: commands.Context, level: Optional[str] = "medium"):
         target_map = {
             "off": "off",
             "low": "bassboost_low",
@@ -52,27 +87,27 @@ class Filters(commands.Cog):
             "high": "bassboost_high",
             "extreme": "bassboost_extreme"
         }
-        target = target_map.get(level or "medium", "bassboost_medium")
+        target = target_map.get(level.lower() if level else "medium", "bassboost_medium")
         display = level.capitalize() if level else "Medium"
         await self.apply_player_filter(ctx, target, f"Bass Boost [{display}]")
 
-    @commands.hybrid_command(name="nightcore", aliases=["nc"], description="Toggle high-energy Nightcore pitch & speed filter.")
+    @commands.command(name="nightcore", aliases=["nc"])
     async def nightcore(self, ctx: commands.Context):
         await self.apply_player_filter(ctx, "nightcore", "Nightcore")
 
-    @commands.hybrid_command(name="slowed", aliases=["slow", "reverb"], description="Toggle aesthetic Slowed + Reverb audio filter.")
+    @commands.command(name="slowed", aliases=["slow", "reverb"])
     async def slowed(self, ctx: commands.Context):
         await self.apply_player_filter(ctx, "slowed", "Slowed + Reverb")
 
-    @commands.hybrid_command(name="spatial8d", aliases=["8d"], description="Toggle 8D 360-degree spatial headphone rotation.")
+    @commands.command(name="spatial8d", aliases=["8d"])
     async def spatial_8d(self, ctx: commands.Context):
         await self.apply_player_filter(ctx, "8d", "8D Spatial 360 Audio")
 
-    @commands.hybrid_command(name="vaporwave", aliases=["vw"], description="Toggle nostalgic retro Vaporwave filter.")
+    @commands.command(name="vaporwave", aliases=["vw"])
     async def vaporwave(self, ctx: commands.Context):
         await self.apply_player_filter(ctx, "vaporwave", "Vaporwave")
 
-    @commands.hybrid_command(name="karaoke", description="Toggle vocal attenuation filter & display song lyrics for sing-along!")
+    @commands.command(name="karaoke")
     async def karaoke(self, ctx: commands.Context):
         player = self.get_player(ctx)
         if not player or not player.is_connected or not player.current:
@@ -85,37 +120,16 @@ class Filters(commands.Cog):
         else:
             player.active_filters.append("karaoke")
             await player.restart_current_with_filters()
-
-            # Automatically fetch and display lyrics for the song
-            lyrics_cog = self.bot.get_cog("Lyrics")
-            if lyrics_cog and player.current:
-                data = await lyrics_cog.fetch_lyrics(player.current.title)
-                if data and data.get("lyrics"):
-                    lyrics_text = data["lyrics"]
-                    if len(lyrics_text) > 3900:
-                        lyrics_text = lyrics_text[:3885] + "...\n*(Lyrics truncated)*"
-
-                    embed = discord.Embed(
-                        title=f"🎤 Karaoke Sing-Along: {data.get('title', player.current.title)}",
-                        description=f"```fix\n{lyrics_text}\n```" if len(lyrics_text) < 1800 else lyrics_text,
-                        color=0xFF1493
-                    )
-                    embed.set_author(name=f"{data.get('author', 'Artist')} • Sing Along", icon_url=config.RAI_ICON_URL)
-                    embed.set_thumbnail(url=player.current.thumbnail or config.RAI_ICON_URL)
-                    embed.set_footer(text="RAI VIBES 💗 • Center Vocals Attenuated • Sing Loud & Proud!", icon_url=config.RAI_ICON_URL)
-                    return await ctx.send(content="⚡ **Audio Filter Activated: Karaoke (Vocal Attenuation)**", embed=embed)
-
             await ctx.send("⚡ **Audio Filter Activated: Karaoke (Vocal Attenuation)**\n*Center vocal frequencies suppressed. Sing along with the music!*")
 
-    @commands.hybrid_command(name="speed", description="Adjust playback speed (0.5x to 2.0x).")
-    @app_commands.describe(value="Playback speed factor (e.g. 1.25 for 1.25x)")
+    @commands.command(name="speed")
     async def speed(self, ctx: commands.Context, value: float):
         player = self.get_player(ctx)
         if not player or not player.is_connected or not player.current:
-            return await ctx.send("❌ RAI VIBES 💗 must be playing a song to adjust speed.", ephemeral=True)
+            return await ctx.send("❌ RAI VIBES 💗 must be playing a song to adjust speed.")
 
         if not 0.5 <= value <= 2.0:
-            return await ctx.send("❌ Speed must be between 0.5x and 2.0x.", ephemeral=True)
+            return await ctx.send("❌ Speed must be between 0.5x and 2.0x.")
 
         player.custom_speed = value
         await player.restart_current_with_filters()

@@ -202,12 +202,14 @@ class Radio(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 Tamil Nadu FM Live", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="tnfm", description="Quick shortcut: Stream 24/7 Tamil Nadu FM Live!")
+    @commands.command(name="tnfm")
     async def tnfm(self, ctx: commands.Context):
+        """Quick prefix shortcut: Stream 24/7 Tamil Nadu FM Live!"""
         await self.tamilnadufm(ctx)
 
-    @commands.hybrid_command(name="tamil", description="Quick shortcut: Stream 24/7 Non-Stop Tamil Hit Songs!")
+    @commands.command(name="tamil")
     async def tamil(self, ctx: commands.Context):
+        """Quick prefix shortcut: Stream 24/7 Non-Stop Tamil Hit Songs!"""
         await self.tamilnadufm(ctx)
 
     @commands.hybrid_command(name="radio", description="Stream continuous 24/7 live themed radio stations.")

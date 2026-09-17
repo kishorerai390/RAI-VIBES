@@ -198,6 +198,10 @@ class Leveling(commands.Cog):
         self.message_cooldowns[message.author.id] = now
         xp_gain = random.randint(15, 25)
 
+        # Weekend 2x XP Multiplier (Saturday & Sunday UTC)
+        if datetime.datetime.now(datetime.timezone.utc).weekday() in (5, 6):
+            xp_gain *= 2
+
         new_xp, new_lvl, leveled_up = await database.add_user_xp(message.guild.id, message.author.id, xp_gain)
 
         if leveled_up:
@@ -260,9 +264,12 @@ class Leveling(commands.Cog):
                 for member in vc.members:
                     if member.bot or member.voice.self_deaf or member.voice.deaf:
                         continue
-                    # Award 15 XP + 5 Coins for active voice participation
-                    await database.add_user_xp(guild.id, member.id, 15)
-                    award_vc_coins(member.id, amount=5)
+                    # Award 15 XP (30 on weekends) + 5 Coins (10 on weekends) for active voice participation
+                    is_weekend = datetime.datetime.now(datetime.timezone.utc).weekday() in (5, 6)
+                    v_xp = 30 if is_weekend else 15
+                    v_coins = 10 if is_weekend else 5
+                    await database.add_user_xp(guild.id, member.id, v_xp)
+                    award_vc_coins(member.id, amount=v_coins)
 
     @voice_xp_task.before_loop
     async def before_voice_task(self):

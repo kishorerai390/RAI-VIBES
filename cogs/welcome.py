@@ -521,7 +521,7 @@ class Welcome(commands.Cog):
             except Exception:
                 pass
 
-    @commands.hybrid_command(name="testwelcome", description="Preview the Grand Royal Welcome Card & Announcement.")
+    @commands.command(name="testwelcome")
     @commands.has_permissions(administrator=True)
     async def testwelcome(self, ctx: commands.Context, member: discord.Member = None):
         target = member or ctx.author
@@ -589,7 +589,7 @@ class Welcome(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Failed to generate preview: {e}")
 
-    @commands.hybrid_command(name="testgoodbye", description="Preview the Grand Royal Farewell & Goodbye Card.")
+    @commands.command(name="testgoodbye")
     @commands.has_permissions(administrator=True)
     async def testgoodbye(self, ctx: commands.Context, member: discord.Member = None):
         target = member or ctx.author

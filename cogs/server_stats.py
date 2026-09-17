@@ -69,6 +69,9 @@ class ServerStats(commands.Cog):
                     await ch_bot.edit(name=name_bot)
                     logger.info(f"Updated Bots -> {name_bot}")
 
+            # 4. Check & Celebrate Milestones
+            await self.check_milestones(guild, total)
+
         except discord.errors.HTTPException as e:
             if e.status == 429:
                 logger.warning(f"Stats rate limited by Discord, will retry next cycle.")
@@ -76,6 +79,51 @@ class ServerStats(commands.Cog):
                 logger.error(f"Error updating stats: {e}")
         except Exception as e:
             logger.error(f"Unexpected stats error: {e}")
+
+    async def check_milestones(self, guild: discord.Guild, total_members: int):
+        import json
+        from pathlib import Path
+        milestones_file = Path("data") / "milestones.json"
+        milestones_file.parent.mkdir(parents=True, exist_ok=True)
+        announced = []
+        if milestones_file.exists():
+            try:
+                with open(milestones_file, "r", encoding="utf-8") as f:
+                    announced = json.load(f)
+            except Exception:
+                announced = []
+
+        MILESTONES = [30, 50, 75, 100, 150, 200, 250, 500]
+        for m in MILESTONES:
+            if total_members >= m and m not in announced:
+                announced.append(m)
+                try:
+                    with open(milestones_file, "w", encoding="utf-8") as f:
+                        json.dump(announced, f, indent=2)
+                except Exception:
+                    pass
+
+                ch = guild.get_channel(1545502718792175646) or guild.get_channel(1545502730699808768)
+                if ch:
+                    embed = discord.Embed(
+                        title="🎉 ✦ SERVER MILESTONE ACHIEVED! ✦ 🎉",
+                        description=(
+                            f"✨ **RAI FAM 💗 has officially crossed {m} Members!** ✨\n\n"
+                            f"A massive thank you to everyone who made this community vibrant, welcoming, and fun!\n"
+                            f"Here is to the next big milestone on our journey together! 🌸"
+                        ),
+                        color=0xFF69B4
+                    )
+                    icon_url = guild.icon.url if guild.icon else "https://cdn.discordapp.com/emojis/1149363065603702834.webp"
+                    embed.set_footer(text=f"RAI FAM 💗 Milestone Tracker • {total_members} Members Strong", icon_url=icon_url)
+                    try:
+                        await ch.send(content="@everyone 🎊", embed=embed)
+                    except Exception:
+                        try:
+                            await ch.send(embed=embed)
+                        except Exception:
+                            pass
+                logger.info(f"Announced server milestone: {m} members!")
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):

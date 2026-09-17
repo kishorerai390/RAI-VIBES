@@ -407,6 +407,89 @@ class Casino(commands.Cog):
         embed.set_footer(text="RAI VIBES Casino • High Rollers Arena")
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="spin", description="Spin the Daily Lucky Wheel of Fortune for bonus coins and jackpots!")
+    async def spin_wheel(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        spins_file = DATA_DIR / "spins.json"
+        now = int(time.time())
+        cooldown = 64800  # 18 hours
+
+        spins_data = {}
+        if spins_file.exists():
+            try:
+                with open(spins_file, "r", encoding="utf-8") as f:
+                    spins_data = json.load(f)
+            except Exception:
+                pass
+
+        last_spin = spins_data.get(str(user_id), 0)
+        if now - last_spin < cooldown:
+            next_spin_ts = last_spin + cooldown
+            return await interaction.response.send_message(
+                f"⏳ You have already spun the wheel today! Your next spin is available <t:{next_spin_ts}:R> (<t:{next_spin_ts}:t>).",
+                ephemeral=True
+            )
+
+        # Record spin time
+        spins_data[str(user_id)] = now
+        try:
+            with open(spins_file, "w", encoding="utf-8") as f:
+                json.dump(spins_data, f, indent=2)
+        except Exception:
+            pass
+
+        # Defer and show spinning animation
+        await interaction.response.defer()
+
+        # Spin outcome selection
+        TIERS = [
+            ("🍒", 150, "Cherry Nibble", 0xFF6B81, 35),
+            ("🍋", 300, "Lemon Zest", 0xFFA502, 25),
+            ("🍇", 600, "Grape Rush", 0x9B59B6, 20),
+            ("🔔", 1200, "Golden Bell", 0x00FFCC, 12),
+            ("⭐", 2500, "Starlight Bonanza", 0xFFD700, 6),
+            ("💎", 5000, "GRAND CYBER JACKPOT", 0xFF1493, 2),
+        ]
+
+        weights = [t[4] for t in TIERS]
+        chosen_tier = random.choices(TIERS, weights=weights, k=1)[0]
+        symbol, reward, tier_name, color, _ = chosen_tier
+
+        # Reel animation
+        reel1 = symbol
+        reel2 = symbol if random.random() < 0.75 else random.choice(["🍒", "🍋", "🍇", "🔔"])
+        reel3 = symbol if reel2 == symbol and random.random() < 0.65 else random.choice(["🍒", "🍋", "🍇", "🔔", "⭐"])
+
+        embed_spinning = discord.Embed(
+            title="🎰 ┊ 𝐋𝐔𝐂𝐊𝐘  𝐖𝐇𝐄𝐄𝐋  𝐎𝐅  𝐅𝐎𝐑𝐓𝐔𝐍𝐄",
+            description=(
+                f"✦ ───────────────────────────────────── ✦\n\n"
+                f"### `[ 🌀 ┊ 🌀 ┊ 🌀 ]`\n"
+                f"*The wheel is spinning through the neon reels...*\n\n"
+                f"✦ ───────────────────────────────────── ✦"
+            ),
+            color=0x2B0938
+        )
+        msg = await interaction.followup.send(embed=embed_spinning)
+        await asyncio.sleep(1.8)
+
+        add_coins(user_id, reward)
+        record_stats(user_id, won=True)
+
+        embed_result = discord.Embed(
+            title="🎰 ┊ 𝐋𝐔𝐂𝐊𝐘  𝐖𝐇𝐄𝐄𝐋  𝐎𝐅  𝐅𝐎𝐑𝐓𝐔𝐍𝐄",
+            description=(
+                f"✦ ───────────────────────────────────── ✦\n\n"
+                f"### `[ {reel1} ┊ {reel2} ┊ {reel3} ]`\n\n"
+                f"✨ **Tier Reached:** `{tier_name}`\n"
+                f"💰 **Payout Awarded:** `+{reward:,} Rai Coins`!\n\n"
+                f"✦ ───────────────────────────────────── ✦\n"
+                f"Come back <t:{now + cooldown}:R> for your next free spin! 🌸"
+            ),
+            color=color
+        )
+        embed_result.set_footer(text=f"Spun by {interaction.user.display_name} • Daily Wheel", icon_url=interaction.user.display_avatar.url)
+        await msg.edit(embed=embed_result)
 
 
 async def setup(bot: commands.Bot):
