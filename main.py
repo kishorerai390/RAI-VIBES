@@ -414,6 +414,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.antinuke",
         "cogs.whitelist",
         "cogs.arcade_panel",
+        "cogs.verify",
     ]
 
     for extension in initial_extensions:
