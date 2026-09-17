@@ -1282,6 +1282,106 @@ class Moderation(commands.Cog):
         view = ModPanelView(member, ctx.author, self)
         await ctx.send(embed=embed, view=view, ephemeral=True)
 
+    @app_commands.command(name="lockdown", description="Lockdown the channel to prevent raids or spam breaches.")
+    @app_commands.describe(channel="Channel to lockdown (defaults to current)", reason="Reason for emergency lockdown")
+    async def lockdown_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None, reason: Optional[str] = "Emergency Sentinel Lockdown"):
+        if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /lockdown.", ephemeral=True)
+
+        target_ch = channel or interaction.channel
+        guild = interaction.guild
+        everyone_role = guild.default_role
+
+        try:
+            current_overwrite = target_ch.overwrites_for(everyone_role)
+            current_overwrite.send_messages = False
+            await target_ch.set_permissions(everyone_role, overwrite=current_overwrite, reason=f"Lockdown by {interaction.user.name}: {reason}")
+
+            embed = discord.Embed(
+                title="🚨 ┊ 𝐂𝐇𝐀𝐍𝐍𝐄𝐋  𝐋𝐎𝐂𝐊𝐃𝐎𝐖𝐍  𝐄𝐍𝐅𝐎𝐑𝐂𝐄𝐃",
+                description=(
+                    f"🔒 **{target_ch.mention} has been locked down by Server Staff.**\n\n"
+                    f"📋 **Reason:** `{reason}`\n"
+                    f"🛡️ **Status:** Public messaging temporarily suspended.\n"
+                    f"⚡ *Please remain calm while moderators handle the situation.*"
+                ),
+                color=0xFF4757
+            )
+            embed.set_footer(text="RAI FAM 💗 • Sentinel Shield", icon_url=config.RAI_ICON_URL)
+            embed.timestamp = discord.utils.utcnow()
+            await target_ch.send(embed=embed)
+            if target_ch.id != interaction.channel.id:
+                await interaction.response.send_message(f"🔒 Successfully locked down {target_ch.mention}.", ephemeral=True)
+            else:
+                await interaction.response.send_message("🔒 Lockdown active.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Failed to lockdown channel: {e}", ephemeral=True)
+
+    @app_commands.command(name="unlock", description="Unlock a previously locked down channel.")
+    @app_commands.describe(channel="Channel to unlock (defaults to current)")
+    async def unlock_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
+        if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /unlock.", ephemeral=True)
+
+        target_ch = channel or interaction.channel
+        guild = interaction.guild
+        everyone_role = guild.default_role
+
+        try:
+            current_overwrite = target_ch.overwrites_for(everyone_role)
+            current_overwrite.send_messages = None
+            await target_ch.set_permissions(everyone_role, overwrite=current_overwrite, reason=f"Channel unlocked by {interaction.user.name}")
+
+            embed = discord.Embed(
+                title="🔓 ┊ 𝐂𝐇𝐀𝐍𝐍𝐄𝐋  𝐔𝐍𝐋𝐎𝐂𝐊𝐄𝐃",
+                description=(
+                    f"✨ **{target_ch.mention} has been unlocked.**\n\n"
+                    f"💬 Regular messaging permissions have been restored.\n"
+                    f"Enjoy your time in **RAI FAM 💗** and please follow server rules!"
+                ),
+                color=0x2ED573
+            )
+            embed.set_footer(text="RAI FAM 💗 • Sentinel Shield", icon_url=config.RAI_ICON_URL)
+            embed.timestamp = discord.utils.utcnow()
+            await target_ch.send(embed=embed)
+            if target_ch.id != interaction.channel.id:
+                await interaction.response.send_message(f"🔓 Successfully unlocked {target_ch.mention}.", ephemeral=True)
+            else:
+                await interaction.response.send_message("🔓 Channel unlocked.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Failed to unlock channel: {e}", ephemeral=True)
+
+    @app_commands.command(name="prunechannels", description="Prune empty temporary voice rooms and unused channels.")
+    async def prunechannels_cmd(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /prunechannels.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        pruned = 0
+
+        for vc in guild.voice_channels:
+            name_lower = vc.name.lower()
+            is_temp = ("'s room" in name_lower or "temp-" in name_lower or "hub-" in name_lower or "dynamic" in name_lower)
+            if is_temp and len(vc.members) == 0:
+                try:
+                    await vc.delete(reason=f"Automated Channel Pruner by {interaction.user.name}")
+                    pruned += 1
+                except Exception:
+                    pass
+
+        embed = discord.Embed(
+            title="🧹 ┊ 𝐂𝐇𝐀𝐍𝐍𝐄𝐋  𝐏𝐑𝐔𝐍𝐄  𝐂𝐎𝐌𝐏𝐋𝐄𝐓𝐄",
+            description=(
+                f"✅ Scanned all voice lounges in **{guild.name}**.\n\n"
+                f"🗑️ **Pruned Channels:** `{pruned}` empty temporary rooms\n"
+                f"✨ Channel hierarchy is clean and optimized!"
+            ),
+            color=0x00F2FE
+        )
+        embed.set_footer(text="RAI FAM 💗 • Sentinel Maintenance", icon_url=config.RAI_ICON_URL)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 class ModPanelView(discord.ui.View):
     def __init__(self, target: discord.Member, author: discord.Member, cog):

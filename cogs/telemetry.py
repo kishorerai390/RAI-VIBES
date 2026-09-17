@@ -261,6 +261,72 @@ class Telemetry(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Hall of Fame Milestones", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="telemetry", description="Display real-time bot performance, active voice loungers, and server health telemetry.")
+    async def telemetry_dashboard(self, interaction: discord.Interaction):
+        import psutil
+        guild = interaction.guild
+        data = load_telemetry()
+        songs = data.get("songs", {})
+        total_plays = sum(songs.values())
+
+        # Bot latency & memory
+        ping_ms = round(self.bot.latency * 1000)
+        process = psutil.Process()
+        ram_mb = round(process.memory_info().rss / (1024 * 1024), 1)
+        cpu_usage = psutil.cpu_percent(interval=None)
+
+        # Voice lounge census
+        active_vc_members = 0
+        active_vcs = 0
+        if guild:
+            for vc in guild.voice_channels:
+                m_count = len([m for m in vc.members if not m.bot])
+                if m_count > 0:
+                    active_vcs += 1
+                    active_vc_members += m_count
+
+        # Visual bar for ping
+        if ping_ms < 60:
+            ping_status = f"🟢 **Excellent** (`{ping_ms}ms`)"
+        elif ping_ms < 150:
+            ping_status = f"🟡 **Normal** (`{ping_ms}ms`)"
+        else:
+            ping_status = f"🔴 **High** (`{ping_ms}ms`)"
+
+        total_members = guild.member_count if guild else sum(len(g.members) for g in self.bot.guilds)
+
+        embed = discord.Embed(
+            title="⚡ ┊ 𝐑𝐀𝐈  𝐕𝐈𝐁𝐄𝐒  •  𝐋𝐈𝐕𝐄  𝐓𝐄𝐋𝐄𝐌𝐄𝐓𝐑𝐘  𝐃𝐀𝐒𝐇𝐁𝐎𝐀𝐑𝐃",
+            description=(
+                f"Real-time operational telemetry for **{guild.name if guild else 'RAI Community'}**:\n"
+                f"✦ ───────────────────────────────────── ✦"
+            ),
+            color=0x00F2FE
+        )
+        embed.set_thumbnail(url=config.RAI_ICON_URL)
+        embed.add_field(name="📶 Gateway Ping", value=ping_status, inline=True)
+        embed.add_field(name="🧠 Bot Memory", value=f"`{ram_mb} MB` RAM", inline=True)
+        embed.add_field(name="⚙️ CPU Load", value=f"`{cpu_usage}%` Usage", inline=True)
+
+        embed.add_field(
+            name="🎙️ Active Voice Lounges",
+            value=f"**{active_vc_members} Members** across **{active_vcs} Lounges**",
+            inline=True
+        )
+        embed.add_field(name="👥 Community Citizens", value=f"**{total_members:,} Members**", inline=True)
+        embed.add_field(name="🎵 Total Streamed Songs", value=f"**{total_plays:,} Tracks**", inline=True)
+
+        embed.add_field(
+            name="🛡️ Sentinel Shield Status",
+            value="🟢 **Online & Enforcing** • Anti-Link & Verification Active",
+            inline=False
+        )
+
+        embed.set_footer(text="RAI VIBES Telemetry Core • 24/7 Audio & Community Shield", icon_url=config.RAI_ICON_URL)
+        embed.timestamp = discord.utils.utcnow()
+
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Telemetry(bot))

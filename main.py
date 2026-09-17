@@ -8,7 +8,7 @@ import logging
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import colorama
 from colorama import Fore, Style
 
@@ -62,11 +62,27 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         logger.info(f"Logged in as: {b.user.name}#{b.user.discriminator} (ID: {b.user.id})")
         logger.info(f"Connected to {len(b.guilds)} Discord server(s)")
         
-        activity = discord.Streaming(
-            name="🌸 24/7 Lo-Fi Chill Hop • /help",
-            url="https://twitch.tv/lofigirl"
-        )
-        await b.change_presence(activity=activity)
+        # Dynamic Presence Rotator (Item 48)
+        presences = [
+            discord.Streaming(name="🌸 24/7 Lo-Fi Chill Hop • /play", url="https://twitch.tv/lofigirl"),
+            discord.Activity(type=discord.ActivityType.watching, name="🎮 Gaming Hub & Tourneys • /lfg"),
+            discord.Activity(type=discord.ActivityType.listening, name="🍅 Focus Lounges • /pomodoro"),
+            discord.Activity(type=discord.ActivityType.playing, name="🪙 High Rollers Casino • /spin"),
+            discord.Activity(type=discord.ActivityType.watching, name="🛡️ Guarding RAI FAM 💗 • /telemetry")
+        ]
+
+        @tasks.loop(minutes=3)
+        async def status_rotator():
+            idx = getattr(status_rotator, "idx", 0)
+            try:
+                await b.change_presence(activity=presences[idx % len(presences)])
+                status_rotator.idx = idx + 1
+            except Exception:
+                pass
+
+        if not hasattr(b, "_status_rotator_started"):
+            b._status_rotator_started = True
+            status_rotator.start()
 
         # Automatically update server nickname to match RAI VIBES
         for guild in b.guilds:
@@ -389,6 +405,10 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.lottery",
         "cogs.party_games",
         "cogs.invites",
+        "cogs.productivity",
+        "cogs.tickets",
+        "cogs.antilink",
+        "cogs.moderation",
     ]
 
     for extension in initial_extensions:

@@ -70,52 +70,6 @@ class PartyGames(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="pomodoro", description="Start a productivity focus Pomodoro timer with coin completion rewards!")
-    @app_commands.describe(minutes="Duration of study session in minutes (default 25 min)")
-    async def pomodoro_timer(self, interaction: discord.Interaction, minutes: int = 25):
-        if minutes < 5 or minutes > 120:
-            return await interaction.response.send_message("❌ Pomodoro timer must be between 5 and 120 minutes.", ephemeral=True)
-
-        user = interaction.user
-        end_time = int(time.time()) + (minutes * 60)
-
-        embed_start = discord.Embed(
-            title="🍅 ┊ 𝐏𝐎𝐌𝐎𝐃𝐎𝐑𝐎  𝐅𝐎𝐂𝐔𝐒  𝐒𝐄𝐒𝐒𝐈𝐎𝐍",
-            description=(
-                f"Concentration session started for {user.mention}!\n\n"
-                f"⏱️ **Duration:** `{minutes} Minutes`\n"
-                f"🎯 **Target Finish:** <t:{end_time}:R> (<t:{end_time}:t>)\n"
-                f"💡 **Tip:** Mute distractions and join <#1545781986193309789> (Lo-Fi Zone) for gentle background music!\n\n"
-                f"✨ *Complete the full session to earn bonus Rai Coins!*"
-            ),
-            color=0xFF4757
-        )
-        embed_start.set_footer(text="Focus Mode Activated • Work hard, play hard")
-        await interaction.response.send_message(embed=embed_start)
-
-        # Background countdown and completion notification
-        async def countdown_task():
-            await asyncio.sleep(minutes * 60)
-            from cogs.casino import add_coins
-            coin_reward = minutes * 10
-            add_coins(user.id, coin_reward)
-
-            embed_done = discord.Embed(
-                title="🔔 ✦ POMODORO SESSION COMPLETE! ✦ 🔔",
-                description=(
-                    f"Great job {user.mention}! Your **{minutes}-minute** study focus session has ended!\n\n"
-                    f"☕ **Time to take a 5-minute break:** stretch, hydrate, or rest your eyes.\n"
-                    f"🪙 **Productivity Reward:** `+{coin_reward:,} Rai Coins` credited to your wallet!"
-                ),
-                color=0x00FF88
-            )
-            embed_done.set_footer(text="RAI VIBES Productivity Engine", icon_url=config.RAI_ICON_URL)
-            try:
-                await interaction.channel.send(content=f"🔔 {user.mention}", embed=embed_done)
-            except Exception:
-                pass
-
-        asyncio.create_task(countdown_task())
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PartyGames(bot))
