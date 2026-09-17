@@ -1134,7 +1134,26 @@ class EntrySound(commands.Cog):
     @entrysound_group.command(name="upload", description="Upload an audio file (.mp3, .wav, .ogg, max 8MB) as your personal entrance sound.")
     @app_commands.describe(file="Audio file attachment (.mp3, .wav, or .ogg)")
     async def upload_cmd(self, ctx: commands.Context, file: discord.Attachment):
-        await ctx.defer(ephemeral=True)
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            try:
+                await ctx.interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
+        elif not ctx.interaction:
+            try:
+                await ctx.defer(ephemeral=True)
+            except Exception:
+                pass
+
+        async def reply(content: Optional[str] = None, embed: Optional[discord.Embed] = None):
+            if ctx.interaction:
+                if ctx.interaction.response.is_done():
+                    return await ctx.interaction.followup.send(content=content, embed=embed, ephemeral=True)
+                else:
+                    return await ctx.interaction.response.send_message(content=content, embed=embed, ephemeral=True)
+            else:
+                return await ctx.send(content=content, embed=embed)
+
         prof = get_user_entry_profile(ctx.author.id)
         is_unlocked = prof.get("custom_unlocked", False) or ctx.author.id == OWNER_ID
         if not is_unlocked:
@@ -1144,19 +1163,20 @@ class EntrySound(commands.Cog):
                 unlock_custom_pass(ctx.author.id)
 
         if not is_unlocked:
-            return await ctx.send(
-                "🔒 **Custom Audio Upload is a Premium Perk!**\n"
-                "Unlock it in `#🛒・server-shop` with **🔮 Custom Audio URL Pass** (`3,000 Coins`), "
-                "or gain instant access by becoming a **💎 VIP Elite** or **Server Booster**!",
-                ephemeral=True
+            return await reply(
+                content=(
+                    "🔒 **Custom Audio Upload is a Premium Perk!**\n"
+                    "Unlock it in `#🛒・server-shop` with **🔮 Custom Audio URL Pass** (`3,000 Coins`), "
+                    "or gain instant access by becoming a **💎 VIP Elite** or **Server Booster**!"
+                )
             )
 
         filename = file.filename.lower()
         if not any(filename.endswith(ext) for ext in [".mp3", ".wav", ".ogg", ".m4a"]):
-            return await ctx.send("❌ Only audio files (`.mp3`, `.wav`, `.ogg`, `.m4a`) are supported.", ephemeral=True)
+            return await reply(content="❌ Only audio files (`.mp3`, `.wav`, `.ogg`, `.m4a`) are supported.")
 
         if file.size > 8 * 1024 * 1024:
-            return await ctx.send("❌ Audio file size cannot exceed 8MB.", ephemeral=True)
+            return await reply(content="❌ Audio file size cannot exceed 8MB.")
 
         try:
             CUSTOM_SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1186,15 +1206,34 @@ class EntrySound(commands.Cog):
                 color=0x2ECC71
             )
             embed.set_footer(text="RAI FAM 💗 • Custom Audio Studio", icon_url=config.RAI_ICON_URL)
-            await ctx.send(embed=embed, ephemeral=True)
+            await reply(embed=embed)
         except Exception as e:
             logger.error(f"Error saving uploaded sound: {e}")
-            await ctx.send(f"❌ Error saving audio file: {e}", ephemeral=True)
+            await reply(content=f"❌ Error saving audio file: {e}")
 
     @entrysound_group.command(name="custom", description="Set a direct web audio stream URL (.mp3, .wav) as your entrance theme.")
     @app_commands.describe(url="Direct public URL to an MP3 or WAV audio stream")
     async def custom_cmd(self, ctx: commands.Context, url: str):
-        await ctx.defer(ephemeral=True)
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            try:
+                await ctx.interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
+        elif not ctx.interaction:
+            try:
+                await ctx.defer(ephemeral=True)
+            except Exception:
+                pass
+
+        async def reply(content: Optional[str] = None, embed: Optional[discord.Embed] = None):
+            if ctx.interaction:
+                if ctx.interaction.response.is_done():
+                    return await ctx.interaction.followup.send(content=content, embed=embed, ephemeral=True)
+                else:
+                    return await ctx.interaction.response.send_message(content=content, embed=embed, ephemeral=True)
+            else:
+                return await ctx.send(content=content, embed=embed)
+
         prof = get_user_entry_profile(ctx.author.id)
         is_unlocked = prof.get("custom_unlocked", False) or ctx.author.id == OWNER_ID
         if not is_unlocked:
@@ -1204,16 +1243,17 @@ class EntrySound(commands.Cog):
                 unlock_custom_pass(ctx.author.id)
 
         if not is_unlocked:
-            return await ctx.send(
-                "🔒 **Custom Audio Stream URL is a Premium Perk!**\n"
-                "Unlock it in `#🛒・server-shop` with **🔮 Custom Audio URL Pass** (`3,000 Coins`), "
-                "or gain instant access by becoming a **💎 VIP Elite** or **Server Booster**!",
-                ephemeral=True
+            return await reply(
+                content=(
+                    "🔒 **Custom Audio Stream URL is a Premium Perk!**\n"
+                    "Unlock it in `#🛒・server-shop` with **🔮 Custom Audio URL Pass** (`3,000 Coins`), "
+                    "or gain instant access by becoming a **💎 VIP Elite** or **Server Booster**!"
+                )
             )
 
         url = url.strip()
         if not (url.startswith("http://") or url.startswith("https://")):
-            return await ctx.send("❌ Invalid URL. Must start with `http://` or `https://`.", ephemeral=True)
+            return await reply(content="❌ Invalid URL. Must start with `http://` or `https://`.")
 
         data = load_entry_data()
         u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {})
@@ -1238,7 +1278,7 @@ class EntrySound(commands.Cog):
             color=0x2ECC71
         )
         embed.set_footer(text="RAI FAM 💗 • Custom Audio Studio", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed, ephemeral=True)
+        await reply(embed=embed)
 
     @entrysound_group.command(name="preview", description="Preview and listen to any entrance theme.")
     @app_commands.describe(theme="Theme key or name (e.g. gigachad, anime_wow, tokyo_drift)")
