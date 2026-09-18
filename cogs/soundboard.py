@@ -339,23 +339,17 @@ class Soundboard(commands.Cog):
                 color=0xFF0055
             )
             embed.set_footer(text="RAI FAM 💗 • Founder Voice Authority", icon_url=config.RAI_ICON_URL)
-            if ctx.interaction:
-                return await ctx.interaction.response.send_message(embed=embed, ephemeral=True)
-            else:
-                return await ctx.send(embed=embed)
-
-        # 2. Defer interaction if present
-        if ctx.interaction and not ctx.interaction.response.is_done():
-            await ctx.interaction.response.defer(ephemeral=False)
+            return await ctx.send(embed=embed, ephemeral=True)
 
         async def reply_msg(content: Optional[str] = None, embed: Optional[discord.Embed] = None):
-            if ctx.interaction:
-                if ctx.interaction.response.is_done():
-                    return await ctx.interaction.followup.send(content=content, embed=embed)
-                else:
-                    return await ctx.interaction.response.send_message(content=content, embed=embed)
-            else:
+            try:
                 return await ctx.send(content=content, embed=embed)
+            except Exception:
+                if ctx.channel:
+                    try:
+                        return await ctx.channel.send(content=content, embed=embed)
+                    except Exception:
+                        pass
 
         # 3. Determine target channel
         target_chan = channel
