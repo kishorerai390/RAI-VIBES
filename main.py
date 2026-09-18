@@ -167,8 +167,11 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
     async def auto_defer_commands(ctx: commands.Context):
         """Immediately defers slash command interactions to prevent 'didn't respond in time' timeouts."""
         if ctx.interaction and not ctx.interaction.response.is_done():
+            cmd_name = ctx.command.name if ctx.command else ""
+            ephemeral_commands = {"mutesoundboard", "unmutesoundboard", "entrysound"}
+            is_ephem = cmd_name in ephemeral_commands
             try:
-                await ctx.defer()
+                await ctx.defer(ephemeral=is_ephem)
             except Exception:
                 pass
 

@@ -341,15 +341,12 @@ class Soundboard(commands.Cog):
             embed.set_footer(text="RAI FAM 💗 • Founder Voice Authority", icon_url=config.RAI_ICON_URL)
             return await ctx.send(embed=embed, ephemeral=True)
 
+        # Reply ONLY to the user who ran the command (ephemeral)
         async def reply_msg(content: Optional[str] = None, embed: Optional[discord.Embed] = None):
             try:
-                return await ctx.send(content=content, embed=embed)
-            except Exception:
-                if ctx.channel:
-                    try:
-                        return await ctx.channel.send(content=content, embed=embed)
-                    except Exception:
-                        pass
+                return await ctx.send(content=content, embed=embed, ephemeral=True)
+            except Exception as e:
+                pass
 
         # 3. Determine target channel
         target_chan = channel
