@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import Optional
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 
 import database
@@ -223,6 +224,139 @@ class AutoProvision(commands.Cog):
                             pass
             except Exception as e:
                 logger.error(f"Watchdog error in {guild.name}: {e}")
+
+    # -------------------------------------------------------------
+    # SLASH COMMANDS: /backup
+    # -------------------------------------------------------------
+    backup_group = app_commands.Group(name="backup", description="Server disaster recovery snapshots and restoration.")
+
+    @backup_group.command(name="snapshot", description="Take a fresh SQLite backup snapshot of all server channels and roles.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def backup_snapshot_cmd(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        ch_count = 0
+        for ch in guild.channels:
+            try:
+                await database.save_channel_snapshot(guild.id, ch)
+                ch_count += 1
+            except Exception:
+                pass
+
+        role_count = 0
+        for r in guild.roles:
+            if r != guild.default_role:
+                try:
+                    await database.save_role_snapshot(guild.id, r)
+                    role_count += 1
+                except Exception:
+                    pass
+
+        embed = discord.Embed(
+            title="📸 Disaster Recovery Snapshot Created",
+            description=(
+                f"Successfully backed up server infrastructure to persistent SQLite vault:\n\n"
+                f"• **Channels Stored:** `{ch_count}`\n"
+                f"• **Roles Stored:** `{role_count}`\n"
+                f"• **Snapshot Timestamp:** <t:{int(time.time())}:F>"
+            ),
+            color=0x00FF88
+        )
+        embed.set_footer(text="RAI SENTINEL • Anti-Nuke Recovery Vault")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @backup_group.command(name="status", description="View current disaster recovery snapshot statistics.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def backup_status_cmd(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        channels = await database.get_all_channel_snapshots(interaction.guild_id)
+        roles = await database.get_all_role_snapshots(interaction.guild_id)
+
+        embed = discord.Embed(
+            title="🛡️ Disaster Recovery Vault Status",
+            color=0x70A1FF
+        )
+        embed.add_field(name="📁 Backed Up Channels", value=f"`{len(channels)}` channels", inline=True)
+        embed.add_field(name="🎭 Backed Up Roles", value=f"`{len(roles)}` roles", inline=True)
+        embed.add_field(name="🔒 Vault Engine", value="`SQLite3 Persistent WAL`", inline=True)
+        embed.set_footer(text="RAI SENTINEL • Disaster Recovery")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @backup_group.command(name="restore", description="Restore deleted channels and roles from the disaster recovery snapshot.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def backup_restore_cmd(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        channels_snap = await database.get_all_channel_snapshots(guild.id)
+        roles_snap = await database.get_all_role_snapshots(guild.id)
+
+        if not channels_snap and not roles_snap:
+            return await interaction.followup.send("❌ No snapshot records found in vault for this server.", ephemeral=True)
+
+        existing_channel_names = {c.name.lower() for c in guild.channels}
+        existing_role_names = {r.name.lower() for r in guild.roles}
+
+        restored_roles = 0
+        for r_data in roles_snap:
+            r_name = r_data["name"]
+            if r_name.lower() not in existing_role_names:
+                try:
+                    await guild.create_role(
+                        name=r_name,
+                        color=discord.Color(r_data.get("color", 0)),
+                        permissions=discord.Permissions(r_data.get("permissions", 0)),
+                        hoist=bool(r_data.get("hoist", 0)),
+                        reason="[Disaster Recovery] Restoring missing role from vault"
+                    )
+                    restored_roles += 1
+                except Exception as e:
+                    logger.warning(f"Could not restore role {r_name}: {e}")
+
+        restored_channels = 0
+        # 1. Restore categories first
+        category_map = {}
+        for c_data in channels_snap:
+            if c_data.get("channel_type") == "category":
+                c_name = c_data["name"]
+                cat = discord.utils.get(guild.categories, name=c_name)
+                if not cat:
+                    try:
+                        cat = await guild.create_category(name=c_name, reason="[Disaster Recovery] Restoring category")
+                        restored_channels += 1
+                    except Exception:
+                        pass
+                if cat:
+                    category_map[c_data["channel_id"]] = cat
+
+        # 2. Restore text and voice channels
+        for c_data in channels_snap:
+            c_type = c_data.get("channel_type")
+            if c_type == "category":
+                continue
+            c_name = c_data["name"]
+            if c_name.lower() not in existing_channel_names:
+                target_cat = category_map.get(c_data.get("category_id"))
+                try:
+                    if c_type == "voice":
+                        await guild.create_voice_channel(name=c_name, category=target_cat, reason="[Disaster Recovery] Restoring voice channel")
+                    else:
+                        await guild.create_text_channel(name=c_name, category=target_cat, topic=c_data.get("topic") or None, reason="[Disaster Recovery] Restoring text channel")
+                    restored_channels += 1
+                except Exception as e:
+                    logger.warning(f"Could not restore channel {c_name}: {e}")
+
+        embed = discord.Embed(
+            title="🛡️ Disaster Recovery Completed",
+            description=(
+                f"Restoration process completed from vault snapshot:\n\n"
+                f"• **Restored Channels:** `{restored_channels}`\n"
+                f"• **Restored Roles:** `{restored_roles}`\n\n"
+                f"Any channels or roles that were missing have been reconstructed."
+            ),
+            color=0x2ED573
+        )
+        embed.set_footer(text="RAI SENTINEL • Autonomous Infrastructure Restoration")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoProvision(bot))

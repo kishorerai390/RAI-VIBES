@@ -27,13 +27,17 @@ class AutoUpdater(commands.Cog):
         self.last_ytdlp_check = 0.0
         self.is_updating = False
 
-        # Start periodic tasks
-        self.auto_git_sync_task.start()
-        self.auto_ytdlp_upgrade_task.start()
+    async def cog_load(self):
+        if not self.auto_git_sync_task.is_running():
+            self.auto_git_sync_task.start()
+        if not self.auto_ytdlp_upgrade_task.is_running():
+            self.auto_ytdlp_upgrade_task.start()
 
     def cog_unload(self):
-        self.auto_git_sync_task.cancel()
-        self.auto_ytdlp_upgrade_task.cancel()
+        if self.auto_git_sync_task.is_running():
+            self.auto_git_sync_task.cancel()
+        if self.auto_ytdlp_upgrade_task.is_running():
+            self.auto_ytdlp_upgrade_task.cancel()
 
     # =========================================================================
     # PROCESS EXECUTION HELPER (Safe against shell escaping)

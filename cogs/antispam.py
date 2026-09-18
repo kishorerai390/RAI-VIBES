@@ -210,5 +210,62 @@ class AntiSpam(commands.Cog):
                 await self.handle_violation(message, "Repeated Duplicate Messages")
                 return
 
+    @commands.Cog.listener()
+    async def on_message_delete(self, message: discord.Message):
+        """Detects and alerts on ghost-pings (deleted messages containing user or role mentions)."""
+        if not message.guild or message.author.bot:
+            return
+
+        # Check if the deleted message contained member or role mentions
+        if not message.mentions and not message.role_mentions:
+            return
+
+        # Ignore if author is whitelisted administrator or server owner
+        if await database.is_whitelisted(message.guild, message.author):
+            return
+
+        # Don't alert if the message was posted more than 3 minutes ago
+        if message.created_at and (discord.utils.utcnow() - message.created_at).total_seconds() > 180:
+            return
+
+        # Build list of pinged targets (exclude self-ping)
+        pinged_users = [m for m in message.mentions if m.id != message.author.id]
+        pinged_roles = message.role_mentions
+
+        if not pinged_users and not pinged_roles:
+            return
+
+        targets_str = ", ".join([u.mention for u in pinged_users] + [r.mention for r in pinged_roles])
+
+        embed = discord.Embed(
+            title="👻 GHOST-PING DETECTED",
+            description=(
+                f"**Perpetrator:** {message.author.mention} (`{message.author.id}`)\n"
+                f"**Channel:** {message.channel.mention}\n"
+                f"**Targets Pinged:** {targets_str}\n\n"
+                f"**Original Message Content:**\n```\n{message.content[:800] if message.content else '[No text content]'}\n```"
+            ),
+            color=0xFFA502
+        )
+        embed.timestamp = discord.utils.utcnow()
+        embed.set_footer(text="RAI SENTINEL • Anti-Ghost-Ping Sentinel")
+
+        # Notify channel (auto-deleted after 12s)
+        try:
+            await message.channel.send(
+                f"👻 **Ghost-Ping Detected!** {message.author.mention} pinged {targets_str} and deleted their message.",
+                delete_after=12
+            )
+        except Exception:
+            pass
+
+        # Send detailed incident report to security log channel
+        log_chan = await self.get_log_channel(message.guild)
+        if log_chan:
+            try:
+                await log_chan.send(embed=embed)
+            except Exception:
+                pass
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiSpam(bot))

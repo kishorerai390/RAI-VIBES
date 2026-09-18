@@ -149,6 +149,13 @@ async def get_channel_snapshot(guild_id: int, channel_id: int) -> Optional[Dict[
         row = await cur.fetchone()
         return dict(row) if row else None
 
+async def get_all_channel_snapshots(guild_id: int) -> List[Dict[str, Any]]:
+    async with get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM channel_snapshots WHERE guild_id = ? ORDER BY position ASC", (guild_id,))
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
 async def save_role_snapshot(guild_id: int, role: discord.Role):
     async with get_db() as db:
         await db.execute("""
@@ -163,6 +170,13 @@ async def get_role_snapshot(guild_id: int, role_id: int) -> Optional[Dict[str, A
         cur = await db.execute("SELECT * FROM role_snapshots WHERE guild_id = ? AND role_id = ?", (guild_id, role_id))
         row = await cur.fetchone()
         return dict(row) if row else None
+
+async def get_all_role_snapshots(guild_id: int) -> List[Dict[str, Any]]:
+    async with get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM role_snapshots WHERE guild_id = ? ORDER BY position ASC", (guild_id,))
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
 
 async def get_guild_settings(guild_id: int) -> Dict[str, Any]:
     async with get_db() as db:
