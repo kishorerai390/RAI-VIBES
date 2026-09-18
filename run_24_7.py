@@ -56,6 +56,7 @@ async def run_sentinel(token: str):
         "cogs.antilink",
         "cogs.whitelist",
         "cogs.security_dashboard",
+        "cogs.tournaments",
     ]
     import database
     await database.init_db()

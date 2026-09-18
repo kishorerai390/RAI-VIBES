@@ -14,13 +14,26 @@ URL_REGEX = re.compile(r"https?://(?:www\.)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?:/[^
 
 import datetime
 
+HOMOGLYPH_MAP = {
+    'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'ѕ': 's', 'х': 'x', 'у': 'y',
+    'і': 'i', 'ј': 'j', 'ԁ': 'd', 'ո': 'n', 'г': 'r', 'ӏ': 'l', 'v': 'v', 'w': 'w',
+    '0': 'o', '1': 'l'
+}
+
+def normalize_homoglyphs(text: str) -> str:
+    """Normalizes confusable Cyrillic and deceptive unicode characters to Latin."""
+    return "".join(HOMOGLYPH_MAP.get(ch, ch) for ch in text)
+
 KNOWN_SCAM_PATTERNS = [
     "discorcl", "dlscord", "discrod", "discord-nitro", "free-nitro", "nitro-gift",
     "steamcommuniity", "steamcomminuty", "gift-discord", "discordapp.biz", "discord-app.me",
     "airdrop-nitro", "claim-nitro", "steam-gift", "discordgift", "t.me/airdrop",
     "discord-claim", "nitro-drop", "free-steam", "discord-boost", "get-nitro", "gift-nitro.click",
     "discord-event", "steam-community", "csgo-skin", "nitrogift", "discord-drop", "discord-nitro.org",
-    "discord-free", "free-boost", "claim-steam", "discordapp.info", "nitro-free.org", "discord-gifts.ru"
+    "discord-free", "free-boost", "claim-steam", "discordapp.info", "nitro-free.org", "discord-gifts.ru",
+    "discordapp.gg", "discord-app.net", "discord-nitro.su", "nitro-claim.xyz", "steam-trade.ru",
+    "discordgift.site", "discord-halloween.com", "discord-promo.com", "nitro-generator", "steam-community.ru",
+    "free-robux", "roblox-gift", "free-vbucks", "grabify.link", "iplogger.org", "blasze.com", "2no.co"
 ]
 
 class AntiLink(commands.Cog):
@@ -64,16 +77,17 @@ class AntiLink(commands.Cog):
             return
 
         content_lower = message.content.lower()
+        normalized_content = normalize_homoglyphs(content_lower)
 
         # 1. Check for Discord invites
-        has_invite = bool(INVITE_REGEX.search(content_lower))
+        has_invite = bool(INVITE_REGEX.search(content_lower)) or bool(INVITE_REGEX.search(normalized_content))
         
-        # 2. Check for known scam domains
-        has_scam = any(scam in content_lower for scam in KNOWN_SCAM_PATTERNS)
+        # 2. Check for known scam domains & deceptive homoglyphs
+        has_scam = any(scam in content_lower or scam in normalized_content for scam in KNOWN_SCAM_PATTERNS)
 
         # 3. Check for custom blocked domains from SQLite
         blocked_domains = await database.get_blocked_domains(message.guild.id)
-        has_blocked_domain = any(domain in content_lower for domain in blocked_domains)
+        has_blocked_domain = any(domain in content_lower or domain in normalized_content for domain in blocked_domains)
 
         if has_invite or has_scam or has_blocked_domain:
             try:
@@ -178,7 +192,36 @@ class AntiLink(commands.Cog):
             description=domain_list,
             color=0x00FFCC
         )
-        embed.set_footer(text=f"Total: {len(domains)} custom blocked domain(s)")
+    @link_group.command(name="check", description="Test if a URL or message triggers the Sentinel link firewall.")
+    @app_commands.describe(text="URL or text string to analyze")
+    async def check_link(self, interaction: discord.Interaction, text: str):
+        content_lower = text.strip().lower()
+        normalized_content = normalize_homoglyphs(content_lower)
+
+        has_invite = bool(INVITE_REGEX.search(content_lower)) or bool(INVITE_REGEX.search(normalized_content))
+        has_scam = any(scam in content_lower or scam in normalized_content for scam in KNOWN_SCAM_PATTERNS)
+        blocked_domains = await database.get_blocked_domains(interaction.guild.id)
+        has_blocked = any(domain in content_lower or domain in normalized_content for domain in blocked_domains)
+
+        is_threat = has_invite or has_scam or has_blocked
+
+        matched = []
+        if has_invite:
+            matched.append("Discord Invite Link")
+        if has_scam:
+            matched.append("Phishing / Nitro / Steam Scam Pattern")
+        if has_blocked:
+            matched.append("Server Blacklisted Domain")
+
+        embed = discord.Embed(
+            title="🛡️ Sentinel Firewall Analysis",
+            color=0xFF0033 if is_threat else 0x2ED573
+        )
+        embed.add_field(name="Analyzed Input", value=f"```\n{text[:200]}\n```", inline=False)
+        embed.add_field(name="Threat Status", value="🚨 **BLOCKED (Malicious / Restricted)**" if is_threat else "✅ **CLEAN (Allowed)**", inline=True)
+        if matched:
+            embed.add_field(name="Trigger Reasons", value="\n".join(f"• {m}" for m in matched), inline=False)
+        embed.set_footer(text="RAI SENTINEL • Anti-Phishing Firewall")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup(bot: commands.Bot):

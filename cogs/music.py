@@ -19,7 +19,7 @@ logger = logging.getLogger("Music")
 
 import config
 from utils.ffmpeg_setup import get_ffmpeg_executable
-from utils.spotify import is_spotify_url, resolve_spotify
+from utils.spotify import is_spotify_url, resolve_spotify, is_apple_music_url, resolve_apple_music
 from utils.views import MusicPlayerView, QueuePaginationView
 from utils.filters import get_filter_string
 
@@ -1263,28 +1263,32 @@ class Music(commands.Cog):
                 return await ctx.interaction.followup.send(msg, ephemeral=True)
             return await ctx.send(msg)
 
-        # Check if Spotify URL
-        if is_spotify_url(query):
-            spotify_tracks = await resolve_spotify(query)
-            if not spotify_tracks:
+        # Check if Spotify or Apple Music URL
+        is_sp = is_spotify_url(query)
+        is_am = is_apple_music_url(query)
+        if is_sp or is_am:
+            source_label = "Apple Music" if is_am else "Spotify"
+            resolved_tracks = await resolve_apple_music(query) if is_am else await resolve_spotify(query)
+            if not resolved_tracks:
+                msg = f"❌ Could not parse {source_label} link. Please ensure it is a valid track, album, or playlist."
                 if ctx.interaction:
-                    return await ctx.interaction.followup.send("❌ Could not parse Spotify link. Please ensure it is a valid track, album, or playlist.", ephemeral=True)
-                return await ctx.send("❌ Could not parse Spotify link. Please ensure it is a valid track, album, or playlist.")
+                    return await ctx.interaction.followup.send(msg, ephemeral=True)
+                return await ctx.send(msg)
 
-            if len(spotify_tracks) == 1:
-                t = spotify_tracks[0]
+            if len(resolved_tracks) == 1:
+                t = resolved_tracks[0]
                 song_obj = await Song.create_source(t["search_query"], ctx.author, self.bot.loop)
                 if not song_obj:
+                    msg = f"❌ Could not find audio for {source_label} track: `{t['title']}`"
                     if ctx.interaction:
-                        return await ctx.interaction.followup.send(f"❌ Could not find audio for Spotify track: `{t['title']}`", ephemeral=True)
-                    return await ctx.send(f"❌ Could not find audio for Spotify track: `{t['title']}`")
+                        return await ctx.interaction.followup.send(msg, ephemeral=True)
+                    return await ctx.send(msg)
                 if t.get("thumbnail"):
                     song_obj.thumbnail = t["thumbnail"]
                 
                 is_queued = player.enqueue_track(song_obj, is_queue_mode=is_queue_mode)
 
                 if is_queued:
-                    # Calculate estimated time until playing
                     est_sec = 0
                     if player.current:
                         cur_elapsed = int(time.time() - player.start_time) if player.start_time else 0
@@ -1304,7 +1308,7 @@ class Music(commands.Cog):
                     embed.add_field(name="⏱️ Track Duration", value=f"`{dur_str}`", inline=True)
                     embed.add_field(name="📍 Position in Queue", value=f"`#{len(player.queue)}`", inline=True)
                     embed.add_field(name="⏳ Estimated Time", value=f"`{est_str}`", inline=True)
-                    embed.set_footer(text=f"Requested by {ctx.author.display_name} • RAI VIBES 💗", icon_url=ctx.author.display_avatar.url)
+                    embed.set_footer(text=f"Requested by {ctx.author.display_name} • {source_label} • RAI VIBES 💗", icon_url=ctx.author.display_avatar.url)
                     
                     if ctx.interaction:
                         sent = await ctx.interaction.followup.send(embed=embed)
@@ -1326,20 +1330,20 @@ class Music(commands.Cog):
                             asyncio.create_task(self._auto_delete(sent, 3))
             else:
                 remaining_space = max(0, config.MAX_QUEUE_SIZE - len(player.queue))
-                added_tracks = spotify_tracks[:remaining_space]
+                added_tracks = resolved_tracks[:remaining_space]
 
                 is_radio = player.is_radio_playing()
                 for t in added_tracks:
                     unresolved_song = Song(
                         data={
-                            "title": f"{t['title']} - {t['artist']}",
+                            "title": f"{t['title']} - {t.get('artist', source_label)}",
                             "search_query": t["search_query"],
                             "thumbnail": t.get("thumbnail", ""),
                             "duration": 0,
-                            "webpage_url": "https://spotify.com"
+                            "webpage_url": "https://apple.com" if is_am else "https://spotify.com"
                         },
                         requester=ctx.author,
-                        source_type="spotify"
+                        source_type="apple_music" if is_am else "spotify"
                     )
                     player.queue.append(unresolved_song)
 
@@ -1349,12 +1353,12 @@ class Music(commands.Cog):
                     player.play_next_song.set()
 
                 embed = discord.Embed(
-                    title="⚡ Spotify Playlist / Album Enqueued!",
-                    description=f"Added **{len(added_tracks)} tracks** from Spotify to the RAI VIBES 💗 queue (Queue: `{len(player.queue)}/{config.MAX_QUEUE_SIZE}`).",
+                    title=f"⚡ {source_label} Playlist / Album Enqueued!",
+                    description=f"Added **{len(added_tracks)} tracks** from {source_label} to the RAI VIBES 💗 queue (Queue: `{len(player.queue)}/{config.MAX_QUEUE_SIZE}`).",
                     color=config.COLOR_PRIMARY
                 )
-                embed.set_thumbnail(url=spotify_tracks[0].get("thumbnail", config.RAI_ICON_URL))
-                embed.set_footer(text="RAI VIBES 💗 Music Engine", icon_url=config.RAI_ICON_URL)
+                embed.set_thumbnail(url=resolved_tracks[0].get("thumbnail", config.RAI_ICON_URL))
+                embed.set_footer(text=f"RAI VIBES 💗 • {source_label} Engine", icon_url=config.RAI_ICON_URL)
                 
                 if ctx.interaction:
                     sent = await ctx.interaction.followup.send(embed=embed)

@@ -34,9 +34,17 @@ SPOTIFY_URL_REGEX = re.compile(
     r"https?://open\.spotify\.com/(?:intl-[a-zA-Z]+/)?(track|album|playlist)/([a-zA-Z0-9]+)"
 )
 
+APPLE_MUSIC_REGEX = re.compile(
+    r"https?://music\.apple\.com/(?:[a-zA-Z]{2}/)?(album|playlist)/([^/?]+)(?:/(\d+))?(?:\?i=(\d+))?"
+)
+
 def is_spotify_url(query: str) -> bool:
     """Check if query is a Spotify URL."""
     return bool(SPOTIFY_URL_REGEX.search(query))
+
+def is_apple_music_url(query: str) -> bool:
+    """Check if query is an Apple Music URL."""
+    return bool(APPLE_MUSIC_REGEX.search(query))
 
 def parse_spotify_url(query: str) -> Optional[tuple[str, str]]:
     """Returns (type, id) for a spotify URL, e.g. ('track', '4cOdK2wGLETKBW3PvgPWqT')."""
@@ -232,4 +240,47 @@ async def resolve_spotify(query: str) -> List[Dict[str, str]]:
         "duration": 0,
         "source": "spotify"
     })
+    return tracks
+
+
+async def resolve_apple_music(query: str) -> List[Dict[str, Any]]:
+    """Extract tracks from Apple Music URLs using public page metadata."""
+    tracks = []
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(query, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    html = await resp.text()
+                    og_title_m = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+                    og_img_m = re.search(r'<meta property="og:image" content="([^"]+)"', html)
+                    img_url = og_img_m.group(1) if og_img_m else ""
+
+                    if og_title_m:
+                        raw_title = og_title_m.group(1).replace("&#39;", "'").replace("&amp;", "&")
+                        # Clean " - Song by Artist on Apple Music"
+                        clean = re.sub(r' on Apple Music$', '', raw_title, flags=re.I)
+                        tracks.append({
+                            "title": clean,
+                            "artist": "Apple Music",
+                            "search_query": clean,
+                            "thumbnail": img_url,
+                            "duration": 0,
+                            "source": "apple_music"
+                        })
+    except Exception as e:
+        print(f"[Apple Music Scraper Warning] {e}")
+
+    if not tracks:
+        clean_q = re.sub(r'https?://[^\s]+', '', query).strip() or query
+        tracks.append({
+            "title": clean_q,
+            "artist": "Apple Music",
+            "search_query": clean_q,
+            "thumbnail": "",
+            "duration": 0,
+            "source": "apple_music"
+        })
     return tracks
