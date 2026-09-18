@@ -311,6 +311,8 @@ HTML_STATUS_PAGE = """<!DOCTYPE html>
         .badge-cyan { background: var(--cyan-accent); color: #000; }
         .badge-pink { background: var(--pink-accent); color: #000; }
         .badge-purple { background: var(--purple-accent); color: #fff; }
+        .badge-gold { background: #ffd700; color: #000; }
+        .bot-card.arcade { border-color: rgba(255, 215, 0, 0.3); }
 
         .bot-title {
             font-size: 19px;
@@ -453,38 +455,56 @@ HTML_STATUS_PAGE = """<!DOCTYPE html>
 
         <!-- Bot Ecosystem Cards -->
         <div class="bots-grid">
-            <!-- AURA ✦ -->
+            <!-- RAI VIBES 💗 -->
             <div class="bot-card primary">
                 <div>
                     <div class="bot-header">
                         <span class="bot-badge badge-pink">MUSIC CORE</span>
                         <span style="font-size: 12px; color: var(--cyan-accent); font-weight: 600;">● LIVE 24/7</span>
                     </div>
-                    <div class="bot-title">AURA ✦</div>
-                    <p class="bot-desc">Celestial 24/7 audio powerhouse delivering lossless sound, continuous lo-fi ambient streaming, and dynamic voice hubs.</p>
+                    <div class="bot-title">RAI VIBES 💗</div>
+                    <p class="bot-desc">Lossless 24/7 audio powerhouse delivering continuous lo-fi streaming, cinema screening hubs, dynamic voice hubs, and Dolby sound.</p>
                     <ul class="features-list">
-                        <li><span>✔</span> Continuous 24/7 Streaming in 🌧️ Lo-Fi Zone</li>
-                        <li><span>✔</span> Lossless Audio Playback & Auto-DJ</li>
-                        <li><span>✔</span> DAVE E2EE High-Security Voice Protocol</li>
-                        <li><span>✔</span> Dynamic Voice Hub & Room Controls</li>
+                        <li><span>✔</span> Lossless Audio Playback • /play & /radio</li>
+                        <li><span>✔</span> 24/7 Midnight Lo-Fi & Cinema Stream</li>
+                        <li><span>✔</span> Cinema Hub With Live RSVP & Voting</li>
+                        <li><span>✔</span> Dynamic Voice Hubs & Soundboard</li>
                     </ul>
                 </div>
             </div>
 
-            <!-- AEGIS 🛡️ -->
+            <!-- RAI SENTINEL 🛡️ -->
             <div class="bot-card security">
                 <div>
                     <div class="bot-header">
                         <span class="bot-badge badge-cyan">SECURITY CORE</span>
                         <span style="font-size: 12px; color: var(--cyan-accent); font-weight: 600;">● ARMED</span>
                     </div>
-                    <div class="bot-title">AEGIS 🛡️</div>
-                    <p class="bot-desc">Autonomous server protection engine actively monitoring raid storms, destructive actions, phishing, and spam.</p>
+                    <div class="bot-title">RAI SENTINEL 🛡️</div>
+                    <p class="bot-desc">Autonomous server protection engine actively monitoring raid storms, destructive actions, phishing, tickets, and spam.</p>
                     <ul class="features-list">
                         <li><span>✔</span> Precision Anti-Nuke Disaster Recovery</li>
                         <li><span>✔</span> Real-Time SQLite Structure Snapshots</li>
                         <li><span>✔</span> Anti-Raid Join Velocity Rate Limiting</li>
-                        <li><span>✔</span> Automated Threat Cooldown & Quarantines</li>
+                        <li><span>✔</span> Automated Threat Cooldown & Tickets</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- RAI PLAY 🎮 -->
+            <div class="bot-card arcade">
+                <div>
+                    <div class="bot-header">
+                        <span class="bot-badge badge-gold">ARCADE & ECONOMY</span>
+                        <span style="font-size: 12px; color: var(--cyan-accent); font-weight: 600;">● ACTIVE</span>
+                    </div>
+                    <div class="bot-title">RAI PLAY 🎮</div>
+                    <p class="bot-desc">Ultimate community engagement hub featuring full virtual economy, casino, pet companions, clan squads, and party games.</p>
+                    <ul class="features-list">
+                        <li><span>✔</span> Rai Coin Economy & Daily Quests • /balance</li>
+                        <li><span>✔</span> Casino Blackjack, Slots & Coin Flip</li>
+                        <li><span>✔</span> 3D Glassmorphic Profile & Rank Cards</li>
+                        <li><span>✔</span> Clan Squads, Duels & Anime Hub</li>
                     </ul>
                 </div>
             </div>
