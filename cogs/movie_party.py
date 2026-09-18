@@ -141,6 +141,8 @@ class MovieRSVPView(View):
             join_url = f"https://discord.com/channels/1457382179981099090/{room_id}"
             btn_label = f"🍿 Join {room_name or 'Screening Room'}"
             self.add_item(Button(label=btn_label, url=join_url, style=discord.ButtonStyle.link, row=0))
+            chat_url = "https://discord.com/channels/1457382179981099090/1550584226376720476"
+            self.add_item(Button(label="💬 Cinema Chat", url=chat_url, style=discord.ButtonStyle.link, row=0))
 
     @button(label="Count Me In! 🍿", style=discord.ButtonStyle.primary, custom_id="movie_rsvp_toggle_btn", row=0)
     async def rsvp_button(self, interaction: discord.Interaction, btn: Button):
@@ -271,6 +273,7 @@ class MovieParty(commands.Cog):
         details_lines = [
             f"• 📅 **Showtime:** `{showtime}`",
             f"• 🎙️ **Screening Room:** {room_mention}",
+            f"• 💬 **Live Chat:** <#1550584226376720476>",
             f"• 🎧 **Audio / Quality:** `1080p 60FPS Stereo Surround`",
             f"• 🍿 **Vibe:** Relaxed, high fidelity & open to all RAI FAM members!"
         ]
