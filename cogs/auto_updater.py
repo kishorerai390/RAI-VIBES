@@ -36,13 +36,13 @@ class AutoUpdater(commands.Cog):
         self.auto_ytdlp_upgrade_task.cancel()
 
     # =========================================================================
-    # SHELL EXECUTION HELPER
+    # PROCESS EXECUTION HELPER (Safe against shell escaping)
     # =========================================================================
-    async def run_shell(self, command: str, timeout: int = 45) -> Tuple[int, str, str]:
-        """Execute a shell command asynchronously with a timeout."""
+    async def run_cmd(self, *args: str, timeout: int = 60) -> Tuple[int, str, str]:
+        """Execute a command directly without shell interpretation to prevent quoting issues."""
         try:
-            process = await asyncio.create_subprocess_shell(
-                command,
+            process = await asyncio.create_subprocess_exec(
+                *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(PROJECT_ROOT)
@@ -61,9 +61,10 @@ class AutoUpdater(commands.Cog):
     # =========================================================================
     async def get_current_commit(self) -> Tuple[str, str]:
         """Get the current commit hash and subject line."""
-        code, out, _ = await self.run_shell("git log -1 --format=\"%h - %s (%cr)\"")
+        code, out, _ = await self.run_cmd("git", "log", "-1", "--format=%h - %s (%cr)")
         if code == 0 and out:
-            return out.split(" - ")[0].strip('"'), out.strip('"')
+            parts = out.split(" - ", 1)
+            return parts[0].strip(), out.strip()
         return "unknown", "Unknown Commit"
 
     async def check_for_git_updates(self) -> Tuple[bool, str, str, str]:
@@ -72,14 +73,14 @@ class AutoUpdater(commands.Cog):
         """
         self.last_update_check = time.time()
         # 1. Fetch remote tracking branch
-        code, _, err = await self.run_shell("git fetch origin main")
+        code, _, err = await self.run_cmd("git", "fetch", "origin", "main")
         if code != 0:
             logger.warning(f"[AutoUpdater] git fetch failed: {err}")
             return False, "", "", f"Git fetch error: {err}"
 
         # 2. Get local and remote HEAD hashes
-        _, local_hash, _ = await self.run_shell("git rev-parse HEAD")
-        _, remote_hash, _ = await self.run_shell("git rev-parse origin/main")
+        _, local_hash, _ = await self.run_cmd("git", "rev-parse", "HEAD")
+        _, remote_hash, _ = await self.run_cmd("git", "rev-parse", "origin/main")
 
         if not local_hash or not remote_hash:
             return False, "", "", "Could not resolve commit hashes."
@@ -88,7 +89,7 @@ class AutoUpdater(commands.Cog):
             return False, local_hash.strip()[:7], remote_hash.strip()[:7], "Up to date."
 
         # 3. Retrieve changelog of new commits
-        _, log_out, _ = await self.run_shell(f"git log {local_hash.strip()}..{remote_hash.strip()} --oneline -n 10")
+        _, log_out, _ = await self.run_cmd("git", "log", f"{local_hash.strip()}..{remote_hash.strip()}", "--oneline", "-n", "10")
         return True, local_hash.strip()[:7], remote_hash.strip()[:7], log_out or "New commits available."
 
     async def apply_git_updates(self) -> Tuple[bool, str, List[str]]:
@@ -100,24 +101,24 @@ class AutoUpdater(commands.Cog):
 
         self.is_updating = True
         try:
-            _, old_hash, _ = await self.run_shell("git rev-parse HEAD")
+            _, old_hash, _ = await self.run_cmd("git", "rev-parse", "HEAD")
 
             # 1. Pull origin main
-            code, pull_out, pull_err = await self.run_shell("git pull origin main")
+            code, pull_out, pull_err = await self.run_cmd("git", "pull", "origin", "main")
             if code != 0:
                 logger.error(f"[AutoUpdater] git pull failed: {pull_err}")
                 return False, f"Git pull failed: {pull_err or pull_out}", []
 
-            _, new_hash, _ = await self.run_shell("git rev-parse HEAD")
+            _, new_hash, _ = await self.run_cmd("git", "rev-parse", "HEAD")
 
             # 2. Inspect changed files
-            code, diff_out, _ = await self.run_shell(f"git diff --name-only {old_hash.strip()} {new_hash.strip()}")
+            code, diff_out, _ = await self.run_cmd("git", "diff", "--name-only", old_hash.strip(), new_hash.strip())
             changed_files = [f.strip() for f in diff_out.splitlines() if f.strip()]
 
             # 3. If requirements.txt changed, update pip dependencies
             if "requirements.txt" in changed_files:
                 logger.info("[AutoUpdater] requirements.txt changed. Installing updated dependencies...")
-                await self.run_shell(f'"{sys.executable}" -m pip install -r requirements.txt')
+                await self.run_cmd(sys.executable, "-m", "pip", "install", "-r", "requirements.txt")
 
             # 4. Determine if reload or restart is needed
             core_files = ["main.py", "run_24_7.py", "security_bot.py", "config.py", "database.py"]
@@ -157,11 +158,11 @@ class AutoUpdater(commands.Cog):
         old_ver = getattr(yt_dlp, "version", None)
         old_ver_str = old_ver.__version__ if old_ver else "unknown"
 
-        code, out, err = await self.run_shell(f'"{sys.executable}" -m pip install --upgrade yt-dlp')
+        code, out, err = await self.run_cmd(sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp")
         self.last_ytdlp_check = time.time()
         if code == 0:
             # Re-read version
-            code2, new_ver_str, _ = await self.run_shell(f'"{sys.executable}" -c "import yt_dlp; print(yt_dlp.version.__version__)"')
+            code2, new_ver_str, _ = await self.run_cmd(sys.executable, "-c", "import yt_dlp; print(yt_dlp.version.__version__)")
             new_ver = new_ver_str.strip() or "updated"
             if old_ver_str != new_ver:
                 msg = f"yt-dlp upgraded from `{old_ver_str}` to `{new_ver}`."
