@@ -12,10 +12,11 @@ from typing import Optional, Dict, List
 import requests
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ui import View, Button, button
 
 import config
+from utils.ffmpeg_setup import get_ffmpeg_executable
 
 logger = logging.getLogger("MovieParty")
 
@@ -25,8 +26,17 @@ SUGGESTIONS_FILE = DATA_DIR / "movie_suggestions.json"
 
 DEFAULT_ANNOUNCEMENT_CHANNEL_ID = 1545502718792175646  # 📢｜ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛꜱ
 DEFAULT_VOICE_ROOM_ID = 1550196955660029964           # 🍿 | Movie Time 1
+OVERFLOW_VOICE_ROOM_ID = 1550198444021514331          # 🍿 | Movie Time 2
 CINEMA_CHAT_CHANNEL_ID = 1550584226376720476          # 🍿｜ᴄɪɴᴇᴍᴀ-ᴄʜᴀᴛ
+CINEMA_HOST_ROLE_ID = 1550588116077645914             # 🎙️ Cinema Host
 FOUNDER_USER_ID = 1457380609641938981
+
+LOFI_STREAM_URL = "https://stream.zeno.fm/f3wvbbqmdg8uv"
+
+FFMPEG_OPTIONS = {
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
+    "options": "-vn -b:a 96k"
+}
 
 
 def load_events() -> Dict[str, dict]:
@@ -86,19 +96,33 @@ async def set_voice_channel_status(channel_id: int, status_text: str):
         logger.debug(f"Failed to update voice channel status: {e}")
 
 
+def get_content_advisory_badge(rated: str) -> str:
+    """Returns color-coded MPAA maturity advisory badges."""
+    clean_r = (rated or "PG-13").strip().upper()
+    advisories = {
+        "G": "🟢 **Rated G** • General Audiences (All Ages Admitted)",
+        "PG": "🟢 **Rated PG** • Parental Guidance Suggested",
+        "PG-13": "🟡 **Rated PG-13** • Parents Strongly Cautioned (May be inappropriate for pre-teens)",
+        "R": "🔴 **Rated R** • Mature Audiences Only (Age 17+ / Intense Action, Language & Themes)",
+        "NC-17": "⛔ **Rated NC-17** • Adults Only (Strictly 18+)",
+        "TV-MA": "🔴 **Rated TV-MA** • Mature Audience Only",
+        "TV-14": "🟡 **Rated TV-14** • Parents Strongly Cautioned",
+        "NOT RATED": "⚪ **Unrated** • Viewer Discretion Advised",
+    }
+    return advisories.get(clean_r, f"🟡 **Rated {clean_r}** • Viewer Discretion Advised")
+
+
 def fetch_movie_metadata_sync(query: str) -> dict:
     """Fetch movie metadata, rating, synopsis, and HD theatrical poster from OMDb and Wikipedia."""
     import re
     clean_q = query.strip()
     data = {}
 
-    # Extract 4-digit release year if provided (e.g. "Rush (2013)" or "Rush 2013")
     year_match = re.search(r"\(?\b(19\d\d|20\d\d)\b\)?", clean_q)
     extracted_year = year_match.group(1) if year_match else None
     search_title = re.sub(r"\(?\b(19\d\d|20\d\d)\b\)?", "", clean_q).strip()
     search_title = re.sub(r"[\(\)]", "", search_title).strip() or clean_q
 
-    # 1. Primary: OMDb API
     try:
         url = f"http://www.omdbapi.com/?t={urllib.parse.quote(search_title)}"
         if extracted_year:
@@ -126,7 +150,6 @@ def fetch_movie_metadata_sync(query: str) -> dict:
     except Exception as e:
         logger.debug(f"OMDb lookup failed: {e}")
 
-    # 2. Wikipedia fallback for poster / plot if needed
     if not data or not data.get("poster"):
         try:
             wiki_search = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(clean_q)}&limit=3&namespace=0&format=json"
@@ -205,7 +228,7 @@ class MovieRSVPView(View):
             msg = "⚪ You cancelled your RSVP."
         else:
             rsvps.append(uid)
-            msg = "🍿 **RSVP Confirmed!** You're on the cinema roster. Enjoy the screening!"
+            msg = "🍿 **RSVP Confirmed!** You'll receive a showtime alert before screening begins!"
 
         events[msg_id]["rsvps"] = rsvps
         save_events(events)
@@ -251,7 +274,7 @@ class MovieVoteView(View):
             s_data["upvotes"].remove(uid)
             msg = "⚪ Removed your upvote."
         else:
-            if uid not in s_data["upvotes"]:
+            if uid not in s_data.get("upvotes", []):
                 s_data["upvotes"].append(uid)
             if uid in s_data.get("downvotes", []):
                 s_data["downvotes"].remove(uid)
@@ -277,7 +300,7 @@ class MovieVoteView(View):
             s_data["downvotes"].remove(uid)
             msg = "⚪ Removed your downvote."
         else:
-            if uid not in s_data["downvotes"]:
+            if uid not in s_data.get("downvotes", []):
                 s_data["downvotes"].append(uid)
             if uid in s_data.get("upvotes", []):
                 s_data["upvotes"].remove(uid)
@@ -318,6 +341,37 @@ class MovieParty(commands.Cog):
     """Automated Movie Night, Anime Watch-Party & Cinema Announcement Hub."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._last_overflow_alert = 0
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Monitors capacity in Movie Time 1 and alerts overflow to Movie Time 2 (Item 16)."""
+        if after.channel and after.channel.id == DEFAULT_VOICE_ROOM_ID:
+            count = len(after.channel.members)
+            limit = after.channel.user_limit or 25
+            now = time.time()
+            if count >= limit and (now - self._last_overflow_alert) > 300:
+                self._last_overflow_alert = now
+                cinema_chat = member.guild.get_channel(CINEMA_CHAT_CHANNEL_ID)
+                if cinema_chat:
+                    overflow_vc = member.guild.get_channel(OVERFLOW_VOICE_ROOM_ID)
+                    embed = discord.Embed(
+                        title="⚠️ 🍿 Main Cinema Hall Reached Full Capacity!",
+                        description=(
+                            f"<#{DEFAULT_VOICE_ROOM_ID}> has reached **{count}/{limit} viewers**!\n\n"
+                            f"🛋️ Please join the cozy overflow room in {overflow_vc.mention if overflow_vc else 'Movie Time 2'} "
+                            f"to enjoy the synchronized stream without lag!"
+                        ),
+                        color=0xF1C40F
+                    )
+                    view = View()
+                    if overflow_vc:
+                        join_url = f"https://discord.com/channels/{member.guild.id}/{overflow_vc.id}"
+                        view.add_item(Button(label="🍿 Join Movie Time 2", url=join_url, style=discord.ButtonStyle.link))
+                    try:
+                        await cinema_chat.send(embed=embed, view=view)
+                    except Exception as e:
+                        logger.debug(f"Overflow alert note: {e}")
 
     @app_commands.command(
         name="movienight",
@@ -380,13 +434,38 @@ class MovieParty(commands.Cog):
         if movie_data.get("year"):
             title_display += f" ({movie_data['year']})"
 
-        # 1. Update Voice Channel Status live
+        # Item 15: Cinema Auto-Bitrate Boost
+        if screening_room and screening_room.bitrate < 96000:
+            try:
+                await screening_room.edit(bitrate=96000)
+            except Exception:
+                pass
+
+        # Item 17: Dynamic Room Renaming
+        if screening_room:
+            try:
+                clean_short_title = movie_data["title"][:18].strip()
+                await screening_room.edit(name=f"🎬 | Screening: {clean_short_title}")
+            except Exception as e:
+                logger.debug(f"Dynamic room rename notice: {e}")
+
+        # Item 14: Host Priority Speaker Role
+        host_role = interaction.guild.get_role(CINEMA_HOST_ROLE_ID)
+        if host_role and host_role not in interaction.user.roles:
+            try:
+                await interaction.user.add_roles(host_role, reason="Cinema Screening Host")
+            except Exception:
+                pass
+
+        # Live Voice Channel Status
         voice_status_text = f"🎬 {title_display}"
         if movie_data.get("rating") and movie_data.get("rating") != "N/A":
             voice_status_text += f" • ⭐ {movie_data['rating']}"
         await set_voice_channel_status(room_id, voice_status_text)
 
-        # 2. Build Announcement Embed
+        # Item 11: Content & Age Advisory Badge
+        advisory_badge = get_content_advisory_badge(movie_data.get("rated", "PG-13"))
+
         embed = discord.Embed(
             title=f"🎬 RAI FAM CINEMA NIGHT: {title_display.upper()}",
             description=(
@@ -401,7 +480,8 @@ class MovieParty(commands.Cog):
             f"• 📅 **Showtime:** `{showtime}`",
             f"• 🎙️ **Screening Room:** {room_mention}",
             f"• 💬 **Live Chat:** <#{CINEMA_CHAT_CHANNEL_ID}>",
-            f"• 🎧 **Audio / Quality:** `1080p 60FPS Stereo Surround`",
+            f"• 🏷️ **Advisory:** {advisory_badge}",
+            f"• 🎧 **Audio / Quality:** `96 kbps 1080p 60FPS Stereo Surround`",
             f"• 🍿 **Vibe:** Relaxed, high fidelity & open to all RAI FAM members!"
         ]
         embed.add_field(name="🎟️ Screening Details", value="\n".join(details_lines), inline=False)
@@ -411,8 +491,6 @@ class MovieParty(commands.Cog):
             info_lines.append(f"• ⭐ **Rating:** `{movie_data['rating']}/10 IMDb`")
         if movie_data.get("runtime") and movie_data.get("runtime") != "N/A":
             info_lines.append(f"• ⏱️ **Runtime:** `{movie_data['runtime']}`")
-        if movie_data.get("rated") and movie_data.get("rated") != "N/A":
-            info_lines.append(f"• 🏷️ **Rated:** `{movie_data['rated']}`")
         if movie_data.get("genre") and movie_data.get("genre") != "N/A":
             info_lines.append(f"• 🎭 **Genre:** `{movie_data['genre']}`")
         if movie_data.get("director") and movie_data.get("director") != "N/A":
@@ -455,12 +533,12 @@ class MovieParty(commands.Cog):
             posted_msg = await target_channel.send(content=content, embed=embed, view=view)
         except Exception as e:
             await interaction.followup.send(
-                f"❌ Failed to post in {target_channel.mention}: `{e}`. Make sure the bot has 'Send Messages' permissions.",
+                f"❌ Failed to post in {target_channel.mention}: `{e}`.",
                 ephemeral=True
             )
             return
 
-        # 3. Create Discord Scheduled Event if requested
+        # Discord Scheduled Event if requested
         if create_event and interaction.guild:
             try:
                 start_iso = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)).isoformat()
@@ -501,6 +579,7 @@ class MovieParty(commands.Cog):
                 f"🍿 **Voice Room:** {room_mention}\n"
                 f"💬 **Live Discussion:** <#{CINEMA_CHAT_CHANNEL_ID}>\n"
                 f"✨ **Voice Status:** Updated to `{voice_status_text}`\n"
+                f"🏷️ **Advisory:** {advisory_badge}\n"
                 f"🔗 [**Jump to Announcement**]({posted_msg.jump_url})"
             ),
             color=0x2ECC71
@@ -508,33 +587,274 @@ class MovieParty(commands.Cog):
         await interaction.followup.send(embed=confirm_embed, ephemeral=True)
 
     @app_commands.command(
-        name="movie",
-        description="🎬 Quick shortcut to announce a Cinema Night / Watch-Party"
+        name="moviecountdown",
+        description="⏳ Launch a live showtime countdown timer in Cinema Chat (Item 1)"
     )
     @app_commands.describe(
-        movie="Name of the movie (e.g., Rush, Inception, Interstellar)",
-        showtime="Showtime status (default: LIVE NOW 🔴)",
-        ping="Choose who to ping with the announcement"
+        minutes="Minutes remaining until movie starts (e.g. 10, 15, 30)",
+        movie="Optional movie title"
     )
-    async def movie_shortcut(
+    async def moviecountdown(
         self,
         interaction: discord.Interaction,
-        movie: str,
-        showtime: Optional[str] = "LIVE NOW 🔴",
-        ping: Optional[str] = "everyone"
+        minutes: int,
+        movie: Optional[str] = None
     ):
-        """Shortcut forwarding directly to movienight."""
-        await self.movienight.callback(
-            self,
-            interaction=interaction,
-            movie=movie,
-            showtime=showtime,
-            room=None,
-            channel=None,
-            ping=ping,
-            note=None,
-            create_event=False
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            return await interaction.followup.send("❌ Only Event Hosts can launch count downs.", ephemeral=True)
+
+        cinema_chat = interaction.guild.get_channel(CINEMA_CHAT_CHANNEL_ID) or interaction.channel
+        target_ts = int(time.time() + (minutes * 60))
+        movie_name = movie or "Cinema Night Feature Film"
+
+        embed = discord.Embed(
+            title=f"⏳ SHOWTIME COUNTDOWN: {movie_name.upper()}",
+            description=(
+                f"🍿 Grab your snacks, refill your drinks, and take your seats!\n\n"
+                f"🕒 **Starts:** <t:{target_ts}:R> (<t:{target_ts}:t>)\n"
+                f"🎙️ **Screening Hall:** <#{DEFAULT_VOICE_ROOM_ID}>\n"
+                f"💬 **Live Chat:** <#{CINEMA_CHAT_CHANNEL_ID}>"
+            ),
+            color=0xF1C40F
         )
+        embed.set_footer(text="RAI FAM Cinema Lounge • Fasten your seatbelts!", icon_url=config.RAI_ICON_URL)
+
+        view = View()
+        join_url = f"https://discord.com/channels/{interaction.guild.id}/{DEFAULT_VOICE_ROOM_ID}"
+        view.add_item(Button(label="🍿 Join Screening Hall", url=join_url, style=discord.ButtonStyle.link))
+
+        msg = await cinema_chat.send(content="@here 🍿 **SHOWTIME COUNTDOWN INITIATED!**", embed=embed, view=view)
+        await interaction.followup.send(f"✅ Showtime countdown posted to {cinema_chat.mention}! [Jump]({msg.jump_url})", ephemeral=True)
+
+    @app_commands.command(
+        name="moviealert",
+        description="📢 Send automated showtime mention alerts to all RSVP'd guests (Item 3)"
+    )
+    async def moviealert(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            return await interaction.followup.send("❌ Only Event Hosts can broadcast alerts.", ephemeral=True)
+
+        events = load_events()
+        all_rsvps = set()
+        for ev in events.values():
+            for uid in ev.get("rsvps", []):
+                all_rsvps.add(uid)
+
+        cinema_chat = interaction.guild.get_channel(CINEMA_CHAT_CHANNEL_ID) or interaction.channel
+        if not all_rsvps:
+            return await interaction.followup.send("ℹ️ No RSVP'd members found in the cinema roster yet.", ephemeral=True)
+
+        mentions = " ".join(f"<@{uid}>" for uid in list(all_rsvps)[:25])
+        alert_text = (
+            f"🍿 **LAST CALL FOR SHOWTIME!** {mentions}\n\n"
+            f"The lights are dimming and screening is starting now in <#{DEFAULT_VOICE_ROOM_ID}>! "
+            f"Fasten your seatbelts and grab your popcorn!"
+        )
+        await cinema_chat.send(alert_text)
+        await interaction.followup.send(f"✅ Broadcasted showtime call to {len(all_rsvps)} RSVP'd guests in {cinema_chat.mention}!", ephemeral=True)
+
+    @app_commands.command(
+        name="cinemaintro",
+        description="🔊 Play the official THX / Dolby style cinematic intro chime in voice! (Item 4)"
+    )
+    @app_commands.describe(room="Voice screening room (default: 🍿 | Movie Time 1)")
+    async def cinemaintro(
+        self,
+        interaction: discord.Interaction,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            return await interaction.followup.send("❌ Only Event Hosts can play cinema intro sound.", ephemeral=True)
+
+        screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
+        if not screening_room:
+            return await interaction.followup.send("❌ Voice channel not found.", ephemeral=True)
+
+        sound_path = Path(__file__).resolve().parent.parent / "assets" / "cinema_intro.wav"
+        if not sound_path.exists():
+            return await interaction.followup.send("❌ Cinema intro audio file not found.", ephemeral=True)
+
+        try:
+            vc = interaction.guild.voice_client
+            if not vc:
+                vc = await screening_room.connect()
+            elif vc.channel.id != screening_room.id:
+                await vc.move_to(screening_room)
+
+            if vc.is_playing():
+                vc.stop()
+
+            ffmpeg_bin = get_ffmpeg_executable()
+            source = discord.FFmpegPCMAudio(str(sound_path), executable=ffmpeg_bin)
+            vc.play(source)
+
+            await interaction.followup.send(
+                f"🔊 **Playing Cinematic Intro Chime** in {screening_room.mention}! *Fasten your seatbelts!*",
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to play intro sound: `{e}`", ephemeral=True)
+
+    @app_commands.command(
+        name="cinemastage",
+        description="🎙️ Toggle Stage Broadcast Mode: host presents, audience listens (Item 18)"
+    )
+    @app_commands.describe(
+        enabled="Enable or disable Stage Broadcast Mode",
+        room="Voice screening room (default: 🍿 | Movie Time 1)"
+    )
+    async def cinemastage(
+        self,
+        interaction: discord.Interaction,
+        enabled: bool,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            return await interaction.followup.send("❌ Only Event Hosts can toggle Stage Mode.", ephemeral=True)
+
+        screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
+        if not screening_room:
+            return await interaction.followup.send("❌ Voice channel not found.", ephemeral=True)
+
+        ow = screening_room.overwrites_for(interaction.guild.default_role)
+        ow.speak = not enabled
+        await screening_room.set_permissions(interaction.guild.default_role, overwrite=ow)
+
+        host_role = interaction.guild.get_role(CINEMA_HOST_ROLE_ID)
+        if enabled:
+            if host_role and host_role not in interaction.user.roles:
+                try:
+                    await interaction.user.add_roles(host_role, reason="Stage Host")
+                except Exception:
+                    pass
+            await set_voice_channel_status(screening_room.id, "🎙️ Stage Broadcast Mode • Host Presenting")
+            for m in screening_room.members:
+                if not m.guild_permissions.administrator and m.id != FOUNDER_USER_ID:
+                    try:
+                        await m.edit(mute=True, reason="Stage Mode Enabled")
+                    except Exception:
+                        pass
+            msg = f"🎙️ **Stage Mode ENABLED** in {screening_room.mention}. Only hosts can speak; audience is listening."
+        else:
+            await set_voice_channel_status(screening_room.id, "🍿 Grab your popcorn & relax")
+            for m in screening_room.members:
+                if m.voice and m.voice.mute:
+                    try:
+                        await m.edit(mute=False, reason="Stage Mode Disabled")
+                    except Exception:
+                        pass
+            msg = f"🎙️ **Stage Mode DISABLED** in {screening_room.mention}. Microphones restored for everyone."
+
+        await interaction.followup.send(msg, ephemeral=True)
+
+    @app_commands.command(
+        name="cinemaambience",
+        description="🌧️ Stream 24/7 Midnight Cinema Lo-Fi & Rain Ambience (Item 27)"
+    )
+    @app_commands.describe(
+        action="Start or stop ambient stream",
+        room="Voice room (default: 🍿 | Movie Time 2)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Start Midnight Ambience", value="start"),
+        app_commands.Choice(name="Stop Ambience", value="stop")
+    ])
+    async def cinemaambience(
+        self,
+        interaction: discord.Interaction,
+        action: str,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        target_room = room or interaction.guild.get_channel(OVERFLOW_VOICE_ROOM_ID)
+        if not target_room:
+            return await interaction.followup.send("❌ Room not found.", ephemeral=True)
+
+        if action == "start":
+            try:
+                vc = interaction.guild.voice_client
+                if not vc:
+                    vc = await target_room.connect()
+                elif vc.channel.id != target_room.id:
+                    await vc.move_to(target_room)
+
+                if vc.is_playing():
+                    vc.stop()
+
+                ffmpeg_bin = get_ffmpeg_executable()
+                source = discord.FFmpegPCMAudio(LOFI_STREAM_URL, executable=ffmpeg_bin, **FFMPEG_OPTIONS)
+                vc.play(source)
+
+                await set_voice_channel_status(target_room.id, "🌧️ Midnight Cinema Ambience • Relax & Chill")
+                await interaction.followup.send(
+                    f"🌧️ **Midnight Cinema Ambience Started** in {target_room.mention}! Streaming 24/7 lo-fi chill audio.",
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.followup.send(f"❌ Ambience error: `{e}`", ephemeral=True)
+        else:
+            vc = interaction.guild.voice_client
+            if vc and vc.is_playing():
+                vc.stop()
+            if vc:
+                await vc.disconnect()
+            await set_voice_channel_status(target_room.id, "🍿 Grab your popcorn & relax")
+            await interaction.followup.send(f"⏹️ Midnight Cinema Ambience stopped in {target_room.mention}.", ephemeral=True)
+
+    @app_commands.command(
+        name="movierename",
+        description="🏷️ Temporarily rename screening room to the movie title (Item 17)"
+    )
+    @app_commands.describe(
+        title="Title of the movie",
+        room="Voice room (default: 🍿 | Movie Time 1)"
+    )
+    async def movierename(
+        self,
+        interaction: discord.Interaction,
+        title: str,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            return await interaction.followup.send("❌ Only Event Hosts can rename rooms.", ephemeral=True)
+
+        screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
+        if not screening_room:
+            return await interaction.followup.send("❌ Room not found.", ephemeral=True)
+
+        new_name = f"🎬 | Screening: {title[:18].strip()}"
+        try:
+            await screening_room.edit(name=new_name)
+            await interaction.followup.send(f"✅ Renamed {screening_room.mention} to `{new_name}`!", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to rename: `{e}`", ephemeral=True)
 
     @app_commands.command(
         name="movieend",
@@ -558,11 +878,15 @@ class MovieParty(commands.Cog):
         screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
         room_id = screening_room.id if screening_room else DEFAULT_VOICE_ROOM_ID
 
-        # Reset Voice Channel Status
         await set_voice_channel_status(room_id, "🍿 Grab your popcorn & relax")
 
-        # Unmute everyone and restore speak permissions
+        # Revert room name
         if screening_room:
+            try:
+                await screening_room.edit(name="🍿 | Movie Time 1")
+            except Exception:
+                pass
+
             try:
                 ow = screening_room.overwrites_for(interaction.guild.default_role)
                 ow.speak = True
@@ -611,12 +935,10 @@ class MovieParty(commands.Cog):
             await interaction.followup.send("❌ Voice channel not found.", ephemeral=True)
             return
 
-        # 1. Disable speaking for @everyone
         ow = screening_room.overwrites_for(interaction.guild.default_role)
         ow.speak = False
         await screening_room.set_permissions(interaction.guild.default_role, overwrite=ow)
 
-        # 2. Server mute non-admins currently connected
         muted_count = 0
         for member in screening_room.members:
             if not member.guild_permissions.administrator and member.id != FOUNDER_USER_ID:
@@ -661,12 +983,10 @@ class MovieParty(commands.Cog):
             await interaction.followup.send("❌ Voice channel not found.", ephemeral=True)
             return
 
-        # 1. Restore speaking for @everyone
         ow = screening_room.overwrites_for(interaction.guild.default_role)
         ow.speak = True
         await screening_room.set_permissions(interaction.guild.default_role, overwrite=ow)
 
-        # 2. Unmute members
         unmuted_count = 0
         for member in screening_room.members:
             if member.voice and member.voice.mute:
@@ -706,6 +1026,8 @@ class MovieParty(commands.Cog):
 
         cinema_chat = interaction.guild.get_channel(CINEMA_CHAT_CHANNEL_ID) or interaction.channel
 
+        advisory_badge = get_content_advisory_badge(movie_data.get("rated", "PG-13"))
+
         embed = discord.Embed(
             title=f"💡 MOVIE NIGHT SUGGESTION: {title_display.upper()}",
             description=(
@@ -720,8 +1042,7 @@ class MovieParty(commands.Cog):
             specs.append(f"• ⭐ **IMDb Rating:** `{movie_data['rating']}/10`")
         if movie_data.get("runtime") and movie_data.get("runtime") != "N/A":
             specs.append(f"• ⏱️ **Runtime:** `{movie_data['runtime']}`")
-        if movie_data.get("rated") and movie_data.get("rated") != "N/A":
-            specs.append(f"• 🏷️ **Rated:** `{movie_data['rated']}`")
+        specs.append(f"• 🏷️ **Advisory:** {advisory_badge}")
         if movie_data.get("genre") and movie_data.get("genre") != "N/A":
             specs.append(f"• 🎭 **Genre:** `{movie_data['genre']}`")
         if specs:

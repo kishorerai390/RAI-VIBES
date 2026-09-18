@@ -196,7 +196,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
             cmd_name = ctx.command.name if ctx.command else ""
             ephemeral_commands = {
                 "mutesoundboard", "unmutesoundboard", "entrysound",
-                "movienight", "movie", "movieend", "cinemamute", "cinemaunmute", "moviesuggest"
+                "movienight", "movie", "movieend", "cinemamute", "cinemaunmute", "moviesuggest",
+                "moviecountdown", "moviealert", "cinemaintro", "cinemastage", "cinemaambience", "movierename"
             }
             is_ephem = cmd_name in ephemeral_commands
             try:
