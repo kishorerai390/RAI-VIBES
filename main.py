@@ -363,13 +363,12 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
     return b
 
 async def load_cogs(bot_instance: commands.Bot):
-    # Pure Music, Karaoke, Radio, Audio FX & Autonomous Auto-Updater for RAI VIBES 💗
+    # 100% Pure Music, Radio, Audio FX & Autonomous Auto-Updater for RAI VIBES 💗
     initial_extensions = [
         "cogs.music",
         "cogs.filters",
         "cogs.lyrics",
         "cogs.favorites",
-        "cogs.general",
         "cogs.voicehub",
         "cogs.soundboard",
         "cogs.dj",

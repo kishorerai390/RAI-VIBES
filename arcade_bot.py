@@ -75,6 +75,7 @@ ARCADE_EXTENSIONS = [
     "cogs.starboard",
     "cogs.profile",
     "cogs.telemetry",
+    "cogs.general",
 ]
 
 def create_arcade_bot(use_members: bool = True, use_message_content: bool = True) -> commands.Bot:
