@@ -71,24 +71,33 @@ async def apply_discord_soundboard_permission(
     author: Union[discord.User, discord.Member]
 ) -> Tuple[bool, str]:
     """
-    Updates the @everyone role permission overwrite on the voice channel.
+    Updates the @everyone role and channel role permission overwrites on the voice channel.
     mute=True: use_soundboard=False, use_external_sounds=False
     mute=False: use_soundboard=None, use_external_sounds=None (resets to server default)
     """
     try:
-        default_role = channel.guild.default_role
-        overwrite = channel.overwrites_for(default_role)
+        guild = channel.guild
+        default_role = guild.default_role
 
-        if mute:
-            overwrite.use_soundboard = False
-            overwrite.use_external_sounds = False
-            reason = f"Founder {author.display_name} muted soundboard in #{channel.name}"
-        else:
-            overwrite.use_soundboard = None
-            overwrite.use_external_sounds = None
-            reason = f"Founder {author.display_name} unmuted soundboard in #{channel.name}"
+        # Collect targets: @everyone plus all existing role overwrites that lack Administrator
+        targets = [default_role]
+        for target in list(channel.overwrites.keys()):
+            if isinstance(target, discord.Role) and target != default_role:
+                if not target.permissions.administrator:
+                    targets.append(target)
 
-        await channel.set_permissions(default_role, overwrite=overwrite, reason=reason)
+        for target in targets:
+            ow = channel.overwrites_for(target)
+            if mute:
+                ow.use_soundboard = False
+                ow.use_external_sounds = False
+                reason = f"Founder {author.display_name} muted soundboard in #{channel.name}"
+            else:
+                ow.use_soundboard = None
+                ow.use_external_sounds = None
+                reason = f"Founder {author.display_name} unmuted soundboard in #{channel.name}"
+            await channel.set_permissions(target, overwrite=ow, reason=reason)
+
         return True, "Success"
     except discord.Forbidden:
         return False, "Bot is missing permission to edit channel permissions."

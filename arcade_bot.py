@@ -149,12 +149,8 @@ def create_arcade_bot(use_members: bool = True, use_message_content: bool = True
             except Exception as e:
                 logger.debug(f"[RAI PLAY] Banner update notice: {e}")
 
-        # Synchronize slash commands directly to guilds
+        # Synchronize slash commands globally (zero duplicates)
         try:
-            for guild in bot.guilds:
-                bot.tree.copy_global_to(guild=guild)
-                synced_guild = await bot.tree.sync(guild=guild)
-                logger.info(f"✨ [RAI ARCADE] Instant-synced {len(synced_guild)} slash commands to '{guild.name}'")
             synced = await bot.tree.sync()
             logger.info(f"✨ [RAI ARCADE] Synchronized {len(synced)} global slash commands.")
         except Exception as e:

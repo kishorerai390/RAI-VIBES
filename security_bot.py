@@ -106,12 +106,8 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
             except Exception as e:
                 logger.debug(f"[RAI SENTINEL] Banner update notice: {e}")
 
-        # Synchronize slash commands directly to each guild for instant response
+        # Synchronize slash commands globally (zero duplicates)
         try:
-            for guild in bot.guilds:
-                bot.tree.copy_global_to(guild=guild)
-                synced_guild = await bot.tree.sync(guild=guild)
-                logger.info(f"🛡️ Instant-synced {len(synced_guild)} security slash commands to '{guild.name}'")
             synced = await bot.tree.sync()
             logger.info(f"🛡️ Synchronized {len(synced)} global Security slash commands.")
         except Exception as e:

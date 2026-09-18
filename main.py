@@ -154,12 +154,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                 except Exception as e:
                     logger.info(f"Server banner note (requires Server Boost Level 2): {e}")
 
-        # Synchronize slash commands directly to each guild for instant sub-second response
+        # Synchronize slash commands globally (zero duplicates)
         try:
-            for guild in b.guilds:
-                b.tree.copy_global_to(guild=guild)
-                synced_guild = await b.tree.sync(guild=guild)
-                logger.info(f"✨ Instant-synced {len(synced_guild)} slash commands to '{guild.name}'")
             synced = await b.tree.sync()
             logger.info(f"✨ Synchronized {len(synced)} global Music slash commands.")
         except Exception as e:
