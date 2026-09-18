@@ -477,8 +477,8 @@ class Moderation(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Failed to timeout member: {e}", ephemeral=True)
 
-    @commands.hybrid_command(name="serverunmute", aliases=["vunmute", "sunmute"], description="Remove Server Mute and text timeout from a member.")
-    @commands.has_permissions(moderate_members=True)
+    @commands.command(name="serverunmute", aliases=["vunmute", "sunmute"], description="Remove Server Mute and text timeout from a member.")
+    @commands.has_permissions(manage_roles=True)
     @app_commands.describe(member="Member to unmute")
     async def serverunmute(self, ctx: commands.Context, member: discord.Member):
         await ctx.defer()
@@ -568,7 +568,7 @@ class Moderation(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Could not ban member: {e}", ephemeral=True)
 
-    @commands.hybrid_command(name="unban", description="Unban a user by ID.")
+    @commands.command(name="unban", description="Unban a user by ID.")
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(user_id="Discord User ID to unban", reason="Reason for unban")
     async def unban(self, ctx: commands.Context, user_id: str, *, reason: str = "Pardoned by staff"):
@@ -644,7 +644,7 @@ class Moderation(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 Auto-Mod History", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="clearstrikes", description="Reset all strikes and infractions for a member.")
+    @commands.command(name="clearstrikes", description="Reset all strikes and infractions for a member.")
     @commands.has_permissions(administrator=True)
     @app_commands.describe(member="Member to reset strikes for")
     async def clearstrikes(self, ctx: commands.Context, member: discord.Member):
@@ -661,7 +661,7 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="clear", aliases=["purge"], description="Bulk delete recent messages from channel.")
+    @commands.command(name="clear", aliases=["purge"], description="Bulk delete recent messages from channel.")
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(amount="Number of messages to delete (1-100)")
     async def clear(self, ctx: commands.Context, amount: int = 10):
@@ -694,7 +694,7 @@ class Moderation(commands.Cog):
                 )
                 await self.log_mod_action(message.guild, embed)
 
-    @commands.hybrid_command(name="lockdown", description="Emergency Lockdown: Lock down all public channels in a raid.")
+    @commands.command(name="lockdown", description="Emergency Lockdown: Lock down all public channels in a raid.")
     @commands.has_permissions(administrator=True)
     async def lockdown(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
@@ -717,7 +717,7 @@ class Moderation(commands.Cog):
         await ctx.send(embed=embed)
         await self.log_mod_action(guild, embed)
 
-    @commands.hybrid_command(name="unlock", description="Remove server lockdown and restore public chatting.")
+    @commands.command(name="unlock", description="Remove server lockdown and restore public chatting.")
     @commands.has_permissions(administrator=True)
     async def unlock(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
@@ -740,7 +740,7 @@ class Moderation(commands.Cog):
         await ctx.send(embed=embed)
         await self.log_mod_action(guild, embed)
 
-    @commands.hybrid_command(name="automod", description="View the AutoMod Sentinel status and active protections.")
+    @commands.command(name="automod", description="View the AutoMod Sentinel status and active protections.")
     @commands.has_permissions(moderate_members=True)
     async def automod(self, ctx: commands.Context):
         embed = discord.Embed(
@@ -978,7 +978,7 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="unfreeze", aliases=["unisolate", "unjailvc"], description="Unfreeze an isolated member and restore voice access.")
+    @commands.command(name="unfreeze", aliases=["unisolate", "unjailvc"], description="Unfreeze an isolated member and restore voice access.")
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="Member to unfreeze and release")
     async def unfreeze_command(self, ctx: commands.Context, member: discord.Member):
@@ -1006,7 +1006,7 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="soundboard_timeout", aliases=["sbtimeout", "sbmute"], description="Apply a 15-minute voice & soundboard timeout to a member.")
+    @commands.command(name="soundboard_timeout", aliases=["sbtimeout", "sbmute"], description="Apply a 15-minute voice & soundboard timeout to a member.")
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="Member interrupting with soundboard", minutes="Timeout minutes (default: 15)", reason="Reason for timeout")
     async def soundboard_timeout_cmd(self, ctx: commands.Context, member: discord.Member, minutes: int = 15, reason: str = "Disruptive Soundboard / Noise Interruption in VC"):
@@ -1283,11 +1283,11 @@ class Moderation(commands.Cog):
         view = ModPanelView(member, ctx.author, self)
         await ctx.send(embed=embed, view=view, ephemeral=True)
 
-    @app_commands.command(name="channellockdown", description="Lockdown the channel to prevent raids or spam breaches.")
+    @admin.command(name="lockdown", description="Lockdown the channel to prevent raids or spam breaches.")
     @app_commands.describe(channel="Channel to lockdown (defaults to current)", reason="Reason for emergency lockdown")
     async def lockdown_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None, reason: Optional[str] = "Emergency Sentinel Lockdown"):
         if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /lockdown.", ephemeral=True)
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /admin lockdown.", ephemeral=True)
 
         target_ch = channel or interaction.channel
         guild = interaction.guild
@@ -1318,11 +1318,11 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to lockdown channel: {e}", ephemeral=True)
 
-    @app_commands.command(name="unlock", description="Unlock a previously locked down channel.")
+    @admin.command(name="unlock", description="Unlock a previously locked down channel.")
     @app_commands.describe(channel="Channel to unlock (defaults to current)")
     async def unlock_cmd(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
         if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /unlock.", ephemeral=True)
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /admin unlock.", ephemeral=True)
 
         target_ch = channel or interaction.channel
         guild = interaction.guild
@@ -1352,10 +1352,10 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to unlock channel: {e}", ephemeral=True)
 
-    @app_commands.command(name="prunechannels", description="Prune empty temporary voice rooms and unused channels.")
+    @admin.command(name="prunechannels", description="Prune empty temporary voice rooms and unused channels.")
     async def prunechannels_cmd(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /prunechannels.", ephemeral=True)
+            return await interaction.response.send_message("❌ You require 'Manage Channels' permission to use /admin prunechannels.", ephemeral=True)
 
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
@@ -1383,7 +1383,7 @@ class Moderation(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Sentinel Maintenance", icon_url=config.RAI_ICON_URL)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="autoslowmode", description="Set or adjust chat slowmode to manage conversation velocity.")
+    @admin.command(name="slowmode", description="Set or adjust chat slowmode to manage conversation velocity.")
     @app_commands.describe(seconds="Slowmode cooldown in seconds (0 to disable, max 300)")
     async def autoslowmode_cmd(self, interaction: discord.Interaction, seconds: int):
         if not interaction.user.guild_permissions.manage_channels and not interaction.user.guild_permissions.administrator:
@@ -1403,7 +1403,7 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to set slowmode: {e}", ephemeral=True)
 
-    @app_commands.command(name="altcheck", description="Scan members for suspicious new alt accounts created recently.")
+    @admin.command(name="altcheck", description="Scan members for suspicious new alt accounts created recently.")
     @app_commands.describe(min_age_days="Flag accounts younger than this number of days (default 3)")
     async def altcheck_cmd(self, interaction: discord.Interaction, min_age_days: int = 3):
         if not interaction.user.guild_permissions.moderate_members and not interaction.user.guild_permissions.administrator:
@@ -1432,7 +1432,7 @@ class Moderation(commands.Cog):
         embed.set_footer(text=f"Total flagged: {len(flagged)} members", icon_url=config.RAI_ICON_URL)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="temprole", description="Grant a temporary role to a member with automatic expiry.")
+    @admin.command(name="temprole", description="Grant a temporary role to a member with automatic expiry.")
     @app_commands.describe(member="Member to receive role", role="Role to assign", duration_minutes="Duration in minutes")
     async def temprole_cmd(self, interaction: discord.Interaction, member: discord.Member, role: discord.Role, duration_minutes: int):
         if not interaction.user.guild_permissions.manage_roles and not interaction.user.guild_permissions.administrator:
@@ -1468,7 +1468,7 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to assign role: {e}", ephemeral=True)
 
-    @app_commands.command(name="purge", description="Bulk delete messages with optional member and keyword filters.")
+    @admin.command(name="purge", description="Bulk delete messages with optional member and keyword filters.")
     @app_commands.describe(amount="Number of messages to scan (1 to 100)", member="Filter by specific member", contains="Filter by keyword")
     async def purge_cmd(self, interaction: discord.Interaction, amount: int, member: Optional[discord.Member] = None, contains: Optional[str] = None):
         if not interaction.user.guild_permissions.manage_messages and not interaction.user.guild_permissions.administrator:
@@ -1493,7 +1493,7 @@ class Moderation(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Sentinel Moderation", icon_url=config.RAI_ICON_URL)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="modlogs", description="Inspect infractions, warnings, and strikes for a member.")
+    @admin.command(name="dossier", description="Inspect infractions, warnings, and strikes for a member.")
     @app_commands.describe(member="Member to inspect")
     async def modlogs_cmd(self, interaction: discord.Interaction, member: discord.Member):
         if not interaction.user.guild_permissions.moderate_members and not interaction.user.guild_permissions.administrator:
@@ -1530,7 +1530,7 @@ class Moderation(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Sentinel Case Registry", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="drill", description="Run an emergency Sentinel readiness audit drill.")
+    @admin.command(name="drill", description="Run an emergency Sentinel readiness audit drill.")
     async def drill_cmd(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.administrator:
             return await interaction.response.send_message("❌ Only server administrators can trigger Sentinel drills.", ephemeral=True)
@@ -1557,7 +1557,7 @@ class Moderation(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="backup", description="Create or inspect an encrypted JSON snapshot backup of channels and roles.")
+    @admin.command(name="backup", description="Create or inspect an encrypted JSON snapshot backup of channels and roles.")
     @app_commands.describe(action="Backup operation to execute")
     @app_commands.choices(action=[
         app_commands.Choice(name="Create New Snapshot", value="create"),
