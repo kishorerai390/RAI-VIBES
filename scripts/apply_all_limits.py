@@ -55,7 +55,7 @@ new_channels = [
     ("1550186748364066827", "⚔️ | 1v1 Duel Arena", 2),
     ("1550186748364066827", "🎯 | Valorant / CS2 Squad", 5),
     ("1550186724137640006", "👥 | Squad Chamber", 4),
-    ("1550186724137640006", "🍅 | Study / Pomodoro Pod", 6),
+    ("1550186724137640006", "🎧 | Focus Lounge", 6),
 ]
 
 for parent_id, name, limit in new_channels:
