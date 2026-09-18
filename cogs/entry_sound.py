@@ -20,7 +20,8 @@ from cogs.economy import get_user_data, update_user_coins, OWNER_ID
 
 logger = logging.getLogger("EntrySound")
 
-DATA_DIR = Path("data")
+REPO_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_DIR / "data"
 ENTRY_SOUND_FILE = DATA_DIR / "entry_sounds.json"
 CUSTOM_SOUNDS_DIR = DATA_DIR / "custom_sounds"
 
@@ -957,20 +958,33 @@ class EntrySound(commands.Cog):
                 before_opts = FFMPEG_BEFORE_OPTIONS
             else:
                 # Local file path
-                local_path = Path(url_str)
-                # Check directly, or if relative/name only in CUSTOM_SOUNDS_DIR
+                clean_url = url_str.strip('\'"')
+                local_path = Path(clean_url)
                 if not local_path.exists():
                     candidate = CUSTOM_SOUNDS_DIR / local_path.name
                     if candidate.exists():
                         local_path = candidate
                         url_str = str(local_path)
 
+                # Fallback by user_id if provided
+                if not local_path.exists() and sfx_data.get("user_id"):
+                    for ext in [".mp3", ".wav", ".ogg", ".m4a"]:
+                        uid_cand = CUSTOM_SOUNDS_DIR / f"{sfx_data['user_id']}_custom{ext}"
+                        if uid_cand.exists():
+                            local_path = uid_cand
+                            url_str = str(local_path)
+                            break
+
                 # Fallback: if file missing on container restart, try auto-downloading from attachment_url
                 if not local_path.exists() and sfx_data.get("attachment_url"):
                     try:
                         import urllib.request
                         CUSTOM_SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
-                        urllib.request.urlretrieve(sfx_data["attachment_url"], local_path)
+                        file_ext = Path(sfx_data.get("name", "custom.mp3")).suffix or ".mp3"
+                        target_name = f"{sfx_data.get('user_id', 'unknown')}_custom{file_ext}"
+                        target_save = CUSTOM_SOUNDS_DIR / target_name
+                        urllib.request.urlretrieve(sfx_data["attachment_url"], target_save)
+                        local_path = target_save
                         url_str = str(local_path)
                     except Exception as dl_err:
                         logger.warning(f"Failed to auto-redownload attachment: {dl_err}")
@@ -997,8 +1011,8 @@ class EntrySound(commands.Cog):
 
             voice_client.play(transformed, after=_after_play)
 
-            # Wait dynamically while audio is playing (up to max duration, default 6s)
-            target_duration = min(float(sfx_data.get("duration", 6.0)) + 1.0, 10.0)
+            # Wait dynamically while audio is playing (up to max duration, default 12s, max 18s)
+            target_duration = min(float(sfx_data.get("duration", 12.0)) + 1.0, 18.0)
             waited = 0.0
             await asyncio.sleep(0.5)
             while voice_client and voice_client.is_playing() and waited < target_duration:
@@ -1047,17 +1061,26 @@ class EntrySound(commands.Cog):
             if prof.get("enabled", True) and cooldown_passed:
                 USER_ENTRY_COOLDOWNS[member.id] = now
                 eq_key = prof.get("equipped", "airhorn")
-                if eq_key == "custom" and prof.get("custom_url"):
+                custom_file = None
+                for ext in [".mp3", ".wav", ".ogg", ".m4a"]:
+                    c_path = CUSTOM_SOUNDS_DIR / f"{member.id}_custom{ext}"
+                    if c_path.exists():
+                        custom_file = str(c_path.resolve())
+                        break
+
+                if eq_key == "custom" or custom_file:
+                    sound_url = prof.get("custom_url") or custom_file
                     sfx = {
-                        "name": prof.get("custom_name", "🔮 Custom Theme"),
-                        "url": prof["custom_url"],
+                        "name": prof.get("custom_name", "🔮 Personal Custom Theme"),
+                        "url": sound_url,
                         "attachment_url": prof.get("attachment_url"),
-                        "duration": prof.get("custom_duration", 6.0),
+                        "duration": float(prof.get("custom_duration", 12.0)),
                         "category": "Custom",
-                        "emoji": "🔮"
+                        "emoji": "🔮",
+                        "user_id": member.id
                     }
                 else:
-                    sfx = ENTRY_SOUNDS.get(eq_key)
+                    sfx = ENTRY_SOUNDS.get(eq_key, ENTRY_SOUNDS.get("airhorn"))
 
                 if sfx:
                     vol = prof.get("volume", 85) / 100.0
@@ -1188,14 +1211,23 @@ class EntrySound(commands.Cog):
 
         prof = get_user_entry_profile(ctx.author.id)
         equipped = prof.get("equipped", "airhorn")
-        if equipped == "custom" and prof.get("custom_url"):
+        custom_file = None
+        for ext in [".mp3", ".wav", ".ogg", ".m4a"]:
+            c_path = CUSTOM_SOUNDS_DIR / f"{ctx.author.id}_custom{ext}"
+            if c_path.exists():
+                custom_file = str(c_path.resolve())
+                break
+
+        if equipped == "custom" or custom_file:
+            sound_url = prof.get("custom_url") or custom_file
             sfx = {
-                "name": prof.get("custom_name", "🔮 Custom Theme"),
-                "url": prof["custom_url"],
+                "name": prof.get("custom_name", "🔮 Personal Custom Theme"),
+                "url": sound_url,
                 "attachment_url": prof.get("attachment_url"),
-                "duration": prof.get("custom_duration", 6.0),
+                "duration": float(prof.get("custom_duration", 12.0)),
                 "category": "Custom",
-                "emoji": "🔮"
+                "emoji": "🔮",
+                "user_id": ctx.author.id
             }
         else:
             sfx = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
@@ -1286,10 +1318,10 @@ class EntrySound(commands.Cog):
             data = load_entry_data()
             u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {})
             u_prof["custom_url"] = str(dest_file.resolve())
-            u_prof["custom_path"] = str(dest_file)
+            u_prof["custom_path"] = str(dest_file.resolve())
             u_prof["custom_name"] = file.filename
             u_prof["attachment_url"] = file.url
-            u_prof["custom_duration"] = 6.0
+            u_prof["custom_duration"] = 14.0
             u_prof["equipped"] = "custom"
             u_prof["enabled"] = True
             u_prof["custom_unlocked"] = True
