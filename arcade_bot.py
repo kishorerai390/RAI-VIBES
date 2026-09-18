@@ -4,7 +4,7 @@ import socket
 import asyncio
 import logging
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -94,11 +94,25 @@ def create_arcade_bot(use_members: bool = True, use_message_content: bool = True
         logger.info(f"🎮 Logged in as: {bot.user.name}#{bot.user.discriminator} ({bot.user.id})")
         logger.info(f"🎮 Powering games and economy across {len(bot.guilds)} server(s)")
 
-        activity = discord.Activity(
-            type=discord.ActivityType.playing,
-            name="🎮 RAI Arcade • /spin • /party • /lfg"
-        )
-        await bot.change_presence(status=discord.Status.online, activity=activity)
+        arcade_presences = [
+            discord.Activity(type=discord.ActivityType.playing, name="🎮 RAI Arcade • /spin • /party • /lfg"),
+            discord.Activity(type=discord.ActivityType.playing, name="🪙 High Rollers Casino • /spin • /blackjack"),
+            discord.Activity(type=discord.ActivityType.playing, name="🐾 Virtual Pets & Squads • /pets • /squad"),
+            discord.Activity(type=discord.ActivityType.playing, name="🪙 Server Economy • /daily • /shop"),
+        ]
+
+        @tasks.loop(minutes=3)
+        async def arcade_status_rotator():
+            idx = getattr(arcade_status_rotator, "idx", 0)
+            try:
+                await bot.change_presence(status=discord.Status.online, activity=arcade_presences[idx % len(arcade_presences)])
+                arcade_status_rotator.idx = idx + 1
+            except Exception:
+                pass
+
+        if not hasattr(bot, "_arcade_rotator_started"):
+            bot._arcade_rotator_started = True
+            arcade_status_rotator.start()
 
         # Update bot nickname in guilds
         for guild in bot.guilds:

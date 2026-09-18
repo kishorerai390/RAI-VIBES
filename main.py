@@ -81,22 +81,36 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         logger.info(f"Logged in as: {b.user.name}#{b.user.discriminator} (ID: {b.user.id})")
         logger.info(f"Connected to {len(b.guilds)} Discord server(s)")
         
-        # Dynamic Presence Rotator (Item 48)
+        # Dynamic Presence Rotator for RAI VIBES (100% Pure Music & Audio)
         presences = [
             discord.Streaming(name="🌸 24/7 Lo-Fi Chill Hop • /play", url="https://twitch.tv/lofigirl"),
-            discord.Activity(type=discord.ActivityType.watching, name="🎮 Gaming Hub & Tourneys • /lfg"),
-            discord.Activity(type=discord.ActivityType.listening, name="🍅 Focus Lounges • /pomodoro"),
-            discord.Activity(type=discord.ActivityType.playing, name="🪙 High Rollers Casino • /spin"),
-            discord.Activity(type=discord.ActivityType.watching, name="🛡️ Guarding RAI FAM 💗 • /telemetry")
+            discord.Activity(type=discord.ActivityType.listening, name="🎵 High-Fidelity Audio • /play"),
+            discord.Activity(type=discord.ActivityType.listening, name="🌧️ Midnight Lo-Fi Beats • /radio"),
+            discord.Activity(type=discord.ActivityType.listening, name="🎧 24/7 Music Studio • /queue"),
+            discord.Activity(type=discord.ActivityType.listening, name="✨ Spatial 8D & Bass Boost • /filters"),
         ]
 
         @tasks.loop(minutes=3)
         async def status_rotator():
             idx = getattr(status_rotator, "idx", 0)
             try:
-                # If bot is playing music in any voice channel, do not overwrite real-time song title!
+                # 1. If actively playing music or stream, keep real-time song title
                 if any(vc.is_playing() for vc in b.voice_clients):
                     return
+
+                # 2. If connected to a voice channel (e.g. Midnight Lo-Fi, Music Studio)
+                connected_vc = next((vc for vc in b.voice_clients if vc.is_connected() and vc.channel), None)
+                if connected_vc:
+                    ch_name = connected_vc.channel.name
+                    await b.change_presence(
+                        activity=discord.Activity(
+                            type=discord.ActivityType.listening,
+                            name=f"{ch_name} 🎵 • /play"
+                        )
+                    )
+                    return
+
+                # 3. Rotating audio presences when idling
                 await b.change_presence(activity=presences[idx % len(presences)])
                 status_rotator.idx = idx + 1
             except Exception:
