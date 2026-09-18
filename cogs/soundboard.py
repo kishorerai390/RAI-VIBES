@@ -10,6 +10,13 @@ from typing import Optional, Dict
 
 import config
 from utils.ffmpeg_setup import get_ffmpeg_executable
+from utils.soundboard_manager import (
+    is_founder,
+    is_channel_soundboard_muted,
+    set_channel_soundboard_muted,
+    apply_discord_soundboard_permission,
+    OWNER_ID
+)
 
 SOUND_EFFECTS = {
     "airhorn": {
@@ -115,6 +122,13 @@ class SoundboardButton(Button):
         channel = member.voice.channel
         now = time.time()
         uid = member.id
+
+        # Channel Soundboard Mute Check (Founder Override)
+        if is_channel_soundboard_muted(channel.id) and not is_founder(member, interaction.guild):
+            return await interaction.response.send_message(
+                f"🔇 **Soundboard Restricted:** Soundboard audio is currently muted in {channel.mention} by the Founder.",
+                ephemeral=True
+            )
 
         # Soundboard Interruption & Spam Watchdog
         # If in VC with other members talking and member spams soundboard
@@ -259,6 +273,13 @@ class Soundboard(commands.Cog):
         if not ctx.author.voice or not ctx.author.voice.channel:
             return await ctx.send("⚡ Please join a voice channel first!", ephemeral=True)
 
+        target_vc = ctx.author.voice.channel
+        if is_channel_soundboard_muted(target_vc.id) and not is_founder(ctx.author, ctx.guild):
+            return await ctx.send(
+                f"🔇 **Soundboard Restricted:** Soundboard audio is currently muted in {target_vc.mention} by the Founder.",
+                ephemeral=True
+            )
+
         music_cog = self.bot.get_cog("Music")
         if not music_cog:
             return await ctx.send("❌ Music engine unavailable.", ephemeral=True)
@@ -283,6 +304,161 @@ class Soundboard(commands.Cog):
 
         vc.play(transformed)
         await ctx.send(f"🔊 Playing sound effect: **{sfx_data['name']}**!")
+
+    @commands.hybrid_command(
+        name="mutesoundboard",
+        aliases=["soundboardmute", "silencesoundboard"],
+        description="[👑 FOUNDER ONLY] Mute or unmute the soundboard in a specific voice channel."
+    )
+    @app_commands.describe(
+        channel="Select the voice channel to mute/unmute (Defaults to your current voice channel)",
+        action="Choose whether to Mute, Unmute, Toggle, or check Status"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="🔇 Mute Soundboard (Disable in room)", value="mute"),
+        app_commands.Choice(name="🔊 Unmute Soundboard (Enable in room)", value="unmute"),
+        app_commands.Choice(name="🔄 Toggle Soundboard", value="toggle"),
+        app_commands.Choice(name="📊 View Status", value="status")
+    ])
+    async def mutesoundboard_cmd(
+        self,
+        ctx: commands.Context,
+        channel: Optional[discord.VoiceChannel] = None,
+        action: str = "toggle"
+    ):
+        """Mutes or unmutes Discord native soundboard & bot SFX in a specific voice channel. Founder only."""
+        # 1. Founder security check
+        if not is_founder(ctx.author, ctx.guild):
+            embed = discord.Embed(
+                title="⛔ ACCESS DENIED • FOUNDER RESTRICTED",
+                description=(
+                    "✦ ───────────────────────────────────── ✦\n\n"
+                    "Only the **👑 Server Founder & Owner** can manage soundboard channel restrictions!\n\n"
+                    "✦ ───────────────────────────────────── ✦"
+                ),
+                color=0xFF0055
+            )
+            embed.set_footer(text="RAI FAM 💗 • Founder Voice Authority", icon_url=config.RAI_ICON_URL)
+            if ctx.interaction:
+                return await ctx.interaction.response.send_message(embed=embed, ephemeral=True)
+            else:
+                return await ctx.send(embed=embed)
+
+        # 2. Defer interaction if present
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            await ctx.interaction.response.defer(ephemeral=False)
+
+        async def reply_msg(content: Optional[str] = None, embed: Optional[discord.Embed] = None):
+            if ctx.interaction:
+                if ctx.interaction.response.is_done():
+                    return await ctx.interaction.followup.send(content=content, embed=embed)
+                else:
+                    return await ctx.interaction.response.send_message(content=content, embed=embed)
+            else:
+                return await ctx.send(content=content, embed=embed)
+
+        # 3. Determine target channel
+        target_chan = channel
+        if not target_chan:
+            if isinstance(ctx.author, discord.Member) and ctx.author.voice and ctx.author.voice.channel:
+                target_chan = ctx.author.voice.channel
+            else:
+                err_embed = discord.Embed(
+                    title="❌ Voice Channel Required",
+                    description=(
+                        "Please specify a voice channel or join one first!\n\n"
+                        "👉 **Usage:** `/mutesoundboard channel:#voice-room action:Mute`"
+                    ),
+                    color=config.COLOR_DANGER
+                )
+                return await reply_msg(embed=err_embed)
+
+        # 4. Check current status
+        currently_muted = is_channel_soundboard_muted(target_chan.id)
+
+        if action == "status":
+            state_str = "🔇 MUTED & LOCKED" if currently_muted else "🔊 UNMUTED & ACTIVE"
+            color = 0xFF0055 if currently_muted else 0x00F5D4
+            status_embed = discord.Embed(
+                title="📊 VOICE SOUNDBOARD CHANNEL STATUS",
+                description=(
+                    f"✦ ───────────────────────────────────── ✦\n\n"
+                    f"• **Channel:** {target_chan.mention} (`{target_chan.name}`)\n"
+                    f"• **Soundboard Status:** **`{state_str}`**\n"
+                    f"• **Discord Soundboard:** {'🚫 Disabled for @everyone' if currently_muted else '✅ Enabled for @everyone'}\n"
+                    f"• **External Sounds:** {'🚫 Blocked' if currently_muted else '✅ Allowed'}\n"
+                    f"• **Bot SFX & Fanfares:** {'🔕 Silenced in this room' if currently_muted else '🔔 Active'}\n\n"
+                    f"✦ ───────────────────────────────────── ✦"
+                ),
+                color=color
+            )
+            status_embed.set_footer(text="RAI FAM 💗 • Founder Voice Authority", icon_url=config.RAI_ICON_URL)
+            return await reply_msg(embed=status_embed)
+
+        if action == "mute":
+            new_state = True
+        elif action == "unmute":
+            new_state = False
+        else:  # toggle
+            new_state = not currently_muted
+
+        # 5. Save persistence state
+        set_channel_soundboard_muted(target_chan.id, new_state)
+
+        # 6. Apply Discord channel permission overwrite for @everyone
+        perm_ok, perm_msg = await apply_discord_soundboard_permission(target_chan, new_state, ctx.author)
+
+        if new_state:
+            res_embed = discord.Embed(
+                title="🔇 SOUNDBOARD MUTED & RESTRICTED",
+                description=(
+                    f"✦ ───────────────────────────────────── ✦\n\n"
+                    f"The soundboard has been **MUTED & LOCKED** in {target_chan.mention}!\n\n"
+                    f"• **Target Room:** {target_chan.mention} (`{target_chan.name}`)\n"
+                    f"• **Discord Soundboard:** 🚫 Disabled for `@everyone`\n"
+                    f"• **External Sounds:** 🚫 Blocked\n"
+                    f"• **Bot SFX & Entrance Sounds:** 🔕 Silenced in this room\n"
+                    f"• **Enforced By:** 👑 Founder {ctx.author.mention}\n\n"
+                    f"✦ ───────────────────────────────────── ✦\n"
+                    f"💡 *To re-enable, run `/unmutesoundboard channel:{target_chan.mention}` or `/mutesoundboard action:Unmute`.*"
+                ),
+                color=0xFF0055
+            )
+        else:
+            res_embed = discord.Embed(
+                title="🔊 SOUNDBOARD RESTRICTION REMOVED",
+                description=(
+                    f"✦ ───────────────────────────────────── ✦\n\n"
+                    f"The soundboard has been **UNMUTED & RESTORED** in {target_chan.mention}!\n\n"
+                    f"• **Target Room:** {target_chan.mention} (`{target_chan.name}`)\n"
+                    f"• **Discord Soundboard:** ✅ Enabled for `@everyone`\n"
+                    f"• **External Sounds:** ✅ Restored\n"
+                    f"• **Bot SFX & Entrance Sounds:** 🔔 Active\n"
+                    f"• **Authorized By:** 👑 Founder {ctx.author.mention}\n\n"
+                    f"✦ ───────────────────────────────────── ✦"
+                ),
+                color=0x00F5D4
+            )
+
+        if not perm_ok:
+            res_embed.add_field(
+                name="⚠️ Permission Notice",
+                value=f"Database updated, but Discord channel permission warning: `{perm_msg}`",
+                inline=False
+            )
+
+        res_embed.set_footer(text="RAI FAM 💗 • Founder Voice Authority", icon_url=config.RAI_ICON_URL)
+        await reply_msg(embed=res_embed)
+
+    @commands.hybrid_command(
+        name="unmutesoundboard",
+        aliases=["soundboardunmute"],
+        description="[👑 FOUNDER ONLY] Unmute and restore soundboard in a specific voice channel."
+    )
+    @app_commands.describe(channel="Voice channel to restore soundboard in (Defaults to current VC)")
+    async def unmutesoundboard_cmd(self, ctx: commands.Context, channel: Optional[discord.VoiceChannel] = None):
+        """Quick shortcut to unmute the soundboard in a specific channel."""
+        await self.mutesoundboard_cmd(ctx, channel=channel, action="unmute")
 
 
 async def setup(bot: commands.Bot):

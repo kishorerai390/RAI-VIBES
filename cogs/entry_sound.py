@@ -25,9 +25,13 @@ DATA_DIR = REPO_DIR / "data"
 ENTRY_SOUND_FILE = DATA_DIR / "entry_sounds.json"
 CUSTOM_SOUNDS_DIR = DATA_DIR / "custom_sounds"
 
+from utils.soundboard_manager import is_channel_soundboard_muted
+
 def is_channel_suppressed(channel: Optional[discord.VoiceChannel]) -> bool:
-    """Returns True if the voice channel is a generator, AFK, or quiet room where entry sounds should be silenced."""
+    """Returns True if the voice channel is a generator, AFK, quiet room, or muted by the Founder."""
     if not channel:
+        return True
+    if is_channel_soundboard_muted(channel.id):
         return True
     norm_name = unicodedata.normalize('NFKD', channel.name).lower()
     # Generators
