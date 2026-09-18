@@ -151,12 +151,15 @@ class Radio(commands.Cog):
             if not guild:
                 return
 
-            # Target 24/7 Channel: 🌧️  | ʟᴏ-ꜰɪ ᴢᴏɴᴇ (1545781986193309789) or 🎧  | ʀᴀɪ ᴢᴏɴᴇ (1545502782268772453)
+            def match_vc(c, keywords):
+                norm = unicodedata.normalize('NFKD', c.name).lower()
+                return any(k in norm for k in keywords)
+
+            # Target 24/7 Channel: 🎧 | 24/7 Music Studio or 🌧️ | Midnight Lo-Fi
             target_vc = (
-                guild.get_channel(1545781986193309789)
-                or guild.get_channel(1545502782268772453)
-                or discord.utils.get(guild.voice_channels, name="🌧️  | ʟᴏ-ꜰɪ ᴢᴏɴᴇ")
-                or discord.utils.get(guild.voice_channels, name="🎧  | ʀᴀɪ ᴢᴏɴᴇ")
+                guild.get_channel(1550186760779211003)
+                or guild.get_channel(1550196959841878098)
+                or next((c for c in guild.voice_channels if match_vc(c, ["music", "studio", "lo-fi", "lofi", "beats"])), None)
             )
             if not target_vc:
                 return
