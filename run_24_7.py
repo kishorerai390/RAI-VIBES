@@ -86,17 +86,10 @@ async def run_sentinel(token: str):
 async def run_arcade(token: str):
     while True:
         try:
-            bot = create_arcade_bot(use_members=True, use_message_content=True)
+            bot = create_arcade_bot(use_members=False, use_message_content=False)
             async with bot:
                 await load_arcade_cogs(bot)
-                try:
-                    await bot.start(token)
-                except discord.errors.PrivilegedIntentsRequired:
-                    logger.warning("[RAI ARCADE] Privileged intents not enabled in portal. Falling back to basic intents.")
-                    bot_fallback = create_arcade_bot(use_members=False, use_message_content=False)
-                    async with bot_fallback:
-                        await load_arcade_cogs(bot_fallback)
-                        await bot_fallback.start(token)
+                await bot.start(token)
         except asyncio.CancelledError:
             break
         except discord.errors.LoginFailure:
