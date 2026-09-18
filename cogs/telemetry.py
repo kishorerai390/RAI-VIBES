@@ -49,6 +49,8 @@ class Telemetry(commands.Cog):
         self.bot = bot
         self.voice_tracker_task.start()
 
+    stats = app_commands.Group(name="telemetry", description="Server telemetry, voice lounge stats & activity charts")
+
     def cog_unload(self):
         self.voice_tracker_task.cancel()
 
@@ -89,7 +91,7 @@ class Telemetry(commands.Cog):
         while not self.bot.is_ready():
             await asyncio.sleep(1)
 
-    @app_commands.command(name="voicetime", description="Check your total voice lounge hours, rank, and listening stats.")
+    @stats.command(name="voice", description="Check your total voice lounge hours, rank, and listening stats.")
     @app_commands.describe(member="Member to inspect (defaults to you)")
     async def voicetime(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         target = member or interaction.user
@@ -125,7 +127,7 @@ class Telemetry(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="servertop", description="View server audio telemetry and top played tracks.")
+    @stats.command(name="top", description="View server audio telemetry and top played tracks.")
     async def servertop(self, interaction: discord.Interaction):
         data = load_telemetry()
         users = data.get("users", {})
@@ -162,7 +164,7 @@ class Telemetry(commands.Cog):
         embed.set_footer(text="RAI VIBES Community Telemetry", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="heatmap", description="Display peak voice lounge activity heatmap and channel distribution.")
+    @stats.command(name="heatmap", description="Display peak voice lounge activity heatmap and channel distribution.")
     async def heatmap(self, interaction: discord.Interaction):
         data = load_telemetry()
         users = data.get("users", {})
@@ -208,7 +210,7 @@ class Telemetry(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Real-Time Voice Telemetry", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="servermilestones", description="View server-wide community milestones & Hall of Fame achievements.")
+    @stats.command(name="milestones", description="View server-wide community milestones & Hall of Fame achievements.")
     async def milestones(self, interaction: discord.Interaction):
         data = load_telemetry()
         users = data.get("users", {})
@@ -261,7 +263,7 @@ class Telemetry(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Hall of Fame Milestones", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="telemetry", description="Display real-time bot performance, active voice loungers, and server health telemetry.")
+    @stats.command(name="health", description="Display real-time bot performance, active voice loungers, and server health telemetry.")
     async def telemetry_dashboard(self, interaction: discord.Interaction):
         import psutil
         guild = interaction.guild

@@ -388,6 +388,8 @@ class Economy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    eco = app_commands.Group(name="eco", description="Server economy commands, jobs & games")
+
     def add_balance(self, user_id: int, amount: int) -> int:
         return update_user_coins(user_id, amount)
 
@@ -502,7 +504,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 3. INTERACTIVE TIC-TAC-TOE
-    @app_commands.command(name="tictactoe", description="Challenge another server member to an interactive Tic-Tac-Toe match!")
+    @eco.command(name="tictactoe", description="Challenge another server member to an interactive Tic-Tac-Toe match!")
     @app_commands.describe(opponent="Member you want to challenge")
     async def tictactoe_command(self, interaction: discord.Interaction, opponent: discord.Member):
         if opponent.id == interaction.user.id:
@@ -525,7 +527,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view)
 
     # 4. INTERACTIVE TRIVIA
-    @app_commands.command(name="trivia", description="Answer a fun multiple-choice trivia question for +50 Coins!")
+    @eco.command(name="trivia", description="Answer a fun multiple-choice trivia question for +50 Coins!")
     @app_commands.describe(category="Optional category filter")
     @app_commands.choices(category=[
         app_commands.Choice(name="All Categories", value="all"),
@@ -646,7 +648,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 8. GAMBLE / COIN TOSS BET
-    @app_commands.command(name="gamble", description="Double or nothing! Bet coins on Heads or Tails.")
+    @eco.command(name="gamble", description="Double or nothing! Bet coins on Heads or Tails.")
     @app_commands.describe(bet="Amount of coins to gamble (Min: 10)", choice="Your prediction")
     @app_commands.choices(choice=[
         app_commands.Choice(name="Heads 👑", value="heads"),
@@ -699,7 +701,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 9. RICHEST LEADERBOARD
-    @app_commands.command(name="richest", description="View the top 10 richest members in the server.")
+    @eco.command(name="richest", description="View the top 10 richest members in the server.")
     async def richest_command(self, interaction: discord.Interaction):
         data = load_economy()
         if not data:
@@ -754,7 +756,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 10. WORK COMMAND
-    @app_commands.command(name="work", description="Work an honest shift to earn 150-400 Rai Coins!")
+    @eco.command(name="work", description="Work an honest shift to earn 150-400 Rai Coins!")
     async def work_command(self, interaction: discord.Interaction):
         uid = str(interaction.user.id)
         data = load_economy()
@@ -792,7 +794,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 11. CRIME COMMAND
-    @app_commands.command(name="crime", description="Commit a high-stakes cyber heist for big coins or a heavy fine!")
+    @eco.command(name="crime", description="Commit a high-stakes cyber heist for big coins or a heavy fine!")
     async def crime_command(self, interaction: discord.Interaction):
         uid = str(interaction.user.id)
         data = load_economy()
@@ -844,7 +846,7 @@ class Economy(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # 12. ROB COMMAND
-    @app_commands.command(name="rob", description="Attempt to pickpocket Rai Coins from another member!")
+    @eco.command(name="rob", description="Attempt to pickpocket Rai Coins from another member!")
     @app_commands.describe(member="The target member you want to rob")
     async def rob_command(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:

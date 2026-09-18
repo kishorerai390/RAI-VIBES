@@ -12,8 +12,8 @@ if hasattr(sys.stderr, "reconfigure"):
 
 load_dotenv()
 
-from main import create_bot, load_cogs
-from security_bot import create_security_bot, BOT_NAME
+from main import create_bot, load_cogs, acquire_instance_lock as acquire_vibes_lock
+from security_bot import create_security_bot, BOT_NAME, acquire_instance_lock as acquire_sentinel_lock
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,7 +47,6 @@ async def run_vibes(token: str):
 async def run_sentinel(token: str):
     security_extensions = [
         "cogs.autoprovision",
-        "cogs.verify",
         "cogs.tickets",
         "cogs.moderation",
         "cogs.antinuke",
@@ -617,6 +616,8 @@ async def main():
         await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
+    acquire_vibes_lock(59124)
+    acquire_sentinel_lock(59125)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

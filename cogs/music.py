@@ -1981,32 +1981,6 @@ class Music(commands.Cog):
 
         await (ctx.interaction.followup.send(embed=embed) if ctx.interaction else ctx.send(embed=embed))
 
-    @commands.hybrid_command(name="volume", aliases=["vol", "v"], description="Adjust the music playback volume (1% - 150%).")
-    @app_commands.describe(level="Volume percentage from 1 to 150")
-    async def volume_cmd(self, ctx: commands.Context, level: int):
-        player = self.get_player(ctx.guild.id)
-        if not player or not player.current or not player.voice_client:
-            return await ctx.send("❌ No music currently playing.", ephemeral=True)
-
-        if level < 1 or level > 150:
-            return await ctx.send("❌ Volume must be set between 1% and 150%.", ephemeral=True)
-
-        player.volume = level
-        if hasattr(player, "current_source") and player.current_source:
-            player.current_source.volume = player.get_volume_factor()
-
-        bar_len = 10
-        filled = int((level / 150) * bar_len)
-        bar = "█" * filled + "░" * (bar_len - filled)
-
-        embed = discord.Embed(
-            title="🔊 ┊ 𝐕𝐎𝐋𝐔𝐌𝐄  𝐀𝐃𝐉𝐔𝐒𝐓𝐄𝐃",
-            description=f"Audio output gain set to **`{level}%`**\n`[{bar}]`",
-            color=0x00FF88
-        )
-        embed.set_footer(text="RAI VIBES 💗 • High Fidelity Output", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
     @commands.hybrid_command(name="visualizer", aliases=["viz"], description="Display live audio waveform visualizer for the current track.")
     async def visualizer_cmd(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)

@@ -228,7 +228,7 @@ class General(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Command The Power", icon_url=config.RAI_ICON_URL)
         await msg.edit(content=None, embed=embed)
 
-    @commands.hybrid_command(name="c", aliases=["commands", "cmds"], description="Browse all RAI VIBES 💗 commands (Rythm style).")
+    @commands.command(name="c", aliases=["commands", "cmds"], description="Browse all RAI VIBES 💗 commands (Rythm style).")
     async def c_command(self, ctx: commands.Context):
         embed = discord.Embed(
             title="⚡ RAI VIBES 💗 • Command Directory",
@@ -579,27 +579,6 @@ class General(commands.Cog):
         embed.set_footer(text=f"Rolled by {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="poll", description="Create an interactive community poll with live voting buttons.")
-    @discord.app_commands.describe(
-        question="The question to poll",
-        option1="First option",
-        option2="Second option",
-        option3="Third option (optional)",
-        option4="Fourth option (optional)"
-    )
-    async def poll(self, ctx: commands.Context, question: str, option1: str, option2: str, option3: str = None, option4: str = None):
-        opts = [o for o in [option1, option2, option3, option4] if o]
-        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
-        desc = f"**{question}**\n\n"
-        for i, opt in enumerate(opts):
-            desc += f"{emojis[i]} **{opt}**\n`░░░░░░░░░░` **0.0%** (0 votes)\n\n"
-        desc += "📊 *Total Votes: 0*"
-
-        embed = discord.Embed(title="📊 Community Poll", description=desc, color=0x2B2D31)
-        embed.set_footer(text=f"Poll created by {ctx.author.name} • Vote below!", icon_url=ctx.author.display_avatar.url)
-        view = PollView(question, opts)
-        await ctx.send(embed=embed, view=view)
-
     @commands.hybrid_command(name="afk", description="Set an AFK status so the bot notifies members who ping you.")
     @discord.app_commands.describe(reason="Reason for being AFK (default: AFK)")
     async def afk(self, ctx: commands.Context, reason: str = "AFK"):
@@ -660,7 +639,7 @@ class General(commands.Cog):
         embed.set_footer(text=f"Poll started by {ctx.author.display_name} • Click buttons to vote!", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="gameping", description="Check real-time network latency for Discord Voice gateways and gaming servers.")
+    @commands.command(name="gameping", description="Check real-time network latency for Discord Voice gateways and gaming servers.")
     async def gameping(self, ctx: commands.Context):
         ws_ping = round(self.bot.latency * 1000)
         start = time.monotonic()

@@ -85,10 +85,12 @@ class Social(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    social = app_commands.Group(name="social", description="Wholesome social expressions, friendship actions & reputation")
+
     # -------------------------------------------------------------
     # 🌟 REPUTATION SYSTEM
     # -------------------------------------------------------------
-    @app_commands.command(name="giverep", description="Give +1 community reputation/respect to a helpful server member.")
+    @social.command(name="giverep", description="Give +1 community reputation/respect to a helpful server member.")
     @app_commands.describe(member="The member who helped you or deserves respect")
     async def rep_command(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:
@@ -148,7 +150,7 @@ class Social(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="reputation", description="Check your or another member's community reputation score.")
+    @social.command(name="reputation", description="Check your or another member's community reputation score.")
     @app_commands.describe(member="Optional member to inspect")
     async def reputation_check(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         target = member or interaction.user
@@ -168,13 +170,13 @@ class Social(commands.Cog):
             color=0x00F2FE
         )
         embed.set_thumbnail(url=target.display_avatar.url)
-        embed.set_footer(text="Award rep to peers with /rep @member", icon_url=config.RAI_ICON_URL)
+        embed.set_footer(text="Award rep to peers with /social giverep @member", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed)
 
     # -------------------------------------------------------------
     # 🤝 FRIENDSHIP & EXPRESSIVE ACTIONS
     # -------------------------------------------------------------
-    @app_commands.command(name="highfive", description="Give an epic high-five to celebrate a win or milestone!")
+    @social.command(name="highfive", description="Give an epic high-five to celebrate a win or milestone!")
     @app_commands.describe(member="The member you want to high-five")
     async def highfive(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:
@@ -189,7 +191,7 @@ class Social(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Good Vibes Only", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(content=f"{member.mention}", embed=embed)
 
-    @app_commands.command(name="fistbump", description="Give a friendly gamer fist-bump!")
+    @social.command(name="fistbump", description="Give a friendly gamer fist-bump!")
     @app_commands.describe(member="The member you want to fist-bump")
     async def fistbump(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:
@@ -204,7 +206,7 @@ class Social(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Gaming Hub", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(content=f"{member.mention}", embed=embed)
 
-    @app_commands.command(name="cheers", description="Raise a glass, coffee, or tea to celebrate together!")
+    @social.command(name="cheers", description="Raise a glass, coffee, or tea to celebrate together!")
     @app_commands.describe(member="The member you want to toast with")
     async def cheers(self, interaction: discord.Interaction, member: discord.Member):
         target_name = member.display_name if member.id != interaction.user.id else "the entire server"
@@ -217,7 +219,7 @@ class Social(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Chill Lounge", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(content=None if member.id == interaction.user.id else member.mention, embed=embed)
 
-    @app_commands.command(name="pat", description="Give a comforting, encouraging headpat to a friend.")
+    @social.command(name="pat", description="Give a comforting, encouraging headpat to a friend.")
     @app_commands.describe(member="The member who deserves a pat")
     async def pat(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:
@@ -232,7 +234,7 @@ class Social(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Wholesome Corner", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(content=f"{member.mention}", embed=embed)
 
-    @app_commands.command(name="slap", description="Playfully slap someone with an anime squeaky toy or giant fish!")
+    @social.command(name="slap", description="Playfully slap someone with an anime squeaky toy or giant fish!")
     @app_commands.describe(member="The member you want to playfully slap")
     async def slap(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:
@@ -250,7 +252,7 @@ class Social(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • 100% Comedic & Harmless Fun", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(content=f"{member.mention}", embed=embed)
 
-    @app_commands.command(name="poke", description="Playfully poke a friend to get their attention!")
+    @social.command(name="poke", description="Playfully poke a friend to get their attention!")
     @app_commands.describe(member="The member you want to poke")
     async def poke(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:
@@ -265,7 +267,7 @@ class Social(commands.Cog):
         embed.set_footer(text="RAI FAM 💗 • Friendly Interactions", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(content=f"{member.mention}", embed=embed)
 
-    @app_commands.command(name="hug", description="Give a warm, friendly buddy hug to a member.")
+    @social.command(name="hug", description="Give a warm, friendly buddy hug to a member.")
     @app_commands.describe(member="The member you want to hug")
     async def hug(self, interaction: discord.Interaction, member: discord.Member):
         if member.id == interaction.user.id:

@@ -362,28 +362,53 @@ class Welcome(commands.Cog):
                     pass
 
         # 5. Public Welcome Announcement with real-time auto-updating Member Count
-        welcome_chan = guild.get_channel(1545502705643167876) # #🌸・welcome
+        def match_ch(c, keywords):
+            norm = unicodedata.normalize('NFKD', c.name).lower()
+            return any(k in norm for k in keywords)
+
+        welcome_chan = (
+            discord.utils.get(guild.text_channels, name="🌸｜ᴡᴇʟᴄᴏᴍᴇ") or
+            guild.system_channel or
+            next((c for c in guild.text_channels if match_ch(c, ["welcome"])), None)
+        )
         if welcome_chan:
+            rules_ch = next((c for c in guild.text_channels if match_ch(c, ["rule", "info"])), None)
+            verify_ch = next((c for c in guild.text_channels if match_ch(c, ["verify"])), None)
+            roles_ch = next((c for c in guild.text_channels if match_ch(c, ["role"])), None)
+            chats_ch = next((c for c in guild.text_channels if match_ch(c, ["chat"])), None)
+            cmds_ch = next((c for c in guild.text_channels if match_ch(c, ["cmd", "bot"])), None)
+            lfg_ch = next((c for c in guild.text_channels if match_ch(c, ["lfg", "game"])), None)
+            music_vc = next((c for c in guild.voice_channels if match_ch(c, ["music", "studio", "lo-fi"])), None)
+
+            desc_parts = [
+                f"**HEY BUDDY!** {member.mention}\n",
+                f"**Welcome To {guild.name} !**\n",
+            ]
+            if rules_ch:
+                desc_parts.append(f"**Follow The Server Guidelines:** {rules_ch.mention}")
+            if verify_ch:
+                desc_parts.append(f"**Verify For Full Access:** {verify_ch.mention}")
+            if roles_ch:
+                desc_parts.append(f"**Role Hierarchy & Codex:** {roles_ch.mention}")
+            if cmds_ch:
+                desc_parts.append(f"**Commands & Perks:** {cmds_ch.mention}")
+            if lfg_ch:
+                desc_parts.append(f"**Gaming Hub & LFG:** {lfg_ch.mention}")
+            if music_vc:
+                desc_parts.append(f"**24/7 Lo-Fi & Beats:** {music_vc.mention}")
+            if chats_ch:
+                desc_parts.append(f"**Join And Chill With Us!:** {chats_ch.mention}")
+
+            desc_parts.append("\n**Thanks For Joining. Hope You Have A Great Time Here!**")
+
             embed = discord.Embed(
                 title=f"🌸 {guild.name} !",
-                description=(
-                    f"**HEY BUDDY!** {member.mention}\n\n"
-                    f"**Welcome To {guild.name} !**\n"
-                    f"**Get started with below:** <#1545502710101704714>\n\n"
-                    f"**Follow The Server Guidelines:** <#1545502710101704714>\n\n"
-                    f"**Verify For Full Access:** <#1545502700840427702>\n\n"
-                    f"**Role Hierarchy & Codex:** <#1545502722739150898>\n\n"
-                    f"**Share Media & Fun:** <#1546097792915873842>\n\n"
-                    f"**Gaming Zone:** <#1545803554550190212>\n\n"
-                    f"**24/7 Lo-Fi & Beats:** <#1545781986193309789>\n\n"
-                    f"**Join And Chill With Us!:** <#1545502730699808768>\n\n"
-                    f"**Thanks For Joining. Hope You Have A Great Time Here!**"
-                ),
+                description="\n\n".join(desc_parts),
                 color=0xFF69B4
             )
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(
-                text=f"Member #{member_count} • RAI FAM Luxury Community 💗",
+                text=f"Member #{member_count} • {guild.name} Community 💗",
                 icon_url=guild.icon.url if guild.icon else None
             )
             try:
@@ -397,15 +422,20 @@ class Welcome(commands.Cog):
 
         # 6. Automated Direct Message (DM) Onboarding
         try:
+            v_ref = verify_ch.mention if 'verify_ch' in locals() and verify_ch else "#verify"
+            r_ref = roles_ch.mention if 'roles_ch' in locals() and roles_ch else "#roles"
+            ru_ref = rules_ch.mention if 'rules_ch' in locals() and rules_ch else "#rules"
+            c_ref = chats_ch.mention if 'chats_ch' in locals() and chats_ch else "#chats"
+
             dm_embed = discord.Embed(
                 title=f"🌸 Welcome to {guild.name}!",
                 description=(
                     f"Hey **{member.name}**! Welcome to our sanctuary! ✨\n\n"
                     f"**Quick Start Guide:**\n"
-                    f"> 1️⃣ **Get Verified:** Click the button in <#1545502700840427702> to unlock all channels.\n"
-                    f"> 2️⃣ **Pick Roles:** Head over to <#1545502722739150898> to pick colors & game pings.\n"
-                    f"> 3️⃣ **Read Rules:** Review our community guidelines in <#1545502710101704714>.\n\n"
-                    f"💬 Say hi in <#1545502730699808768> or hop into a voice channel! Enjoy your stay! 💗"
+                    f"> 1️⃣ **Get Verified:** Click the button in {v_ref} to unlock all channels.\n"
+                    f"> 2️⃣ **Pick Roles:** Head over to {r_ref} to pick colors & game pings.\n"
+                    f"> 3️⃣ **Read Rules:** Review our community guidelines in {ru_ref}.\n\n"
+                    f"💬 Say hi in {c_ref} or hop into a voice channel! Enjoy your stay! 💗"
                 ),
                 color=0x2B2D31
             )

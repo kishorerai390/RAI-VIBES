@@ -75,6 +75,6 @@ A complete automated server setup suite equipped with **Interactive Button Self-
 
 1. Make sure your bot is invited into server `1457382179981099090` with Administrator permissions:
    👉 **[Invite APEX VIBES Bot](https://discord.com/api/oauth2/authorize?client_id=1545479610550980709&permissions=8&scope=bot%20applications.commands)**
-2. In this folder (`SERVER_SETUP_1457382179981099090`), double-click:
+2. In this folder (`RAI FAM`), double-click:
    📁 **`run_setup.bat`**
 3. Sit back and watch your server transform automatically into a clean community!

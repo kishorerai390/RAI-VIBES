@@ -434,9 +434,8 @@ class Moderation(commands.Cog):
     # MODERATOR SLASH & HYBRID COMMANDS
     # ==========================================
 
-    @commands.hybrid_command(name="servermute", aliases=["vmute", "smute"], description="Server mute a member (Voice Mute + Text Timeout).")
+    @commands.command(name="servermute", aliases=["vmute", "smute"], description="Server mute a member (Voice Mute + Text Timeout).")
     @commands.has_permissions(moderate_members=True)
-    @app_commands.describe(member="Member to server mute", minutes="Duration in minutes (default: 15)", reason="Reason for mute")
     async def servermute(self, ctx: commands.Context, member: discord.Member, minutes: int = 15, *, reason: str = "Inappropriate behavior"):
         """Puts an improper user to voice server mute and text timeout."""
         await ctx.defer()
@@ -955,13 +954,8 @@ class Moderation(commands.Cog):
         embed.set_footer(text="RAI SENTINEL 🛡️ Voice Isolation Engine", icon_url=config.RAI_ICON_URL)
         await self.log_mod_action(guild, embed)
 
-    @commands.hybrid_command(name="freeze", aliases=["isolate", "jailvc", "silencevc"], description="Freeze a noisy/trolling member and isolate them in the Freeze Chamber.")
+    @commands.command(name="freeze", aliases=["isolate", "jailvc", "silencevc"], description="Freeze a noisy/trolling member and isolate them in the Freeze Chamber.")
     @commands.has_permissions(moderate_members=True)
-    @app_commands.describe(
-        member="Member making extreme noise or trolling in voice",
-        minutes="Duration in minutes (0 for permanent until unfreeze)",
-        reason="Reason for voice freeze"
-    )
     async def freeze_command(self, ctx: commands.Context, member: discord.Member, minutes: int = 10, *, reason: str = "Extreme noise / mic spamming"):
         await ctx.defer()
         if member.top_role >= ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
@@ -1255,8 +1249,7 @@ class Moderation(commands.Cog):
         else:
             await ctx.send(f"No notes existed for **{user.mention}**.", ephemeral=True)
 
-    @commands.hybrid_command(name="modpanel", description="Open an interactive quick-action moderation dashboard for a member.")
-    @app_commands.describe(member="The member to inspect or moderate")
+    @commands.command(name="modpanel", description="Open an interactive quick-action moderation dashboard for a member.")
     @commands.has_permissions(moderate_members=True)
     async def modpanel(self, ctx: commands.Context, member: discord.Member):
         infra = load_infractions()

@@ -232,7 +232,9 @@ class Casino(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="blackjack", description="Play high-stakes Blackjack against the dealer!")
+    casino = app_commands.Group(name="casino", description="High-stakes cyber casino games")
+
+    @casino.command(name="blackjack", description="Play high-stakes Blackjack against the dealer!")
     @app_commands.describe(bet="Amount of coins to wager (minimum 50)")
     async def blackjack(self, interaction: discord.Interaction, bet: int):
         if bet < 50:
@@ -266,7 +268,7 @@ class Casino(commands.Cog):
         embed = view.build_embed()
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="slots", description="Spin the Cyber-Pink slot machine for jackpot multipliers!")
+    @casino.command(name="slots", description="Spin the Cyber-Pink slot machine for jackpot multipliers!")
     @app_commands.describe(bet="Amount of coins to spin (minimum 25)")
     async def slots(self, interaction: discord.Interaction, bet: int):
         if bet < 25:
@@ -329,7 +331,7 @@ class Casino(commands.Cog):
         embed.set_footer(text="RAI VIBES Casino • Match 3 for massive jackpots!")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="coinflip", description="Flip a coin for double-or-nothing coin rewards!")
+    @casino.command(name="coinflip", description="Flip a coin for double-or-nothing coin rewards!")
     @app_commands.describe(choice="Heads or Tails", bet="Amount of coins to bet")
     async def coinflip(self, interaction: discord.Interaction, choice: Literal["heads", "tails"], bet: int):
         if bet < 20:
@@ -364,7 +366,7 @@ class Casino(commands.Cog):
         embed.set_footer(text="RAI VIBES Casino • Double or Nothing")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="dice", description="Roll high-stakes cyber dice against the bot!")
+    @casino.command(name="dice", description="Roll high-stakes cyber dice against the bot!")
     @app_commands.describe(bet="Amount of coins to bet")
     async def dice(self, interaction: discord.Interaction, bet: int):
         if bet < 20:
@@ -408,7 +410,7 @@ class Casino(commands.Cog):
         embed.set_footer(text="RAI VIBES Casino • High Rollers Arena")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="spin", description="Spin the Daily Lucky Wheel of Fortune for bonus coins and jackpots!")
+    @casino.command(name="spin", description="Spin the Daily Lucky Wheel of Fortune for bonus coins and jackpots!")
     async def spin_wheel(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         spins_file = DATA_DIR / "spins.json"

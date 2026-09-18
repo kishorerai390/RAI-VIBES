@@ -1,8 +1,25 @@
 import os
 import sys
 import re
+import socket
 import asyncio
 import logging
+
+# Ensure single instance of RAI VIBES using OS-level local socket mutex
+_instance_lock_socket = None
+
+def acquire_instance_lock(port: int = 59124) -> bool:
+    global _instance_lock_socket
+    if _instance_lock_socket is not None:
+        return True
+    _instance_lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        _instance_lock_socket.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        print(f"[CRITICAL] Another instance of bot is already running (Port {port} in use)!")
+        print("[CRITICAL] Exiting immediately to prevent duplicate responses and message spam.")
+        sys.exit(0)
 
 # Ensure UTF-8 output encoding for Windows terminals
 if hasattr(sys.stdout, "reconfigure"):
@@ -20,7 +37,9 @@ from utils.persistent_views import (
     NotificationRolesView,
     IdentityRolesView,
     ServerGuideView,
-    GamingHubStationView
+    GamingHubStationView,
+    TicketCreateView,
+    TicketCloseView
 )
 
 # Configure Logging
@@ -113,6 +132,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
         b.add_view(IdentityRolesView())
+        b.add_view(TicketCreateView())
+        b.add_view(TicketCloseView())
         b.add_view(VoiceControlView())
         b.add_view(MusicPlayerView())
         b.add_view(VerifyButtonView())
@@ -154,14 +175,14 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                 except Exception as e:
                     logger.info(f"Server banner note (requires Server Boost Level 2): {e}")
 
-        # Synchronize slash commands directly to each guild for instant updates
+        # Synchronize slash commands directly to each guild for instant sub-second response
         try:
-            # Purge duplicate guild-scoped commands so each command only appears once (globally)
             for guild in b.guilds:
-                b.tree.clear_commands(guild=guild)
-                await b.tree.sync(guild=guild)
+                b.tree.copy_global_to(guild=guild)
+                synced_guild = await b.tree.sync(guild=guild)
+                logger.info(f"✨ Instant-synced {len(synced_guild)} slash commands to '{guild.name}'")
             synced = await b.tree.sync()
-            logger.info(f"✨ Synchronized {len(synced)} clean Music slash commands (duplicates purged).")
+            logger.info(f"✨ Synchronized {len(synced)} global Music slash commands.")
         except Exception as e:
             logger.error(f"Failed to synchronize slash commands: {e}")
 
@@ -462,6 +483,7 @@ async def main():
             await start_bot(use_members=False, use_message_content=False)
 
 if __name__ == "__main__":
+    acquire_instance_lock(59124)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

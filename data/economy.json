@@ -1,6 +1,6 @@
 {
   "1541841989308514389": {
-    "coins": 400,
+    "coins": 800,
     "last_daily": 0,
     "wins": 0,
     "losses": 0
@@ -12,5 +12,11 @@
     "losses": 0,
     "streak": 999,
     "rep": 999
+  },
+  "1365981348589862923": {
+    "coins": 500,
+    "last_daily": 0,
+    "wins": 0,
+    "losses": 0
   }
 }

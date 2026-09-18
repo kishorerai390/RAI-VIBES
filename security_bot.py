@@ -1,7 +1,25 @@
 import os
 import sys
+import socket
 import asyncio
 import logging
+
+# Ensure single instance of RAI SENTINEL using OS-level local socket mutex
+_instance_lock_socket = None
+
+def acquire_instance_lock(port: int = 59125) -> bool:
+    global _instance_lock_socket
+    if _instance_lock_socket is not None:
+        return True
+    _instance_lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        _instance_lock_socket.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        print(f"[CRITICAL] Another instance of RAI SENTINEL is already running (Port {port} in use)!")
+        print("[CRITICAL] Exiting immediately to prevent duplicate responses and message spam.")
+        sys.exit(0)
+
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -59,17 +77,16 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
             except Exception:
                 pass
 
-        # Register Persistent Views for Verification, Tickets, Welcome, and Self-Roles
+        # Register Persistent Views for Verification, Tickets, and Self-Roles
         from utils.persistent_views import (
             VerifyButtonView, TicketCreateView, TicketCloseView,
-            GamingRolesView, NotificationRolesView, IdentityRolesView
+            GamingRolesView, NotificationRolesView, IdentityRolesView, ColorRolesView
         )
         from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
-        from cogs.welcome import WelcomeQuickActionsView
         for view_cls in [
             VerifyButtonView, TicketCreateView, TicketCloseView,
-            GamingRolesView, NotificationRolesView, IdentityRolesView,
-            PersistentTicketLauncherView, TicketChannelControlView, WelcomeQuickActionsView
+            PersistentTicketLauncherView, TicketChannelControlView,
+            GamingRolesView, NotificationRolesView, IdentityRolesView, ColorRolesView
         ]:
             try:
                 bot.add_view(view_cls())
@@ -87,13 +104,14 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
             except Exception as e:
                 logger.debug(f"[RAI SENTINEL] Banner update notice: {e}")
 
+        # Synchronize slash commands directly to each guild for instant response
         try:
-            # Clear duplicate guild-scoped commands so each command only appears once (globally)
             for guild in bot.guilds:
-                bot.tree.clear_commands(guild=guild)
-                await bot.tree.sync(guild=guild)
+                bot.tree.copy_global_to(guild=guild)
+                synced_guild = await bot.tree.sync(guild=guild)
+                logger.info(f"🛡️ Instant-synced {len(synced_guild)} security slash commands to '{guild.name}'")
             synced = await bot.tree.sync()
-            logger.info(f"🛡️ Synchronized {len(synced)} clean Security slash commands (duplicates purged).")
+            logger.info(f"🛡️ Synchronized {len(synced)} global Security slash commands.")
         except Exception as e:
             logger.error(f"Failed to sync security commands: {e}")
 
@@ -117,10 +135,9 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
 async def start_sentinel(token: str, use_members: bool = True, use_message_content: bool = True):
     bot = create_security_bot(use_members=use_members, use_message_content=use_message_content)
     
-    # Sentinel manages Autonomous Defense, Anti-Nuke, Anti-Raid, Verification, and Tickets
+    # Sentinel manages Autonomous Defense, Anti-Nuke, Anti-Raid, and Tickets
     security_extensions = [
         "cogs.autoprovision",
-        "cogs.verify",
         "cogs.tickets",
         "cogs.moderation",
         "cogs.antinuke",
@@ -149,16 +166,11 @@ async def main():
         print("[RAI SENTINEL] Missing bot token! Please set SECURITY_BOT_TOKEN in .env")
         return
 
-    try:
-        await start_sentinel(token, use_members=True, use_message_content=True)
-    except discord.errors.PrivilegedIntentsRequired:
-        logger.warning("[RAI SENTINEL] Privileged Gateway Intents not enabled. Falling back to basic intents.")
-        try:
-            await start_sentinel(token, use_members=False, use_message_content=True)
-        except discord.errors.PrivilegedIntentsRequired:
-            await start_sentinel(token, use_members=False, use_message_content=False)
+    logger.info("[RAI SENTINEL] Connecting with standard intents...")
+    await start_sentinel(token, use_members=False, use_message_content=False)
 
 if __name__ == "__main__":
+    acquire_instance_lock(59125)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

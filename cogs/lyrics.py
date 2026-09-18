@@ -154,9 +154,9 @@ class Lyrics(commands.Cog):
         embed.set_thumbnail(url=data.get("thumbnail") or thumbnail_url)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="karaoke", description="Display interactive karaoke card with synced lines.")
+    @commands.hybrid_command(name="sing", aliases=["karaokelyrics"], description="Display interactive karaoke card with synced lines.")
     @app_commands.describe(song="Optional song name (defaults to playing track)")
-    async def karaoke(self, ctx: commands.Context, *, song: Optional[str] = None):
+    async def sing(self, ctx: commands.Context, *, song: Optional[str] = None):
         if ctx.interaction:
             await ctx.defer()
 
