@@ -137,7 +137,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.verify import VerifyButtonView
         from utils.persistent_views import TicketCreateView, TicketCloseView
         from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
-        from cogs.movie_party import MovieRSVPView
+        from cogs.movie_party import MovieRSVPView, MovieVoteView
 
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
@@ -153,6 +153,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(PersistentTicketLauncherView())
         b.add_view(TicketChannelControlView())
         b.add_view(MovieRSVPView())
+        b.add_view(MovieVoteView())
 
         # Update bot profile banner to 3D animated GIF
         banner_path = os.path.join("assets", "rai_vibes_3d_banner.gif")
@@ -193,7 +194,10 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         """Immediately defers slash command interactions to prevent 'didn't respond in time' timeouts."""
         if ctx.interaction and not ctx.interaction.response.is_done():
             cmd_name = ctx.command.name if ctx.command else ""
-            ephemeral_commands = {"mutesoundboard", "unmutesoundboard", "entrysound", "movienight", "movie"}
+            ephemeral_commands = {
+                "mutesoundboard", "unmutesoundboard", "entrysound",
+                "movienight", "movie", "movieend", "cinemamute", "cinemaunmute", "moviesuggest"
+            }
             is_ephem = cmd_name in ephemeral_commands
             try:
                 await ctx.defer(ephemeral=is_ephem)

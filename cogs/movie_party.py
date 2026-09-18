@@ -3,11 +3,13 @@ import json
 import time
 import asyncio
 import logging
+import datetime
 import urllib.request
 import urllib.parse
 from pathlib import Path
 from typing import Optional, Dict, List
 
+import requests
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -19,9 +21,11 @@ logger = logging.getLogger("MovieParty")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 EVENTS_FILE = DATA_DIR / "movie_events.json"
+SUGGESTIONS_FILE = DATA_DIR / "movie_suggestions.json"
 
 DEFAULT_ANNOUNCEMENT_CHANNEL_ID = 1545502718792175646  # 📢｜ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛꜱ
 DEFAULT_VOICE_ROOM_ID = 1550196955660029964           # 🍿 | Movie Time 1
+CINEMA_CHAT_CHANNEL_ID = 1550584226376720476          # 🍿｜ᴄɪɴᴇᴍᴀ-ᴄʜᴀᴛ
 FOUNDER_USER_ID = 1457380609641938981
 
 
@@ -43,6 +47,43 @@ def save_events(data: Dict[str, dict]):
             json.dump(data, f, indent=2)
     except Exception as e:
         logger.error(f"Failed to save movie events: {e}")
+
+
+def load_suggestions() -> Dict[str, dict]:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if SUGGESTIONS_FILE.exists():
+        try:
+            with open(SUGGESTIONS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_suggestions(data: Dict[str, dict]):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save movie suggestions: {e}")
+
+
+async def set_voice_channel_status(channel_id: int, status_text: str):
+    """Sets Discord native voice channel status text displayed next to voice channels."""
+    token = config.DISCORD_TOKEN
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    url = f"https://discord.com/api/v10/channels/{channel_id}/voice-status"
+
+    def _put():
+        return requests.put(url, headers=headers, json={"status": status_text[:500]})
+
+    try:
+        res = await asyncio.to_thread(_put)
+        if res.status_code in [200, 204]:
+            logger.info(f"✨ Set voice status on channel {channel_id} -> '{status_text}'")
+    except Exception as e:
+        logger.debug(f"Failed to update voice channel status: {e}")
 
 
 def fetch_movie_metadata_sync(query: str) -> dict:
@@ -141,7 +182,7 @@ class MovieRSVPView(View):
             join_url = f"https://discord.com/channels/1457382179981099090/{room_id}"
             btn_label = f"🍿 Join {room_name or 'Screening Room'}"
             self.add_item(Button(label=btn_label, url=join_url, style=discord.ButtonStyle.link, row=0))
-            chat_url = "https://discord.com/channels/1457382179981099090/1550584226376720476"
+            chat_url = f"https://discord.com/channels/1457382179981099090/{CINEMA_CHAT_CHANNEL_ID}"
             self.add_item(Button(label="💬 Cinema Chat", url=chat_url, style=discord.ButtonStyle.link, row=0))
 
     @button(label="Count Me In! 🍿", style=discord.ButtonStyle.primary, custom_id="movie_rsvp_toggle_btn", row=0)
@@ -169,7 +210,6 @@ class MovieRSVPView(View):
         events[msg_id]["rsvps"] = rsvps
         save_events(events)
 
-        # Update button label count
         btn.label = f"Count Me In! 🍿 ({len(rsvps)})"
         try:
             if interaction.message.embeds:
@@ -190,6 +230,90 @@ class MovieRSVPView(View):
         await interaction.followup.send(msg, ephemeral=True)
 
 
+class MovieVoteView(View):
+    """Persistent voting view for community movie suggestions."""
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @button(label="Upvote 👍 (0)", style=discord.ButtonStyle.success, custom_id="movie_vote_up_btn", row=0)
+    async def upvote_btn(self, interaction: discord.Interaction, btn: Button):
+        await interaction.response.defer(ephemeral=True)
+        suggestions = load_suggestions()
+        msg_id = str(interaction.message.id)
+
+        if msg_id not in suggestions:
+            suggestions[msg_id] = {"upvotes": [], "downvotes": []}
+
+        s_data = suggestions[msg_id]
+        uid = interaction.user.id
+
+        if uid in s_data.get("upvotes", []):
+            s_data["upvotes"].remove(uid)
+            msg = "⚪ Removed your upvote."
+        else:
+            if uid not in s_data["upvotes"]:
+                s_data["upvotes"].append(uid)
+            if uid in s_data.get("downvotes", []):
+                s_data["downvotes"].remove(uid)
+            msg = "👍 **Upvoted!** You voted in favor of this movie."
+
+        save_suggestions(suggestions)
+        await self._update_message(interaction, s_data)
+        await interaction.followup.send(msg, ephemeral=True)
+
+    @button(label="Downvote 👎 (0)", style=discord.ButtonStyle.danger, custom_id="movie_vote_down_btn", row=0)
+    async def downvote_btn(self, interaction: discord.Interaction, btn: Button):
+        await interaction.response.defer(ephemeral=True)
+        suggestions = load_suggestions()
+        msg_id = str(interaction.message.id)
+
+        if msg_id not in suggestions:
+            suggestions[msg_id] = {"upvotes": [], "downvotes": []}
+
+        s_data = suggestions[msg_id]
+        uid = interaction.user.id
+
+        if uid in s_data.get("downvotes", []):
+            s_data["downvotes"].remove(uid)
+            msg = "⚪ Removed your downvote."
+        else:
+            if uid not in s_data["downvotes"]:
+                s_data["downvotes"].append(uid)
+            if uid in s_data.get("upvotes", []):
+                s_data["upvotes"].remove(uid)
+            msg = "👎 **Downvoted.** You voted against this movie."
+
+        save_suggestions(suggestions)
+        await self._update_message(interaction, s_data)
+        await interaction.followup.send(msg, ephemeral=True)
+
+    async def _update_message(self, interaction: discord.Interaction, s_data: dict):
+        up_count = len(s_data.get("upvotes", []))
+        down_count = len(s_data.get("downvotes", []))
+
+        for child in self.children:
+            if getattr(child, "custom_id", None) == "movie_vote_up_btn":
+                child.label = f"Upvote 👍 ({up_count})"
+            elif getattr(child, "custom_id", None) == "movie_vote_down_btn":
+                child.label = f"Downvote 👎 ({down_count})"
+
+        try:
+            if interaction.message.embeds:
+                embed = interaction.message.embeds[0]
+                for i, field in enumerate(embed.fields):
+                    if "Community Votes" in field.name or "Votes" in field.name:
+                        embed.set_field_at(
+                            i,
+                            name="📊 Community Votes",
+                            value=f"👍 **Upvotes:** `{up_count}`  •  👎 **Downvotes:** `{down_count}`",
+                            inline=False
+                        )
+                        break
+                await interaction.message.edit(embed=embed, view=self)
+        except Exception as e:
+            logger.debug(f"Could not update suggestion embed: {e}")
+
+
 class MovieParty(commands.Cog):
     """Automated Movie Night, Anime Watch-Party & Cinema Announcement Hub."""
     def __init__(self, bot: commands.Bot):
@@ -205,7 +329,8 @@ class MovieParty(commands.Cog):
         room="Voice screening room (default: 🍿 | Movie Time 1)",
         channel="Text announcement channel (default: 📢｜ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛꜱ)",
         ping="Choose who to ping with the announcement",
-        note="Optional custom note from host (e.g. Bring your popcorn and headsets!)"
+        note="Optional custom note from host (e.g. Bring your popcorn and headsets!)",
+        create_event="Whether to publish a native Discord Scheduled Event banner"
     )
     @app_commands.choices(ping=[
         app_commands.Choice(name="@everyone (All Members)", value="everyone"),
@@ -220,13 +345,12 @@ class MovieParty(commands.Cog):
         room: Optional[discord.VoiceChannel] = None,
         channel: Optional[discord.TextChannel] = None,
         ping: Optional[str] = "everyone",
-        note: Optional[str] = None
+        note: Optional[str] = None,
+        create_event: Optional[bool] = False
     ):
-        # Always defer ephemerally so the caller's interaction never times out
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True)
 
-        # Check permissions: Founder or Admin or Manage Events
         is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
         has_perm = (
             interaction.user.guild_permissions.administrator
@@ -240,25 +364,29 @@ class MovieParty(commands.Cog):
             )
             return
 
-        # Inform the user that data is being fetched
         status_msg = await interaction.followup.send(
             f"⏳ Fetching theatrical data and poster for **\"{movie}\"**...",
             ephemeral=True
         )
 
-        # Resolve channels
         target_channel = channel or interaction.guild.get_channel(DEFAULT_ANNOUNCEMENT_CHANNEL_ID) or interaction.channel
         screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
         room_name = screening_room.name if screening_room else "Movie Time 1"
         room_id = screening_room.id if screening_room else DEFAULT_VOICE_ROOM_ID
 
-        # Fetch metadata in background thread to keep bot responsive
         movie_data = await asyncio.to_thread(fetch_movie_metadata_sync, movie)
 
         title_display = f"{movie_data['title']}"
         if movie_data.get("year"):
             title_display += f" ({movie_data['year']})"
 
+        # 1. Update Voice Channel Status live
+        voice_status_text = f"🎬 {title_display}"
+        if movie_data.get("rating") and movie_data.get("rating") != "N/A":
+            voice_status_text += f" • ⭐ {movie_data['rating']}"
+        await set_voice_channel_status(room_id, voice_status_text)
+
+        # 2. Build Announcement Embed
         embed = discord.Embed(
             title=f"🎬 RAI FAM CINEMA NIGHT: {title_display.upper()}",
             description=(
@@ -268,18 +396,16 @@ class MovieParty(commands.Cog):
             color=0xFF007F
         )
 
-        # 1. Screening Details Field
         room_mention = screening_room.mention if screening_room else f"`🍿 | {room_name}`"
         details_lines = [
             f"• 📅 **Showtime:** `{showtime}`",
             f"• 🎙️ **Screening Room:** {room_mention}",
-            f"• 💬 **Live Chat:** <#1550584226376720476>",
+            f"• 💬 **Live Chat:** <#{CINEMA_CHAT_CHANNEL_ID}>",
             f"• 🎧 **Audio / Quality:** `1080p 60FPS Stereo Surround`",
             f"• 🍿 **Vibe:** Relaxed, high fidelity & open to all RAI FAM members!"
         ]
         embed.add_field(name="🎟️ Screening Details", value="\n".join(details_lines), inline=False)
 
-        # 2. Film Overview Field
         info_lines = []
         if movie_data.get("rating") and movie_data.get("rating") != "N/A":
             info_lines.append(f"• ⭐ **Rating:** `{movie_data['rating']}/10 IMDb`")
@@ -297,17 +423,14 @@ class MovieParty(commands.Cog):
         if info_lines:
             embed.add_field(name="🏁 Film Overview", value="\n".join(info_lines), inline=False)
 
-        # 3. Synopsis Field (if a custom note was provided, we preserve the official plot here)
         if note and movie_data.get("plot"):
             embed.add_field(name="📖 Synopsis", value=f"*{movie_data['plot'][:1000]}*", inline=False)
 
-        # 4. Poster Image
         if movie_data.get("poster") and movie_data["poster"].startswith("http"):
             embed.set_image(url=movie_data["poster"])
         else:
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/3172/3172555.png")
 
-        # 5. Attendees Field
         embed.add_field(
             name="🍿 Attendees RSVP'd (0)",
             value="Be the first to RSVP! Click the button below to join the roster.",
@@ -319,7 +442,6 @@ class MovieParty(commands.Cog):
             icon_url=config.RAI_ICON_URL
         )
 
-        # Ping content
         if ping == "everyone":
             content = "@everyone 🍿 **COMMUNITY MOVIE NIGHT ANNOUNCEMENT!**"
         elif ping == "here":
@@ -327,7 +449,6 @@ class MovieParty(commands.Cog):
         else:
             content = "🍿 **COMMUNITY MOVIE NIGHT ANNOUNCEMENT!**"
 
-        # Interactive view with Jump to Voice Channel button & RSVP counter
         view = MovieRSVPView(room_id=room_id, room_name=room_name)
 
         try:
@@ -339,7 +460,28 @@ class MovieParty(commands.Cog):
             )
             return
 
-        # Record in events file
+        # 3. Create Discord Scheduled Event if requested
+        if create_event and interaction.guild:
+            try:
+                start_iso = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)).isoformat()
+                event_payload = {
+                    "channel_id": str(room_id),
+                    "name": f"🎬 {title_display} Screening",
+                    "privacy_level": 2,
+                    "scheduled_start_time": start_iso,
+                    "entity_type": 2,
+                    "description": f"Community Watch-Party in {room_name}!\n\nSynopsis:\n{movie_data.get('plot', '')[:800]}"
+                }
+                headers = {"Authorization": f"Bot {config.DISCORD_TOKEN}", "Content-Type": "application/json"}
+                await asyncio.to_thread(
+                    requests.post,
+                    f"https://discord.com/api/v10/guilds/{interaction.guild.id}/scheduled-events",
+                    headers=headers,
+                    json=event_payload
+                )
+            except Exception as e:
+                logger.debug(f"Event creation notice: {e}")
+
         events = load_events()
         events[str(posted_msg.id)] = {
             "title": title_display,
@@ -351,13 +493,14 @@ class MovieParty(commands.Cog):
         }
         save_events(events)
 
-        # Ephemeral confirmation to executor with jump link
         confirm_embed = discord.Embed(
             title="🍿 Cinema Announcement Published!",
             description=(
                 f"✅ Official movie announcement for **{title_display}** is now published!\n\n"
                 f"📢 **Channel:** {target_channel.mention}\n"
                 f"🍿 **Voice Room:** {room_mention}\n"
+                f"💬 **Live Discussion:** <#{CINEMA_CHAT_CHANNEL_ID}>\n"
+                f"✨ **Voice Status:** Updated to `{voice_status_text}`\n"
                 f"🔗 [**Jump to Announcement**]({posted_msg.jump_url})"
             ),
             color=0x2ECC71
@@ -389,8 +532,245 @@ class MovieParty(commands.Cog):
             room=None,
             channel=None,
             ping=ping,
-            note=None
+            note=None,
+            create_event=False
         )
+
+    @app_commands.command(
+        name="movieend",
+        description="🎬 End the movie screening, reset voice channel status & unmute viewers"
+    )
+    @app_commands.describe(room="Voice screening room (default: 🍿 | Movie Time 1)")
+    async def movieend(
+        self,
+        interaction: discord.Interaction,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            await interaction.followup.send("❌ Only the Founder and Event Hosts can end screenings.", ephemeral=True)
+            return
+
+        screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
+        room_id = screening_room.id if screening_room else DEFAULT_VOICE_ROOM_ID
+
+        # Reset Voice Channel Status
+        await set_voice_channel_status(room_id, "🍿 Grab your popcorn & relax")
+
+        # Unmute everyone and restore speak permissions
+        if screening_room:
+            try:
+                ow = screening_room.overwrites_for(interaction.guild.default_role)
+                ow.speak = True
+                await screening_room.set_permissions(interaction.guild.default_role, overwrite=ow)
+                for member in screening_room.members:
+                    if member.voice and member.voice.mute:
+                        try:
+                            await member.edit(mute=False, reason="Movie Screening Ended")
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.debug(f"Reset permissions error: {e}")
+
+        embed = discord.Embed(
+            title="🎬 Movie Screening Concluded",
+            description=(
+                f"✅ Voice status reset to `🍿 Grab your popcorn & relax` in {screening_room.mention if screening_room else 'screening room'}.\n"
+                f"🎙️ Microphones unmuted for post-movie discussions.\n"
+                f"💬 Head over to <#{CINEMA_CHAT_CHANNEL_ID}> to share your reviews and ratings!"
+            ),
+            color=0x2ECC71
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(
+        name="cinemamute",
+        description="🤫 Mute viewers in screening room so movie audio plays in crystal clarity"
+    )
+    @app_commands.describe(room="Voice screening room (default: 🍿 | Movie Time 1)")
+    async def cinemamute(
+        self,
+        interaction: discord.Interaction,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            await interaction.followup.send("❌ Only the Founder and Event Hosts can activate Cinema Silence.", ephemeral=True)
+            return
+
+        screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
+        if not screening_room:
+            await interaction.followup.send("❌ Voice channel not found.", ephemeral=True)
+            return
+
+        # 1. Disable speaking for @everyone
+        ow = screening_room.overwrites_for(interaction.guild.default_role)
+        ow.speak = False
+        await screening_room.set_permissions(interaction.guild.default_role, overwrite=ow)
+
+        # 2. Server mute non-admins currently connected
+        muted_count = 0
+        for member in screening_room.members:
+            if not member.guild_permissions.administrator and member.id != FOUNDER_USER_ID:
+                try:
+                    await member.edit(mute=True, reason="Cinema Silence Mode")
+                    muted_count += 1
+                except Exception:
+                    pass
+
+        embed = discord.Embed(
+            title="🤫 Cinema Silence Mode Activated",
+            description=(
+                f"🔒 Speaking permissions locked in {screening_room.mention} ({muted_count} viewers muted).\n"
+                f"🎧 Movie audio will now play cleanly without mic echo or background noise.\n"
+                f"💬 Members can react and chat live in <#{CINEMA_CHAT_CHANNEL_ID}>!"
+            ),
+            color=0xFF007F
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(
+        name="cinemaunmute",
+        description="🎙️ Restore voice permissions in screening room for post-movie chat"
+    )
+    @app_commands.describe(room="Voice screening room (default: 🍿 | Movie Time 1)")
+    async def cinemaunmute(
+        self,
+        interaction: discord.Interaction,
+        room: Optional[discord.VoiceChannel] = None
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        is_founder = interaction.user.id in [FOUNDER_USER_ID, interaction.guild.owner_id]
+        has_perm = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_events
+        if not (is_founder or has_perm):
+            await interaction.followup.send("❌ Only the Founder and Event Hosts can deactivate Cinema Silence.", ephemeral=True)
+            return
+
+        screening_room = room or interaction.guild.get_channel(DEFAULT_VOICE_ROOM_ID)
+        if not screening_room:
+            await interaction.followup.send("❌ Voice channel not found.", ephemeral=True)
+            return
+
+        # 1. Restore speaking for @everyone
+        ow = screening_room.overwrites_for(interaction.guild.default_role)
+        ow.speak = True
+        await screening_room.set_permissions(interaction.guild.default_role, overwrite=ow)
+
+        # 2. Unmute members
+        unmuted_count = 0
+        for member in screening_room.members:
+            if member.voice and member.voice.mute:
+                try:
+                    await member.edit(mute=False, reason="Cinema Silence Mode Deactivated")
+                    unmuted_count += 1
+                except Exception:
+                    pass
+
+        embed = discord.Embed(
+            title="🎙️ Cinema Silence Mode Deactivated",
+            description=(
+                f"✅ Speaking permissions restored in {screening_room.mention} ({unmuted_count} unmuted).\n"
+                f"🗣️ Mics are now open for post-movie discussions!"
+            ),
+            color=0x2ECC71
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(
+        name="moviesuggest",
+        description="💡 Suggest a movie to watch with IMDb rating & community voting!"
+    )
+    @app_commands.describe(movie="Title of the movie to suggest (e.g. Inception, Interstellar, Spirited Away)")
+    async def moviesuggest(
+        self,
+        interaction: discord.Interaction,
+        movie: str
+    ):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        movie_data = await asyncio.to_thread(fetch_movie_metadata_sync, movie)
+        title_display = f"{movie_data['title']}"
+        if movie_data.get("year"):
+            title_display += f" ({movie_data['year']})"
+
+        cinema_chat = interaction.guild.get_channel(CINEMA_CHAT_CHANNEL_ID) or interaction.channel
+
+        embed = discord.Embed(
+            title=f"💡 MOVIE NIGHT SUGGESTION: {title_display.upper()}",
+            description=(
+                f"🎬 Suggested by {interaction.user.mention} for upcoming community cinema night!\n\n"
+                f"*{movie_data.get('plot', 'Vote below if you want to watch this film together!')}*"
+            ),
+            color=0xFF007F
+        )
+
+        specs = []
+        if movie_data.get("rating") and movie_data.get("rating") != "N/A":
+            specs.append(f"• ⭐ **IMDb Rating:** `{movie_data['rating']}/10`")
+        if movie_data.get("runtime") and movie_data.get("runtime") != "N/A":
+            specs.append(f"• ⏱️ **Runtime:** `{movie_data['runtime']}`")
+        if movie_data.get("rated") and movie_data.get("rated") != "N/A":
+            specs.append(f"• 🏷️ **Rated:** `{movie_data['rated']}`")
+        if movie_data.get("genre") and movie_data.get("genre") != "N/A":
+            specs.append(f"• 🎭 **Genre:** `{movie_data['genre']}`")
+        if specs:
+            embed.add_field(name="🎟️ Film Overview", value="\n".join(specs), inline=False)
+
+        crew = []
+        if movie_data.get("director") and movie_data.get("director") != "N/A":
+            crew.append(f"• 🎬 **Director:** `{movie_data['director']}`")
+        if movie_data.get("actors") and movie_data.get("actors") != "N/A":
+            crew.append(f"• 🌟 **Starring:** `{movie_data['actors']}`")
+        if crew:
+            embed.add_field(name="👥 Cast & Crew", value="\n".join(crew), inline=False)
+
+        embed.add_field(
+            name="📊 Community Votes",
+            value="👍 **Upvotes:** `0`  •  👎 **Downvotes:** `0`",
+            inline=False
+        )
+
+        if movie_data.get("poster") and movie_data["poster"].startswith("http"):
+            embed.set_image(url=movie_data["poster"])
+
+        embed.set_footer(
+            text="RAI FAM Cinema Hub • Click buttons below to vote for this movie!",
+            icon_url=config.RAI_ICON_URL
+        )
+
+        view = MovieVoteView()
+        msg = await cinema_chat.send(embed=embed, view=view)
+
+        suggestions = load_suggestions()
+        suggestions[str(msg.id)] = {
+            "title": title_display,
+            "suggester_id": interaction.user.id,
+            "upvotes": [],
+            "downvotes": []
+        }
+        save_suggestions(suggestions)
+
+        confirm_embed = discord.Embed(
+            title="🍿 Movie Suggestion Submitted!",
+            description=(
+                f"✅ **{title_display}** has been posted to {cinema_chat.mention}!\n"
+                f"Members can now vote on your suggestion.\n"
+                f"🔗 [**Jump to Suggestion**]({msg.jump_url})"
+            ),
+            color=0x2ECC71
+        )
+        await interaction.followup.send(embed=confirm_embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
