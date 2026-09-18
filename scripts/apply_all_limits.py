@@ -32,6 +32,9 @@ for cid, (seconds, name) in slowmodes.items():
 voice_limits = {
     "1550186738410987591": (12, "💬 | Chill Lounge 1"),
     "1550186767632826459": (12, "💬 | Chill Lounge 2"),
+    "1550196955660029964": (25, "🍿 | Movie Time 1"),
+    "1550198444021514331": (12, "🍿 | Movie Time 2"),
+    "1550187298115551272": (30, "💤 | AFK / Sleep"),
 }
 
 for cid, (limit, name) in voice_limits.items():
@@ -54,6 +57,7 @@ new_channels = [
     # (Category ID, Channel Name, User Limit)
     ("1550186748364066827", "⚔️ | 1v1 Duel Arena", 2),
     ("1550186748364066827", "🎯 | Valorant / CS2 Squad", 5),
+    ("1550186748364066827", "🏆 | Tournament Finals", 10),
     ("1550186724137640006", "👥 | Squad Chamber", 4),
     ("1550186724137640006", "🎧 | Focus Lounge", 6),
 ]
