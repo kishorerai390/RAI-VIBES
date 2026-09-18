@@ -138,6 +138,17 @@ def create_arcade_bot(use_members: bool = True, use_message_content: bool = True
             except Exception as e:
                 logger.debug(f"View init note: {e}")
 
+        # Auto-apply 3D animated banner to RAI PLAY
+        banner_path = os.path.join("assets", "rai_play_3d_banner.gif")
+        if os.path.exists(banner_path):
+            try:
+                if not bot.user.banner or not str(bot.user.banner).startswith("a_"):
+                    with open(banner_path, "rb") as f:
+                        await bot.user.edit(banner=f.read())
+                    logger.info("✨ [RAI PLAY] Successfully applied 3D animated GIF profile banner!")
+            except Exception as e:
+                logger.debug(f"[RAI PLAY] Banner update notice: {e}")
+
         # Synchronize slash commands directly to guilds
         try:
             for guild in bot.guilds:

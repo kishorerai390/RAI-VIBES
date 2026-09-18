@@ -129,14 +129,16 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(PublicEntrySoundLaunchView())
         b.add_view(ServerGuideView())
 
-        # Update bot profile banner to animated GIF
-        banner_path = os.path.join("assets", "rai_vibes_banner.gif")
+        # Update bot profile banner to 3D animated GIF
+        banner_path = os.path.join("assets", "rai_vibes_3d_banner.gif")
+        if not os.path.exists(banner_path):
+            banner_path = os.path.join("assets", "rai_vibes_banner.gif")
         if os.path.exists(banner_path):
             try:
                 if not b.user.banner or not str(b.user.banner).startswith("a_"):
                     with open(banner_path, "rb") as f:
                         await b.user.edit(banner=f.read())
-                    logger.info("✨ [RAI VIBES] Successfully applied animated GIF profile banner!")
+                    logger.info("✨ [RAI VIBES] Successfully applied 3D animated GIF profile banner!")
             except Exception as e:
                 logger.debug(f"[RAI VIBES] Banner update notice: {e}")
 
