@@ -73,23 +73,21 @@ class QuizChoiceButton(Button):
             self.quiz_view.winner = interaction.user
             self.style = discord.ButtonStyle.success
 
-            # Award XP and coins
-            levels_cog = interaction.client.get_cog("Levels")
-            economy_cog = interaction.client.get_cog("Economy")
-            if levels_cog:
-                try:
-                    levels_cog.add_xp(interaction.user.id, 100)
-                except Exception:
-                    pass
-            if economy_cog:
-                try:
-                    economy_cog.add_balance(interaction.user.id, 150)
-                except Exception:
-                    pass
+            # Award XP and coins directly into data/economy.json
+            try:
+                from cogs.economy import load_economy, save_economy
+                eco = load_economy()
+                uid = str(interaction.user.id)
+                user_eco = eco.get(uid, {"balance": 0, "bank": 0})
+                user_eco["balance"] = user_eco.get("balance", 0) + 150
+                eco[uid] = user_eco
+                save_economy(eco)
+            except Exception as e:
+                print(f"[Quiz Economy Deposit Error] {e}")
 
             await interaction.response.send_message(
                 f"🎉 **BINGO!** {interaction.user.mention} correctly guessed **`{self.quiz_view.correct_track['title']}`**!\n"
-                f"🏆 **Rewards:** `+100 XP` & `+150 Coins` 💰",
+                f"🏆 **Rewards:** `+150 Coins` 💰 deposited into your Arcade Account!",
                 ephemeral=False
             )
             self.quiz_view.stop()
@@ -281,15 +279,52 @@ class MusicQuiz(commands.Cog):
                 medal = "🥇" if rank == 1 else ("🥈" if rank == 2 else ("🥉" if rank == 3 else "🎖️"))
                 leaderboard_lines.append(f"{medal} **{name}** — `{pts} Points`")
 
+            # Award Grand Champion Bonus (+500 Coins)
+            champ_id, champ_pts = sorted_scores[0]
+            try:
+                from cogs.economy import load_economy, save_economy
+                eco = load_economy()
+                cid = str(champ_id)
+                ue = eco.get(cid, {"balance": 0, "bank": 0})
+                ue["balance"] = ue.get("balance", 0) + 500
+                eco[cid] = ue
+                save_economy(eco)
+                leaderboard_lines.append(f"\n🎁 **Grand Champion Bounty:** `<@{champ_id}>` was awarded `+500 Coins` 💰!")
+            except Exception:
+                pass
+
             final_embed = discord.Embed(
-                title="🏆 MUSIC QUIZ FINAL RESULTS! 🏆",
+                title="🏆 MUSIC BATTLE PODIUM OF CHAMPIONS! 🏆",
                 description="\n".join(leaderboard_lines),
                 color=config.COLOR_GOLD
             )
             final_embed.set_footer(text="RAI VIBES 💗 • Music Champion Crowned!", icon_url=config.RAI_ICON_URL)
             await ctx.send(embed=final_embed)
         else:
-            await ctx.send("✨ **Quiz completed!** Use `/musicquiz` anytime to challenge your friends again!")
+            await ctx.send("✨ **Quiz completed!** Use `/musicbattle` anytime to challenge your friends again!")
+
+    @app_commands.command(name="musicbattle", description="⚔️ Live Audio Battle: Fast-draw beat rounds with instant coin bounties!")
+    @app_commands.describe(
+        category="Genre category of music",
+        rounds="Number of battle rounds (1-5)"
+    )
+    @app_commands.choices(
+        category=[
+            app_commands.Choice(name="🌸 Tamil Cinema Superhits", value="tamil"),
+            app_commands.Choice(name="🌍 Global Chartbusters", value="global"),
+            app_commands.Choice(name="🎬 Bollywood Hits", value="bollywood"),
+            app_commands.Choice(name="⚔️ Anime & Gaming OSTs", value="anime")
+        ]
+    )
+    async def musicbattle(
+        self,
+        interaction: discord.Interaction,
+        category: Optional[app_commands.Choice[str]] = None,
+        rounds: int = 3
+    ):
+        ctx = await commands.Context.from_interaction(interaction)
+        cat_key = category.value if category else "tamil"
+        await self._start_quiz_flow(ctx, cat_key, rounds, interaction.user)
 
 
 async def setup(bot: commands.Bot):

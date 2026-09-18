@@ -328,8 +328,64 @@ class Casino(commands.Cog):
             ),
             color=color
         )
-        embed.set_footer(text="RAI VIBES Casino • Match 3 for massive jackpots!")
-        await interaction.response.send_message(embed=embed)
+        embed.set_footer(text="RAI PLAY 🎮 • Match 3 for massive jackpots!")
+
+        # Animated multi-frame slot spin
+        embed_spin1 = discord.Embed(
+            title="🎰 CYBER-PINK SLOTS 🎰",
+            description=(
+                f"Player: {interaction.user.mention} | Bet: **{bet:,} Coins**\n\n"
+                f"╭─────────────╮\n"
+                f"│  [ 🌀 | 🌀 | 🌀 ]  │\n"
+                f"╰─────────────╯\n\n"
+                f"⚡ *Reels are spinning at hyper-speed...*"
+            ),
+            color=0x2B0938
+        )
+        embed_spin1.set_footer(text="RAI PLAY 🎮 • Cyber Casino")
+        await interaction.response.send_message(embed=embed_spin1)
+        await asyncio.sleep(0.8)
+
+        embed_spin2 = discord.Embed(
+            title="🎰 CYBER-PINK SLOTS 🎰",
+            description=(
+                f"Player: {interaction.user.mention} | Bet: **{bet:,} Coins**\n\n"
+                f"╭─────────────╮\n"
+                f"│  [ {r1} | 🌀 | 🌀 ]  │\n"
+                f"╰─────────────╯\n\n"
+                f"🔒 *Reel 1 locked in! Suspense builds...*"
+            ),
+            color=0x9B59B6
+        )
+        embed_spin2.set_footer(text="RAI PLAY 🎮 • Cyber Casino")
+        try:
+            await interaction.edit_original_response(embed=embed_spin2)
+        except Exception:
+            pass
+        await asyncio.sleep(0.8)
+
+        embed_spin3 = discord.Embed(
+            title="🎰 CYBER-PINK SLOTS 🎰",
+            description=(
+                f"Player: {interaction.user.mention} | Bet: **{bet:,} Coins**\n\n"
+                f"╭─────────────╮\n"
+                f"│  [ {r1} | {r2} | 🌀 ]  │\n"
+                f"╰─────────────╯\n\n"
+                f"🔥 *Reel 2 locked! Here comes the final stop...*"
+            ),
+            color=0xFFA502
+        )
+        embed_spin3.set_footer(text="RAI PLAY 🎮 • Cyber Casino")
+        try:
+            await interaction.edit_original_response(embed=embed_spin3)
+        except Exception:
+            pass
+        await asyncio.sleep(0.9)
+
+        try:
+            await interaction.edit_original_response(embed=embed)
+        except Exception:
+            pass
 
     @casino.command(name="coinflip", description="Flip a coin for double-or-nothing coin rewards!")
     @app_commands.describe(choice="Heads or Tails", bet="Amount of coins to bet")
@@ -493,6 +549,215 @@ class Casino(commands.Cog):
         )
         embed_result.set_footer(text=f"Spun by {interaction.user.display_name} • Daily Wheel", icon_url=interaction.user.display_avatar.url)
         await msg.edit(embed=embed_result)
+
+    @app_commands.command(name="heist", description="💼 Cooperative Bank Heist: Assemble a crew, breach security, and crack the vault!")
+    @app_commands.describe(vault="Target security vault to infiltrate")
+    @app_commands.choices(
+        vault=[
+            app_commands.Choice(name="🏦 Downtown National Vault (Easy • 10,000 Coin Vault)", value="easy"),
+            app_commands.Choice(name="🎰 Cyber-City Neon Casino Vault (Medium • 25,000 Coin Vault)", value="medium"),
+            app_commands.Choice(name="💎 Federal Reserve Titanium Stash (Extreme • 50,000 Coin Vault)", value="hard")
+        ]
+    )
+    async def heist(self, interaction: discord.Interaction, vault: Optional[app_commands.Choice[str]] = None):
+        user_id = interaction.user.id
+        entry_fee = 200
+        user_coins = get_coins(user_id)
+        if user_coins < entry_fee:
+            return await interaction.response.send_message(f"❌ You need at least **{entry_fee} Coins** to buy into heist equipment!", ephemeral=True)
+
+        add_coins(user_id, -entry_fee)
+
+        v_type = vault.value if vault else "medium"
+        vault_data = {
+            "easy": {"name": "Downtown National Vault", "base_jackpot": 10000, "color": 0x00FFCC},
+            "medium": {"name": "Cyber-City Neon Casino Vault", "base_jackpot": 25000, "color": 0xFFA502},
+            "hard": {"name": "Federal Reserve Titanium Stash", "base_jackpot": 50000, "color": 0xFF0055}
+        }[v_type]
+
+        lobby_view = HeistLobbyView(interaction.user, entry_fee)
+        embed_lobby = discord.Embed(
+            title=f"💼 CO-OP HEIST: {vault_data['name'].upper()}",
+            description=(
+                f"**Mastermind:** {interaction.user.mention}\n"
+                f"**Target Stash:** `{vault_data['base_jackpot']:,} Coins` minimum!\n"
+                f"**Crew Buy-in:** `{entry_fee} Coins` per operative.\n\n"
+                f"⚡ **Operatives needed!** Click **`[💼 Join Heist Crew]`** within **25 seconds** to gear up!\n"
+                f"*(The larger the crew, the bigger the bonus jackpot split!)*"
+            ),
+            color=vault_data["color"]
+        )
+        embed_lobby.set_footer(text="RAI PLAY 🎮 • Co-op Bank Heist")
+        await interaction.response.send_message(embed=embed_lobby, view=lobby_view)
+
+        await asyncio.sleep(25.0)
+        lobby_view.stop()
+
+        crew = lobby_view.crew
+        crew_mentions = ", ".join(m.mention for m in crew)
+        total_vault_pot = vault_data["base_jackpot"] + (len(crew) * 2500)
+
+        # Stage 1: Laser Grid
+        s1_opts = ["🔴 Cut Red Frequency Wire", "🔵 Cut Blue Optical Wire", "🟢 Cut Green Earth Wire"]
+        s1_view = HeistStageView(crew, "🔵 Cut Blue Optical Wire", s1_opts)
+        embed_s1 = discord.Embed(
+            title="🚨 HEIST STAGE 1: LASER OPTICAL GRID",
+            description=(
+                f"**Operatives:** {crew_mentions}\n\n"
+                f"⚠️ *Corridor laced with blue scanning lasers!*\n"
+                f"**Directive:** An operative must **Cut the BLUE Optical Wire** within **12 seconds**!"
+            ),
+            color=0x3498DB
+        )
+        await interaction.followup.send(embed=embed_s1, view=s1_view)
+        await asyncio.sleep(12.0)
+        s1_view.stop()
+
+        if not s1_view.cleared:
+            embed_fail = discord.Embed(
+                title="🚨 HEIST FAILED: ALARMS TRIGGERED!",
+                description="The optical tripwire was breached! Police sirens wailed and the crew escaped empty handed!",
+                color=0xFF0055
+            )
+            return await interaction.followup.send(embed=embed_fail)
+
+        # Stage 2: Mainframe Firewall
+        s2_opts = ["💾 Inject IP Bypass Code", "⚡ Overload Generator", "🛠️ Smash Terminal"]
+        s2_view = HeistStageView(crew, "💾 Inject IP Bypass Code", s2_opts)
+        embed_s2 = discord.Embed(
+            title="💻 HEIST STAGE 2: MAINFRAME FIREWALL",
+            description=(
+                f"**Lasers Bypassed by {s1_view.success_by.mention}!**\n\n"
+                f"⚠️ *Security door locked with 256-bit cryptographic cipher!*\n"
+                f"**Directive:** An operative must **Inject IP Bypass Code** within **12 seconds**!"
+            ),
+            color=0x9B59B6
+        )
+        await interaction.followup.send(embed=embed_s2, view=s2_view)
+        await asyncio.sleep(12.0)
+        s2_view.stop()
+
+        if not s2_view.cleared:
+            embed_fail = discord.Embed(
+                title="🚨 HEIST FAILED: LOCKDOWN TRIGGERED!",
+                description="Cybersecurity countermeasures locked down the facility! Mission aborted.",
+                color=0xFF0055
+            )
+            return await interaction.followup.send(embed=embed_fail)
+
+        # Stage 3: Titanium Vault Core
+        s3_opts = ["💣 Detonate Shaped C4", "🪛 Pick Pin Mechanism", "🔋 Battery Short-Circuit"]
+        s3_view = HeistStageView(crew, "💣 Detonate Shaped C4", s3_opts)
+        embed_s3 = discord.Embed(
+            title="💥 HEIST STAGE 3: TITANIUM VAULT DOOR",
+            description=(
+                f"**Firewall Breached by {s2_view.success_by.mention}!**\n\n"
+                f"⚠️ *6-inch reinforced vault door standing between the crew and the gold!*\n"
+                f"**Directive:** An operative must **Detonate Shaped C4** within **12 seconds**!"
+            ),
+            color=0xE67E22
+        )
+        await interaction.followup.send(embed=embed_s3, view=s3_view)
+        await asyncio.sleep(12.0)
+        s3_view.stop()
+
+        if not s3_view.cleared:
+            embed_fail = discord.Embed(
+                title="🚨 HEIST FAILED: C4 MISFIRE!",
+                description="The explosive charge failed! Emergency security forces surrounded the vault.",
+                color=0xFF0055
+            )
+            return await interaction.followup.send(embed=embed_fail)
+
+        # VICTORY!
+        payout_per_member = total_vault_pot // len(crew)
+        for member in crew:
+            add_coins(member.id, payout_per_member)
+            record_stats(member.id, won=True)
+
+        embed_win = discord.Embed(
+            title="💎🔥 HEIST SUCCESS: VAULT EMPTIED! 🔥💎",
+            description=(
+                f"### 🏆 **Total Vault Stash Cracked:** `+{total_vault_pot:,} Coins`\n\n"
+                f"**Operative Crew Payouts:**\n"
+                + "\n".join(f"• {m.mention} ➔ **`+{payout_per_member:,} Coins`** 💰" for m in crew)
+                + f"\n\n✨ *Loot deposited directly into everyone's Arcade Account! Incredible teamwork!*"
+            ),
+            color=0x00FFCC
+        )
+        embed_win.set_footer(text="RAI PLAY 🎮 • Legendary Co-op Heist Masters")
+        await interaction.followup.send(embed=embed_win)
+
+
+class HeistStageButton(Button):
+    def __init__(self, label: str, is_correct: bool, stage_view: 'HeistStageView'):
+        super().__init__(label=label, style=discord.ButtonStyle.secondary)
+        self.is_correct = is_correct
+        self.stage_view = stage_view
+
+    async def callback(self, interaction: discord.Interaction):
+        if not any(m.id == interaction.user.id for m in self.stage_view.crew):
+            return await interaction.response.send_message("❌ Only official Heist Crew members can execute tactical tasks!", ephemeral=True)
+
+        if self.stage_view.cleared:
+            return await interaction.response.send_message("⚡ This obstacle has already been breached!", ephemeral=True)
+
+        if self.is_correct:
+            self.stage_view.cleared = True
+            self.stage_view.success_by = interaction.user
+            self.style = discord.ButtonStyle.success
+            await interaction.response.send_message(f"💥 **CRITICAL BREACH!** {interaction.user.mention} executed the task successfully!", ephemeral=False)
+            self.stage_view.stop()
+        else:
+            self.style = discord.ButtonStyle.danger
+            self.disabled = True
+            await interaction.response.send_message("🚨 **WRONG MOVE!** Security alarms detected an error!", ephemeral=True)
+            try:
+                await interaction.message.edit(view=self.stage_view)
+            except Exception:
+                pass
+
+
+class HeistStageView(View):
+    def __init__(self, crew: list, correct_label: str, options: list):
+        super().__init__(timeout=15.0)
+        self.crew = crew
+        self.cleared = False
+        self.success_by = None
+        for opt in options:
+            self.add_item(HeistStageButton(opt, opt == correct_label, self))
+
+
+class HeistLobbyView(View):
+    def __init__(self, mastermind: discord.Member, entry_fee: int):
+        super().__init__(timeout=30.0)
+        self.mastermind = mastermind
+        self.entry_fee = entry_fee
+        self.crew = [mastermind]
+        self.launched = False
+
+    @button(label="💼 Join Heist Crew (200 Coins)", style=discord.ButtonStyle.success, custom_id="heist_crew_join")
+    async def join_crew(self, interaction: discord.Interaction, btn: Button):
+        if self.launched:
+            return await interaction.response.send_message("❌ The heist team is already in the vault!", ephemeral=True)
+        if any(m.id == interaction.user.id for m in self.crew):
+            return await interaction.response.send_message("⚠️ You are already equipped in the crew roster!", ephemeral=True)
+
+        user_coins = get_coins(interaction.user.id)
+        if user_coins < self.entry_fee:
+            return await interaction.response.send_message(f"❌ You need at least **{self.entry_fee} Coins** to buy into the heist gear!", ephemeral=True)
+
+        add_coins(interaction.user.id, -self.entry_fee)
+        self.crew.append(interaction.user)
+        await interaction.response.send_message(f"💼 **{interaction.user.mention}** joined the heist crew! Entry `{self.entry_fee} 🪙` staked.", ephemeral=False)
+
+    @button(label="🚨 Infiltrate Now (Leader)", style=discord.ButtonStyle.primary, custom_id="heist_crew_launch")
+    async def launch_early(self, interaction: discord.Interaction, btn: Button):
+        if interaction.user.id != self.mastermind.id:
+            return await interaction.response.send_message("❌ Only the heist mastermind can initiate early infiltration!", ephemeral=True)
+        self.launched = True
+        self.stop()
+        await interaction.response.send_message("🚨 **ALARM SILENCED • INFILTRATION COMMENCING NOW!**", ephemeral=False)
 
 
 async def setup(bot: commands.Bot):

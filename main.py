@@ -94,6 +94,9 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         async def status_rotator():
             idx = getattr(status_rotator, "idx", 0)
             try:
+                # If bot is playing music in any voice channel, do not overwrite real-time song title!
+                if any(vc.is_playing() for vc in b.voice_clients):
+                    return
                 await b.change_presence(activity=presences[idx % len(presences)])
                 status_rotator.idx = idx + 1
             except Exception:
@@ -375,6 +378,8 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.music_quiz",
         "cogs.radio",
         "cogs.entry_sound",
+        "cogs.ai_dj",
+        "cogs.intercom",
         "cogs.auto_updater",
     ]
 

@@ -722,6 +722,10 @@ class GuildMusicPlayer:
 
                 if not self.queue:
                     self.current = None
+                    try:
+                        await self.bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="24/7 Pure Music 💗 | /play"))
+                    except Exception:
+                        pass
                     # Wait for inactivity timeout or new songs
                     try:
                         timeout_val = None if self.mode_247 else config.INACTIVITY_TIMEOUT
@@ -823,6 +827,15 @@ class GuildMusicPlayer:
                     self.play_next_song.set()
                     continue
 
+                # AI Radio DJ Commentary Hook (if enabled)
+                if not self.is_restarting_for_filters and self.voice_client and self.voice_client.is_connected():
+                    try:
+                        ai_dj_cog = self.bot.get_cog("AIDJ")
+                        if ai_dj_cog and ai_dj_cog.is_enabled(self.guild.id):
+                            await ai_dj_cog.play_transition(self.voice_client, song)
+                    except Exception as e:
+                        print(f"[AI DJ Hook Error] {e}")
+
                 filter_args = get_filter_string(self.active_filters, self.custom_speed)
                 ffmpeg_opt = f"-vn -bufsize 4096k -threads 2 {filter_args}".strip()
 
@@ -839,6 +852,12 @@ class GuildMusicPlayer:
                         self.voice_client.stop()
                         await asyncio.sleep(0.15)
                     self.voice_client.play(self.current_source, after=after_playing)
+                    # Real-time Dynamic Presence on Discord
+                    try:
+                        clean_t = song.title[:45]
+                        await self.bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=f"{clean_t} 🎵"))
+                    except Exception:
+                        pass
                 else:
                     self.queue.appendleft(song)
                     self.current = None
