@@ -116,12 +116,12 @@ class VerifyButtonView(View):
         if not role_ver:
             if guild.id == 1457382179981099090:  # RAI FAM
                 role_ver = discord.utils.get(guild.roles, id=1549504522953695269)
-            elif guild.id == 1428058914141900860:  # ABIJITH 777
+            elif guild.id in (1428058914141900860, 1550205564884226169):  # ABIJITH 777
                 role_ver = discord.utils.get(guild.roles, id=1550205910218182696)
         if not role_mem:
             if guild.id == 1457382179981099090:  # RAI FAM
                 role_mem = discord.utils.get(guild.roles, id=1545494584203673740)
-            elif guild.id == 1428058914141900860:  # ABIJITH 777
+            elif guild.id in (1428058914141900860, 1550205564884226169):  # ABIJITH 777
                 role_mem = discord.utils.get(guild.roles, id=1550205915398152364)
 
         role_unver = None

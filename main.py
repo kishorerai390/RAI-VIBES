@@ -120,6 +120,10 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         from cogs.voicehub import VoiceControlView
         from utils.views import MusicPlayerView
         from cogs.entry_sound import PublicEntrySoundLaunchView
+        from cogs.verify import VerifyButtonView
+        from utils.persistent_views import TicketCreateView, TicketCloseView
+        from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
+
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
@@ -128,6 +132,11 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(MusicPlayerView())
         b.add_view(PublicEntrySoundLaunchView())
         b.add_view(ServerGuideView())
+        b.add_view(VerifyButtonView())
+        b.add_view(TicketCreateView())
+        b.add_view(TicketCloseView())
+        b.add_view(PersistentTicketLauncherView())
+        b.add_view(TicketChannelControlView())
 
         # Update bot profile banner to 3D animated GIF
         banner_path = os.path.join("assets", "rai_vibes_3d_banner.gif")
@@ -382,6 +391,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.ai_dj",
         "cogs.intercom",
         "cogs.auto_updater",
+        "cogs.verify",
     ]
 
     for extension in initial_extensions:
