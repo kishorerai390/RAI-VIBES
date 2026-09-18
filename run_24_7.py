@@ -14,6 +14,7 @@ load_dotenv()
 
 from main import create_bot, load_cogs, acquire_instance_lock as acquire_vibes_lock
 from security_bot import create_security_bot, BOT_NAME, acquire_instance_lock as acquire_sentinel_lock
+from arcade_bot import create_arcade_bot, load_arcade_cogs, acquire_instance_lock as acquire_arcade_lock
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +81,29 @@ async def run_sentinel(token: str):
             await asyncio.sleep(60)
         except Exception as e:
             logger.error(f"[RAI SENTINEL] Error: {e}. Reconnecting in 5s...")
+            await asyncio.sleep(5)
+
+async def run_arcade(token: str):
+    while True:
+        try:
+            bot = create_arcade_bot(use_members=True, use_message_content=True)
+            async with bot:
+                await load_arcade_cogs(bot)
+                try:
+                    await bot.start(token)
+                except discord.errors.PrivilegedIntentsRequired:
+                    logger.warning("[RAI ARCADE] Privileged intents not enabled in portal. Falling back to basic intents.")
+                    bot_fallback = create_arcade_bot(use_members=False, use_message_content=False)
+                    async with bot_fallback:
+                        await load_arcade_cogs(bot_fallback)
+                        await bot_fallback.start(token)
+        except asyncio.CancelledError:
+            break
+        except discord.errors.LoginFailure:
+            logger.error("[RAI ARCADE] Invalid token in COMMUNITY_BOT_TOKEN.")
+            await asyncio.sleep(60)
+        except Exception as e:
+            logger.error(f"[RAI ARCADE] Error: {e}. Reconnecting in 5s...")
             await asyncio.sleep(5)
 
 from aiohttp import web
@@ -580,14 +604,15 @@ async def keep_awake():
 async def main():
     token_vibes = os.getenv("DISCORD_BOT_TOKEN")
     token_sentinel = os.getenv("SECURITY_BOT_TOKEN")
+    token_arcade = os.getenv("COMMUNITY_BOT_TOKEN") or os.getenv("ARCADE_BOT_TOKEN")
 
     if not token_vibes:
         logger.error("DISCORD_BOT_TOKEN is missing!")
         return
 
     print("==================================================")
-    print("   🌸 RAI VIBES & RAI SENTINEL 24/7 CLOUD RUNNER 🌸")
-    print("   Render Web Service • 24/7 Port Health Server   ")
+    print("   🌸 RAI VIBES • RAI SENTINEL • RAI ARCADE 🌸")
+    print("   Cloud Bot Ecosystem • 24/7 Port Health Server  ")
     print("==================================================")
 
     # 1. Start HTTP Health-Check Server for Render (Prevents Port Scan Timeout)
@@ -599,16 +624,19 @@ async def main():
     # 2. Start Self-Ping Task for Render
     asyncio.create_task(keep_awake())
 
-    # Render does not route UDP packets required for Discord Voice connections.
-    # Therefore, RAI SENTINEL (security/moderation) runs 24/7 on Render cloud,
-    # while RAI VIBES (music streaming) runs locally with full UDP audio support.
     enable_cloud_music = os.getenv("ENABLE_CLOUD_MUSIC", "true").lower() == "true"
     tasks = []
     if enable_cloud_music and token_vibes:
         tasks.append(run_vibes(token_vibes))
     if token_sentinel and token_sentinel != "YOUR_DISCORD_BOT_TOKEN_HERE":
         tasks.append(run_sentinel(token_sentinel))
-    
+    if token_arcade and token_arcade.strip() not in ("", "YOUR_COMMUNITY_BOT_TOKEN_HERE"):
+        acquire_arcade_lock(59126)
+        tasks.append(run_arcade(token_arcade.strip()))
+        logger.info("🎮 [RAI ARCADE] Dedicated Arcade & Economy bot initialized.")
+    else:
+        logger.info("ℹ️ [RAI ARCADE] Standing by. Add COMMUNITY_BOT_TOKEN in .env whenever you wish to activate RAI ARCADE.")
+
     if not tasks:
         logger.warning("No bots selected to run. Standing by with health web server.")
         while True:
@@ -622,4 +650,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n[DUAL RUNNER] Shutting down cleanly.")
+        print("\n[ECOSYSTEM RUNNER] Shutting down cleanly.")

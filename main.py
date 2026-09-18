@@ -116,41 +116,15 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         # Register Persistent Views for instant interaction without timeout
         from cogs.voicehub import VoiceControlView
         from utils.views import MusicPlayerView
-        from cogs.verify import VerifyButtonView
-        from cogs.economy import ShopBuyView
-        from cogs.exchange import ExchangeBoothView
-        from cogs.giveaway import GiveawayView
         from cogs.entry_sound import PublicEntrySoundLaunchView
-        from cogs.suggestions import SuggestionVoteView
-        from cogs.movie_party import MovieRSVPView
-        from cogs.pets import PetCareView
-        from cogs.lfg import LFGView
-        from cogs.party_games import PartyGamesView
-        from cogs.arcade_panel import ArcadeStationView
-        from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
         b.add_view(ColorRolesView())
         b.add_view(GamingRolesView())
         b.add_view(NotificationRolesView())
         b.add_view(IdentityRolesView())
-        b.add_view(TicketCreateView())
-        b.add_view(TicketCloseView())
         b.add_view(VoiceControlView())
         b.add_view(MusicPlayerView())
-        b.add_view(VerifyButtonView())
-        b.add_view(ShopBuyView())
-        b.add_view(ExchangeBoothView())
-        b.add_view(GiveawayView())
         b.add_view(PublicEntrySoundLaunchView())
-        b.add_view(SuggestionVoteView())
         b.add_view(ServerGuideView())
-        b.add_view(GamingHubStationView())
-        b.add_view(MovieRSVPView())
-        b.add_view(PetCareView(owner_id=0))
-        b.add_view(LFGView())
-        b.add_view(PartyGamesView())
-        b.add_view(ArcadeStationView())
-        b.add_view(PersistentTicketLauncherView())
-        b.add_view(TicketChannelControlView())
 
         # Update bot profile banner to animated GIF
         banner_path = os.path.join("assets", "rai_vibes_banner.gif")
@@ -389,7 +363,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
     return b
 
 async def load_cogs(bot_instance: commands.Bot):
-    # Pure Music, Karaoke, Audio FX & Clean Community Engine for RAI VIBES 💗
+    # Pure Music, Karaoke, Radio, Audio FX & Autonomous Auto-Updater for RAI VIBES 💗
     initial_extensions = [
         "cogs.music",
         "cogs.filters",
@@ -397,42 +371,11 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.favorites",
         "cogs.general",
         "cogs.voicehub",
-        "cogs.starboard",
         "cogs.soundboard",
         "cogs.dj",
-        "cogs.server_stats",
-        "cogs.leveling",
-        "cogs.economy",
         "cogs.music_quiz",
-        "cogs.welcome",
-        "cogs.bump_reminder",
         "cogs.radio",
-        "cogs.giveaway",
-        "cogs.booster",
-        "cogs.qotd",
-        "cogs.exchange",
         "cogs.entry_sound",
-        "cogs.suggestions",
-        "cogs.pets",
-        "cogs.casino",
-        "cogs.squads",
-        "cogs.quotes",
-        "cogs.movie_party",
-        "cogs.lfg",
-        "cogs.telemetry",
-        "cogs.stream_alerts",
-        "cogs.duels",
-        "cogs.profile",
-        "cogs.social",
-        "cogs.wyr",
-        "cogs.anime",
-        "cogs.lottery",
-        "cogs.party_games",
-        "cogs.invites",
-        "cogs.productivity",
-        "cogs.tickets",
-        "cogs.arcade_panel",
-        "cogs.verify",
         "cogs.auto_updater",
     ]
 
