@@ -436,6 +436,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.auto_updater",
         "cogs.verify",
         "cogs.movie_party",
+        "cogs.help",
     ]
 
     for extension in initial_extensions:

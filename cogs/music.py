@@ -1227,6 +1227,70 @@ class Music(commands.Cog):
         else:
             await ctx.send(content=content, view=view)
 
+    @commands.hybrid_command(
+        name="controllersetup",
+        aliases=["setupcontroller", "musicpanel", "playerpanel"],
+        description="Deploy a permanent, persistent interactive music controller in a channel."
+    )
+    @commands.has_permissions(manage_channels=True)
+    async def controller_setup(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
+        target_channel = channel or ctx.channel
+        player = self.get_or_create_player(ctx.guild)
+        player.text_channel = target_channel
+
+        from utils.views import MusicPlayerView
+        view = MusicPlayerView(self, guild_id=ctx.guild.id)
+
+        embed = discord.Embed(
+            title="🎛️ RAI VIBES 💗 MASTER AUDIO CONTROLLER",
+            description=(
+                "✨ **Welcome to the Interactive Music Sanctuary!**\n\n"
+                "Control playback, toggle audio filters, view lyrics, and manage the queue directly using the buttons below—**no commands needed!**\n\n"
+                "✦ ───────────────────────────── ✦\n"
+                "• **`⏯️` Play/Pause**: Toggle audio streaming\n"
+                "• **`⏭️` Skip**: Advance to the next track\n"
+                "• **`🔁` Loop**: Toggle Track Loop / Queue Repeat / Off\n"
+                "• **`🔀` Shuffle**: Randomize remaining playlist tracks\n"
+                "• **`⏹️` Stop**: Halt playback and clear queue\n"
+                "• **`🔉 / 🔊`**: Adjust volume up or down\n"
+                "• **`📜` Queue**: Browse upcoming songs with pagination\n"
+                "• **`🎤` Lyrics**: Synchronized Genius lyrics on-screen\n"
+                "• **`💖` Fav**: Save current track to your personal favorites\n"
+                "• **`⚡ Nightcore` • `🔊 Bass Boost` • `🌌 8D Audio` • `☕ Lo-Fi`**: Audiophile Filters\n"
+                "✦ ───────────────────────────── ✦\n"
+                "💡 *Tip: Type `/play <song>` or click `➕` in Queue to stream any song from YouTube or Spotify!*"
+            ),
+            color=config.COLOR_PRIMARY
+        )
+        embed.set_thumbnail(url=config.RAI_ICON_URL)
+        embed.set_image(url="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80")
+        embed.set_footer(text="RAI VIBES 💗 • High-Fidelity 24/7 Community Music Engine", icon_url=config.RAI_ICON_URL)
+
+        msg = await target_channel.send(embed=embed, view=view)
+        player.persistent_controller_message = msg
+
+        # Save to persistent file so bot remembers this controller across restarts
+        try:
+            from pathlib import Path
+            import json
+            cfg_file = Path(__file__).resolve().parent.parent / "data" / "persistent_controllers.json"
+            cfg_file.parent.mkdir(parents=True, exist_ok=True)
+            data = {}
+            if cfg_file.exists():
+                with open(cfg_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            data[str(ctx.guild.id)] = {
+                "channel_id": target_channel.id,
+                "message_id": msg.id
+            }
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save persistent controller: {e}")
+
+        await ctx.send(f"✅ **Persistent Music Controller deployed in {target_channel.mention}!**", ephemeral=True)
+
+
     # =========================================================================
     # COMMAND: PLAY / P
     # =========================================================================
