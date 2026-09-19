@@ -660,7 +660,7 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="clear", aliases=["purge"], description="Bulk delete recent messages from channel.")
+    @commands.hybrid_command(name="clear", aliases=["purge"], description="Bulk delete recent messages from channel.")
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(amount="Number of messages to delete (1-100)")
     async def clear(self, ctx: commands.Context, amount: int = 10):
