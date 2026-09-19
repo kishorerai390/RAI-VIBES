@@ -163,12 +163,40 @@ def create_arcade_bot(use_members: bool = True, use_message_content: bool = True
             except Exception as e:
                 logger.debug(f"[RAI PLAY] Banner update notice: {e}")
 
-        # Synchronize slash commands globally (zero duplicates)
+        # Synchronize slash commands:
+        # 1. Clear any stale guild-scoped commands to prevent command collisions/shadowing
+        # 2. Fast-sync to all current guilds for INSTANT zero-delay availability
+        # 3. Synchronize globally
         try:
+            for guild in bot.guilds:
+                try:
+                    bot.tree.clear_commands(guild=guild)
+                    await bot.tree.sync(guild=guild)
+                except Exception as ge:
+                    logger.debug(f"Guild sync note for {guild.id}: {ge}")
             synced = await bot.tree.sync()
             logger.info(f"✨ [RAI ARCADE] Synchronized {len(synced)} global slash commands.")
         except Exception as e:
             logger.error(f"[RAI ARCADE] Command sync notice: {e}")
+
+    @bot.hybrid_command(name="arcade_sync", description="Synchronize and refresh arcade slash commands with Discord.")
+    @commands.is_owner()
+    async def arcade_sync_cmd(ctx: commands.Context):
+        """Owner command to refresh Arcade commands."""
+        if ctx.interaction:
+            await ctx.defer(ephemeral=True)
+        try:
+            if ctx.guild:
+                bot.tree.clear_commands(guild=ctx.guild)
+                await bot.tree.sync(guild=ctx.guild)
+            synced = await bot.tree.sync()
+            msg = f"🎮 Successfully synchronized {len(synced)} Arcade commands with Discord!"
+        except Exception as e:
+            msg = f"❌ Arcade sync failed: {e}"
+        if ctx.interaction:
+            await ctx.followup.send(msg, ephemeral=True)
+        else:
+            await ctx.send(msg)
 
     @bot.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):

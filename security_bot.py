@@ -106,12 +106,40 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
             except Exception as e:
                 logger.debug(f"[RAI SENTINEL] Banner update notice: {e}")
 
-        # Synchronize slash commands globally (zero duplicates)
+        # Synchronize slash commands:
+        # 1. Clear any stale guild-scoped commands to prevent command collisions/shadowing
+        # 2. Fast-sync to all current guilds for INSTANT zero-delay availability
+        # 3. Synchronize globally
         try:
+            for guild in bot.guilds:
+                try:
+                    bot.tree.clear_commands(guild=guild)
+                    await bot.tree.sync(guild=guild)
+                except Exception as ge:
+                    logger.debug(f"Guild sync note for {guild.id}: {ge}")
             synced = await bot.tree.sync()
             logger.info(f"🛡️ Synchronized {len(synced)} global Security slash commands.")
         except Exception as e:
             logger.error(f"Failed to sync security commands: {e}")
+
+    @bot.hybrid_command(name="security_sync", description="Synchronize and refresh security slash commands with Discord.")
+    @commands.is_owner()
+    async def security_sync_cmd(ctx: commands.Context):
+        """Owner command to refresh Sentinel commands."""
+        if ctx.interaction:
+            await ctx.defer(ephemeral=True)
+        try:
+            if ctx.guild:
+                bot.tree.clear_commands(guild=ctx.guild)
+                await bot.tree.sync(guild=ctx.guild)
+            synced = await bot.tree.sync()
+            msg = f"🛡️ Successfully synchronized {len(synced)} Sentinel commands with Discord!"
+        except Exception as e:
+            msg = f"❌ Sentinel sync failed: {e}"
+        if ctx.interaction:
+            await ctx.followup.send(msg, ephemeral=True)
+        else:
+            await ctx.send(msg)
 
     @bot.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
@@ -133,7 +161,7 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
 async def start_sentinel(token: str, use_members: bool = True, use_message_content: bool = True):
     bot = create_security_bot(use_members=use_members, use_message_content=use_message_content)
     
-    # Sentinel manages Autonomous Defense, Anti-Nuke, Anti-Raid, and Tickets
+    # Sentinel manages Autonomous Defense, Anti-Nuke, Anti-Raid, Tickets, and Tournaments
     security_extensions = [
         "cogs.autoprovision",
         "cogs.tickets",
@@ -145,6 +173,7 @@ async def start_sentinel(token: str, use_members: bool = True, use_message_conte
         "cogs.antilink",
         "cogs.whitelist",
         "cogs.security_dashboard",
+        "cogs.tournaments",
     ]
     import database
     await database.init_db()
