@@ -180,8 +180,17 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                 except Exception as e:
                     logger.info(f"Server banner note (requires Server Boost Level 2): {e}")
 
-        # Synchronize slash commands globally (zero duplicates)
+        # Synchronize slash commands:
+        # 1. Clear any stale guild-scoped commands to prevent command collisions/shadowing
+        # 2. Fast-sync to all current guilds for INSTANT zero-delay availability
+        # 3. Synchronize globally
         try:
+            for guild in b.guilds:
+                try:
+                    b.tree.clear_commands(guild=guild)
+                    await b.tree.sync(guild=guild)
+                except Exception as ge:
+                    logger.debug(f"Guild sync note for {guild.id}: {ge}")
             synced = await b.tree.sync()
             logger.info(f"✨ Synchronized {len(synced)} global Music slash commands.")
         except Exception as e:
@@ -205,12 +214,24 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
             except Exception:
                 pass
 
-    @b.command(name="sync")
+    @b.hybrid_command(name="sync", description="Synchronize and refresh slash commands with Discord.")
     @commands.is_owner()
     async def sync_cmd(ctx: commands.Context):
         """Owner command to sync slash commands with Discord."""
-        synced = await b.tree.sync()
-        await ctx.send(f"✅ Successfully synchronized {len(synced)} slash commands!")
+        if ctx.interaction:
+            await ctx.defer(ephemeral=True)
+        try:
+            if ctx.guild:
+                b.tree.clear_commands(guild=ctx.guild)
+                await b.tree.sync(guild=ctx.guild)
+            synced = await b.tree.sync()
+            msg = f"✅ Successfully synchronized {len(synced)} slash commands with Discord!"
+        except Exception as e:
+            msg = f"❌ Sync failed: {e}"
+        if ctx.interaction:
+            await ctx.followup.send(msg, ephemeral=True)
+        else:
+            await ctx.send(msg)
 
     @b.event
     async def on_message(message: discord.Message):
@@ -414,6 +435,8 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.auto_updater",
         "cogs.verify",
         "cogs.movie_party",
+        "cogs.productivity",
+        "cogs.telemetry",
     ]
 
     for extension in initial_extensions:

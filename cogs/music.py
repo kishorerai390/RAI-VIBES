@@ -1069,6 +1069,9 @@ class Music(commands.Cog):
             return self.get_or_create_player(guild)
         return None
 
+    def get_player(self, guild_id: int) -> Optional[GuildMusicPlayer]:
+        return self.players.get(guild_id)
+
     def get_or_create_player(self, guild: discord.Guild) -> GuildMusicPlayer:
         if guild.id not in self.players:
             player = GuildMusicPlayer(self, guild)

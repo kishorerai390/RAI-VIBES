@@ -144,6 +144,20 @@ class AutoUpdater(commands.Cog):
                         reload_errors.append(f"{cog_name}: {e}")
                         logger.error(f"[AutoUpdater] Error reloading {cog_name}: {e}")
 
+            # Resync command tree if any cogs were hot-reloaded
+            if reloaded_cogs:
+                try:
+                    for guild in self.bot.guilds:
+                        try:
+                            self.bot.tree.clear_commands(guild=guild)
+                            await self.bot.tree.sync(guild=guild)
+                        except Exception:
+                            pass
+                    await self.bot.tree.sync()
+                    logger.info("[AutoUpdater] Resynchronized slash commands across guilds and globally.")
+                except Exception as se:
+                    logger.error(f"[AutoUpdater] Error resyncing tree after reload: {se}")
+
             summary = f"Pulled `{old_hash.strip()[:7]}` ➔ `{new_hash.strip()[:7]}`.\n"
             if reloaded_cogs:
                 summary += f"🔄 **Hot-Reloaded Extensions:** {', '.join(reloaded_cogs)}\n"
