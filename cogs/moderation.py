@@ -662,14 +662,56 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_command(name="clear", aliases=["purge"], description="Bulk delete recent messages from channel.")
     @commands.has_permissions(manage_messages=True)
+    @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(amount="Number of messages to delete (1-100)")
     async def clear(self, ctx: commands.Context, amount: int = 10):
+        # 1. Validate Amount
         if not 1 <= amount <= 100:
             return await ctx.send("❌ Amount must be between 1 and 100.", ephemeral=True)
 
+        # 2. Pre-check User Permissions
+        if isinstance(ctx.author, discord.Member):
+            user_perms = ctx.channel.permissions_for(ctx.author)
+            if not (user_perms.manage_messages or user_perms.administrator):
+                return await ctx.send("❌ You require `Manage Messages` (Staff / Moderator) permissions to use `/clear`.", ephemeral=True)
+
+        # 3. Pre-check Bot Permissions in this channel
+        if ctx.guild and ctx.guild.me:
+            bot_perms = ctx.channel.permissions_for(ctx.guild.me)
+            if not bot_perms.manage_messages:
+                return await ctx.send("❌ I am missing the `Manage Messages` permission in this channel. Please grant AEGIS the `Manage Messages` permission in channel settings or via a role.", ephemeral=True)
+            if not bot_perms.read_message_history:
+                return await ctx.send("❌ I am missing the `Read Message History` permission in this channel. Please grant AEGIS the `Read Message History` permission.", ephemeral=True)
+
         await ctx.defer(ephemeral=True)
-        deleted = await ctx.channel.purge(limit=amount)
-        await ctx.send(f"🧹 **Deleted {len(deleted)} message(s).**", ephemeral=True)
+        try:
+            deleted = await ctx.channel.purge(limit=amount)
+            await ctx.send(f"🧹 **Deleted {len(deleted)} message(s).**", ephemeral=True)
+        except discord.Forbidden:
+            await ctx.send("❌ Discord denied permission to delete messages. Please ensure AEGIS has the `Manage Messages` and `Read Message History` permissions in this channel.", ephemeral=True)
+        except discord.HTTPException as e:
+            if getattr(e, "code", None) == 50034:
+                await ctx.send("⚠️ Discord cannot bulk delete messages older than 14 days. Only messages under 14 days old can be purged.", ephemeral=True)
+            else:
+                await ctx.send(f"❌ Discord error while clearing messages: `{getattr(e, 'text', e)}`", ephemeral=True)
+        except Exception as e:
+            await ctx.send(f"❌ An error occurred while clearing messages: `{e}`", ephemeral=True)
+
+    @clear.error
+    async def clear_error(self, ctx: commands.Context, error: Exception):
+        orig = getattr(error, "original", error)
+        if isinstance(orig, (commands.MissingPermissions, app_commands.MissingPermissions)):
+            missing = getattr(orig, "missing_permissions", ["Manage Messages"])
+            await ctx.send(f"❌ You require `{', '.join(missing)}` permissions to use `/clear`.", ephemeral=True)
+        elif isinstance(orig, (commands.BotMissingPermissions, app_commands.BotMissingPermissions)):
+            missing = getattr(orig, "missing_permissions", ["Manage Messages"])
+            await ctx.send(f"❌ AEGIS needs `{', '.join(missing)}` permissions in this channel to delete messages.", ephemeral=True)
+        elif isinstance(orig, discord.Forbidden):
+            await ctx.send("❌ Discord denied permission to delete messages in this channel.", ephemeral=True)
+        elif isinstance(orig, discord.HTTPException) and getattr(orig, "code", None) == 50034:
+            await ctx.send("⚠️ Discord cannot bulk delete messages older than 14 days.", ephemeral=True)
+        else:
+            await ctx.send(f"❌ Clear error: `{orig}`", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):

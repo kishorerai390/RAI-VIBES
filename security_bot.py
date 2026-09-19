@@ -144,9 +144,23 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
     @bot.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         logger.error(f"Security slash command error: {error}")
+        orig = getattr(error, "original", error)
         msg = "❌ An error occurred while executing this command."
-        if isinstance(error, discord.app_commands.MissingPermissions):
-            msg = "❌ You require Staff / Moderator permissions to use this command."
+        
+        if isinstance(orig, (discord.app_commands.MissingPermissions, commands.MissingPermissions)):
+            missing = getattr(orig, "missing_permissions", ["Manage Messages / Moderator"])
+            msg = f"❌ You require `{', '.join(missing)}` permissions to use this command."
+        elif isinstance(orig, (discord.app_commands.BotMissingPermissions, commands.BotMissingPermissions)):
+            missing = getattr(orig, "missing_permissions", ["Manage Messages"])
+            msg = f"❌ AEGIS is missing `{', '.join(missing)}` permissions in this channel to perform this action."
+        elif isinstance(orig, discord.Forbidden):
+            msg = "❌ Discord denied permission for this action. Please ensure AEGIS has the `Manage Messages` and `Read Message History` permissions in this channel."
+        elif isinstance(orig, discord.HTTPException) and getattr(orig, "code", None) == 50034:
+            msg = "⚠️ Discord cannot bulk delete messages older than 14 days."
+        elif isinstance(orig, discord.app_commands.CheckFailure):
+            msg = "❌ You do not have permission to use this command."
+        else:
+            msg = f"❌ Error executing command: `{orig}`"
 
         try:
             if not interaction.response.is_done():
