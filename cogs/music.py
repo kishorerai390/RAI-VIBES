@@ -1174,6 +1174,32 @@ class Music(commands.Cog):
         return voice_client or guild.voice_client
 
     # =========================================================================
+    # COMMAND: CONTROLLER / REMOTE / PANEL
+    # =========================================================================
+    @commands.hybrid_command(
+        name="controller",
+        aliases=["remote", "panel", "player", "controls"],
+        description="Open the Rythm-style interactive music controller remote."
+    )
+    async def controller_cmd(self, ctx: commands.Context):
+        voice_client = await self.ensure_voice(ctx)
+        if not voice_client:
+            return
+
+        player = self.get_or_create_player(ctx.guild)
+        player.voice_client = voice_client
+        player.text_channel = ctx.channel
+
+        from utils.views import RythmControllerView
+        view = RythmControllerView(player, self)
+        content = view.build_content()
+
+        if ctx.interaction:
+            await ctx.interaction.response.send_message(content=content, view=view, ephemeral=True)
+        else:
+            await ctx.send(content=content, view=view)
+
+    # =========================================================================
     # COMMAND: PLAY / P
     # =========================================================================
     @commands.hybrid_command(name="play", aliases=["p"], description="Play music or enqueue tracks from YouTube or Spotify.")

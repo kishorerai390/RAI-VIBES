@@ -206,7 +206,8 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
             ephemeral_commands = {
                 "mutesoundboard", "unmutesoundboard", "entrysound",
                 "movienight", "movie", "movieend", "cinemamute", "cinemaunmute", "moviesuggest",
-                "moviecountdown", "moviealert", "cinemaintro", "cinemastage", "cinemaambience", "movierename"
+                "moviecountdown", "moviealert", "cinemaintro", "cinemastage", "cinemaambience", "movierename",
+                "controller", "remote", "panel", "player", "controls"
             }
             is_ephem = cmd_name in ephemeral_commands
             try:
