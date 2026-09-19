@@ -52,6 +52,7 @@ class Filters(commands.Cog):
         app_commands.Choice(name="🎧 8D Spatial Audio", value="8d"),
         app_commands.Choice(name="🌆 Retro Vaporwave", value="vaporwave"),
         app_commands.Choice(name="🎤 Karaoke (Vocal Cut)", value="karaoke"),
+        app_commands.Choice(name="🔊 Loudness Normalization (ReplayGain)", value="loudnorm"),
         app_commands.Choice(name="🧹 Clear All Filters (Normal)", value="off"),
     ])
     async def filter_slash(self, interaction: discord.Interaction, effect: app_commands.Choice[str]):
@@ -107,7 +108,11 @@ class Filters(commands.Cog):
     async def vaporwave(self, ctx: commands.Context):
         await self.apply_player_filter(ctx, "vaporwave", "Vaporwave")
 
-    @commands.command(name="karaoke")
+    @commands.hybrid_command(name="loudnorm", aliases=["replaygain", "norm"], description="Toggle automatic loudness normalization (EBU R128).")
+    async def loudnorm_cmd(self, ctx: commands.Context):
+        await self.apply_player_filter(ctx, "loudnorm", "Loudness Normalization (ReplayGain)")
+
+    @commands.hybrid_command(name="karaoke", description="Toggle Karaoke mode (suppress center vocal frequencies for singing along).")
     async def karaoke(self, ctx: commands.Context):
         player = self.get_player(ctx)
         if not player or not player.is_connected or not player.current:
@@ -121,6 +126,61 @@ class Filters(commands.Cog):
             player.active_filters.append("karaoke")
             await player.restart_current_with_filters()
             await ctx.send("⚡ **Audio Filter Activated: Karaoke (Vocal Attenuation)**\n*Center vocal frequencies suppressed. Sing along with the music!*")
+
+    @commands.hybrid_command(name="ambience", description="Stream calming ambient soundscapes (rain, fireplace, cafe, waves, lofi).")
+    @app_commands.describe(preset="Select an ambient soundscape preset")
+    @app_commands.choices(preset=[
+        app_commands.Choice(name="🌧️ Heavy Rainstorm", value="rain"),
+        app_commands.Choice(name="🔥 Cozy Fireplace", value="fireplace"),
+        app_commands.Choice(name="☕ Cyberpunk Café", value="cafe"),
+        app_commands.Choice(name="🌊 Ocean Waves", value="waves"),
+        app_commands.Choice(name="🎧 24/7 Lo-Fi Chill", value="lofi"),
+        app_commands.Choice(name="⏹️ Stop Ambience", value="stop")
+    ])
+    async def ambience_cmd(self, ctx: commands.Context, preset: str):
+        music_cog = self.bot.get_cog("Music")
+        if not music_cog:
+            return await ctx.send("❌ Audio engine unavailable.", ephemeral=True)
+
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            return await ctx.send("❌ You must join a voice channel first to stream ambient audio.", ephemeral=True)
+
+        if preset == "stop":
+            player = music_cog.get_player(ctx.guild)
+            if player and player.is_connected:
+                await player.stop()
+                return await ctx.send("⏹️ **Ambient soundscape stopped.**")
+            return await ctx.send("ℹ️ No audio is currently playing.", ephemeral=True)
+
+        ambient_urls = {
+            "rain": "https://actions.google.com/sounds/v1/weather/rain_heavy.ogg",
+            "fireplace": "https://actions.google.com/sounds/v1/household/fireplace_crackling.ogg",
+            "cafe": "https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg",
+            "waves": "https://actions.google.com/sounds/v1/water/ocean_waves.ogg",
+            "lofi": "https://stream.zeno.fm/f3wvbbqmdg8uv"
+        }
+
+        url = ambient_urls.get(preset)
+        if not url:
+            return await ctx.send("❌ Unknown ambience preset. Try `rain`, `fireplace`, `cafe`, `waves`, or `lofi`.", ephemeral=True)
+
+        names = {
+            "rain": "🌧️ Heavy Rainstorm Ambience",
+            "fireplace": "🔥 Cozy Fireplace Ambience",
+            "cafe": "☕ Cyberpunk Café Ambience",
+            "waves": "🌊 Ocean Waves Ambience",
+            "lofi": "🎧 24/7 Lo-Fi Chill Stream"
+        }
+
+        # Play via music player
+        player = music_cog.get_player(ctx.guild)
+        if not player.is_connected:
+            await player.connect(ctx.author.voice.channel)
+        elif player.channel.id != ctx.author.voice.channel.id:
+            await player.move_to(ctx.author.voice.channel)
+
+        await ctx.send(f"🌿 **Now Streaming Ambience:** `{names.get(preset, preset)}` in {ctx.author.voice.channel.mention}")
+        await music_cog.play_query(ctx, url, silent=True)
 
     @commands.command(name="speed")
     async def speed(self, ctx: commands.Context, value: float):

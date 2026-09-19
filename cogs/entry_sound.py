@@ -330,10 +330,10 @@ def get_user_entry_profile(user_id: int) -> dict:
     uid = str(user_id)
     if uid not in data.get("users", {}):
         data.setdefault("users", {})[uid] = {
-            "equipped": "airhorn",
-            "enabled": True,
-            "exit_sound": "bye_great_time",
-            "exit_enabled": True,
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
             "volume": 85,
             "banner_enabled": True,
             "custom_url": None,
@@ -348,14 +348,20 @@ def get_user_entry_profile(user_id: int) -> dict:
     prof.setdefault("banner_enabled", True)
     prof.setdefault("custom_url", None)
     prof.setdefault("custom_unlocked", False)
+    prof.setdefault("equipped", None)
+    prof.setdefault("enabled", False)
+    prof.setdefault("exit_sound", None)
+    prof.setdefault("exit_enabled", False)
 
     if user_id == OWNER_ID:
         prof["unlocked"] = list(ALL_SOUND_KEYS)
         prof["custom_unlocked"] = True
         if not prof.get("equipped"):
             prof["equipped"] = "gigachad"
+            prof["enabled"] = True
         if not prof.get("exit_sound"):
             prof["exit_sound"] = "gta_san_andreas"
+            prof["exit_enabled"] = True
     return prof
 
 
@@ -365,10 +371,10 @@ def unlock_user_sound(user_id: int, sound_key: str) -> bool:
     users = data.setdefault("users", {})
     if uid not in users:
         users[uid] = {
-            "equipped": "airhorn",
-            "enabled": True,
-            "exit_sound": "bye_great_time",
-            "exit_enabled": True,
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
             "volume": 85,
             "banner_enabled": True,
             "custom_url": None,
@@ -392,10 +398,10 @@ def unlock_sound_bundle(user_id: int, bundle_key: str) -> List[str]:
     users = data.setdefault("users", {})
     if uid not in users:
         users[uid] = {
-            "equipped": "airhorn",
-            "enabled": True,
-            "exit_sound": "bye_great_time",
-            "exit_enabled": True,
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
             "volume": 85,
             "banner_enabled": True,
             "custom_url": None,
@@ -417,10 +423,10 @@ def unlock_custom_pass(user_id: int):
     users = data.setdefault("users", {})
     if uid not in users:
         users[uid] = {
-            "equipped": "airhorn",
-            "enabled": True,
-            "exit_sound": "bye_great_time",
-            "exit_enabled": True,
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
             "volume": 85,
             "banner_enabled": True,
             "custom_url": None,
@@ -536,10 +542,20 @@ class SetCustomUrlModal(Modal, title="Set Custom Audio Stream URL"):
 class EntrySoundSelect(Select):
     def __init__(self, user_id: int, mode: str = "entry"):
         prof = get_user_entry_profile(user_id)
-        current_eq = prof.get("exit_sound" if mode == "exit" else "equipped", "airhorn")
+        current_eq = prof.get("exit_sound" if mode == "exit" else "equipped")
         unlocked = prof.get("unlocked", ["airhorn", "bye_great_time"])
 
         options = []
+        # Option to disable / None
+        is_none_eq = not current_eq or current_eq == "none"
+        options.append(discord.SelectOption(
+            label="🚫 None (Disabled)" + (" [EQUIPPED]" if is_none_eq else ""),
+            value=f"{mode}:none",
+            description="Mute & disable audio theme for this event",
+            emoji="🚫",
+            default=is_none_eq
+        ))
+
         # If custom equipped
         if mode == "entry" and prof.get("custom_url"):
             custom_title = prof.get("custom_name") or "Personal Custom File"
@@ -552,8 +568,10 @@ class EntrySoundSelect(Select):
             ))
 
         for key, sfx in ENTRY_SOUNDS.items():
+            if len(options) >= 25:
+                break
             is_unlocked = key in unlocked or user_id == OWNER_ID
-            is_eq = key == current_eq
+            is_eq = (key == current_eq) and not is_none_eq
 
             prefix = " [EQUIPPED]" if is_eq else (" [UNLOCKED]" if is_unlocked else f" [{sfx['price']:,}c]")
             lbl = f"{sfx['name'][:25]}{prefix}"
@@ -597,6 +615,19 @@ class EntrySoundSelect(Select):
 
         data = load_entry_data()
         user_prof = data.setdefault("users", {}).setdefault(str(interaction.user.id), {})
+
+        # Handling None / Disabled option
+        if selected_key == "none":
+            if mode == "exit":
+                user_prof["exit_sound"] = None
+                user_prof["exit_enabled"] = False
+                action_txt = "🚫 Disabled your **Exit / Goodbye Sound**! No sound will play when you leave voice rooms."
+            else:
+                user_prof["equipped"] = None
+                user_prof["enabled"] = False
+                action_txt = "🚫 Disabled your **Entrance Theme**! No sound will play when you join voice rooms."
+            save_entry_data(data)
+            return await interaction.followup.send(action_txt, ephemeral=True)
 
         # Handling Custom URL option
         if selected_key == "custom":
@@ -705,7 +736,10 @@ class EntrySoundControlView(View):
             return await interaction.followup.send("❌ You must join a voice channel first to test audio!", ephemeral=True)
 
         prof = get_user_entry_profile(interaction.user.id)
-        equipped = prof.get("equipped", "airhorn")
+        equipped = prof.get("equipped")
+        if not equipped or equipped == "none":
+            return await interaction.followup.send("⚠️ You do not have an entrance sound equipped! Select a theme from the dropdown above to equip one.", ephemeral=True)
+
         if equipped == "custom" and prof.get("custom_url"):
             sfx = {
                 "name": prof.get("custom_name", "🔮 Custom Theme"),
@@ -716,7 +750,9 @@ class EntrySoundControlView(View):
                 "emoji": "🔮"
             }
         else:
-            sfx = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
+            sfx = ENTRY_SOUNDS.get(equipped)
+            if not sfx:
+                return await interaction.followup.send("⚠️ Equipped sound effect not found.", ephemeral=True)
 
         cog = interaction.client.get_cog("EntrySound")
         if cog:
@@ -740,8 +776,13 @@ class EntrySoundControlView(View):
             return await interaction.followup.send("❌ You must join a voice channel first to test audio!", ephemeral=True)
 
         prof = get_user_entry_profile(interaction.user.id)
-        exit_key = prof.get("exit_sound", "bye_great_time")
-        sfx = ENTRY_SOUNDS.get(exit_key, ENTRY_SOUNDS["bye_great_time"])
+        exit_key = prof.get("exit_sound")
+        if not exit_key or exit_key == "none":
+            return await interaction.followup.send("⚠️ You do not have an exit sound equipped! Select a theme from the dropdown above to equip one.", ephemeral=True)
+
+        sfx = ENTRY_SOUNDS.get(exit_key)
+        if not sfx:
+            return await interaction.followup.send("⚠️ Equipped exit sound effect not found.", ephemeral=True)
 
         cog = interaction.client.get_cog("EntrySound")
         if cog:
@@ -763,25 +804,28 @@ class EntrySoundControlView(View):
 
         data = load_entry_data()
         u_prof = data.setdefault("users", {}).setdefault(str(interaction.user.id), {
-            "equipped": "airhorn",
-            "enabled": True,
-            "exit_sound": "bye_great_time",
-            "exit_enabled": True,
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
             "volume": 85,
             "banner_enabled": True,
             "custom_url": None,
             "custom_unlocked": False,
             "unlocked": ["airhorn", "bye_great_time"]
         })
-        curr_in = u_prof.get("enabled", True)
-        curr_out = u_prof.get("exit_enabled", True)
+        curr_in = u_prof.get("enabled", False)
+        curr_out = u_prof.get("exit_enabled", False)
 
-        new_st = not (curr_in and curr_out)
+        new_st = not (curr_in or curr_out)
         u_prof["enabled"] = new_st
         u_prof["exit_enabled"] = new_st
         save_entry_data(data)
 
-        st_str = "ENABLED 🔔 (Will play on join & leave)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
+        if not u_prof.get("equipped") and not u_prof.get("exit_sound"):
+            st_str = "ENABLED 🔔 (Equip a theme in the menu to activate sound)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
+        else:
+            st_str = "ENABLED 🔔 (Will play on join & leave)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
         await interaction.followup.send(f"Voice Themes are now **{st_str}**!", ephemeral=True)
 
     @button(label="Catalog", style=discord.ButtonStyle.secondary, emoji="📜", row=2)
@@ -865,10 +909,10 @@ class PublicEntrySoundLaunchView(View):
             pass
 
         prof = get_user_entry_profile(interaction.user.id)
-        equipped = prof.get("equipped", "airhorn")
-        exit_sound = prof.get("exit_sound", "bye_great_time")
-        enabled = prof.get("enabled", True)
-        exit_enabled = prof.get("exit_enabled", True)
+        equipped = prof.get("equipped")
+        exit_sound = prof.get("exit_sound")
+        enabled = prof.get("enabled", False)
+        exit_enabled = prof.get("exit_enabled", False)
         vol = prof.get("volume", 85)
         banner = "✨ On" if prof.get("banner_enabled", True) else "🚫 Off"
         unlocked = prof.get("unlocked", ["airhorn", "bye_great_time"])
@@ -876,15 +920,24 @@ class PublicEntrySoundLaunchView(View):
         if equipped == "custom" and prof.get("custom_url"):
             sfx_in_name = "🔮 Custom Stream URL"
             sfx_in_emoji = "🔮"
-        else:
-            sfx_in = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
+        elif equipped and equipped in ENTRY_SOUNDS:
+            sfx_in = ENTRY_SOUNDS[equipped]
             sfx_in_name = sfx_in['name']
             sfx_in_emoji = sfx_in['emoji']
+        else:
+            sfx_in_name = "None (Not Set)"
+            sfx_in_emoji = "🚫"
 
-        sfx_out = ENTRY_SOUNDS.get(exit_sound, ENTRY_SOUNDS["bye_great_time"])
+        if exit_sound and exit_sound in ENTRY_SOUNDS:
+            sfx_out = ENTRY_SOUNDS[exit_sound]
+            sfx_out_name = sfx_out['name']
+            sfx_out_emoji = sfx_out['emoji']
+        else:
+            sfx_out_name = "None (Not Set)"
+            sfx_out_emoji = "🚫"
 
-        status_in = "🟢 Active" if enabled else "🔴 Muted"
-        status_out = "🟢 Active" if exit_enabled else "🔴 Muted"
+        status_in = "🟢 Active" if (enabled and equipped) else ("🔴 Muted" if equipped else "⚪ Not Set")
+        status_out = "🟢 Active" if (exit_enabled and exit_sound) else ("🔴 Muted" if exit_sound else "⚪ Not Set")
         total_unlocked = len(ALL_SOUND_KEYS) if interaction.user.id == OWNER_ID else len(unlocked)
 
         embed = discord.Embed(
@@ -1062,9 +1115,10 @@ class EntrySound(commands.Cog):
                 return
 
             prof = get_user_entry_profile(member.id)
-            if prof.get("enabled", True) and cooldown_passed:
+            eq_key = prof.get("equipped")
+            # Only play if enabled is True and a valid sound is equipped
+            if prof.get("enabled", False) and eq_key and eq_key != "none" and cooldown_passed:
                 USER_ENTRY_COOLDOWNS[member.id] = now
-                eq_key = prof.get("equipped", "airhorn")
                 custom_file = None
                 for ext in [".mp3", ".wav", ".ogg", ".m4a"]:
                     c_path = CUSTOM_SOUNDS_DIR / f"{member.id}_custom{ext}"
@@ -1084,7 +1138,7 @@ class EntrySound(commands.Cog):
                         "user_id": member.id
                     }
                 else:
-                    sfx = ENTRY_SOUNDS.get(eq_key, ENTRY_SOUNDS.get("airhorn"))
+                    sfx = ENTRY_SOUNDS.get(eq_key)
 
                 if sfx:
                     vol = prof.get("volume", 85) / 100.0
@@ -1113,9 +1167,10 @@ class EntrySound(commands.Cog):
             remaining_humans = [m for m in before.channel.members if not m.bot]
             if len(remaining_humans) >= 1:
                 prof = get_user_entry_profile(member.id)
-                if prof.get("exit_enabled", True) and cooldown_passed:
+                exit_key = prof.get("exit_sound")
+                # Only play if exit_enabled is True and a valid sound is equipped
+                if prof.get("exit_enabled", False) and exit_key and exit_key != "none" and cooldown_passed:
                     USER_ENTRY_COOLDOWNS[member.id] = now
-                    exit_key = prof.get("exit_sound", "bye_great_time")
                     sfx = ENTRY_SOUNDS.get(exit_key)
                     if sfx:
                         vol = prof.get("volume", 85) / 100.0
@@ -1142,10 +1197,10 @@ class EntrySound(commands.Cog):
     @entrysound_group.command(name="panel", aliases=["menu"], description="Open the Voice Channel Entrance & Exit Sound Studio.")
     async def panel_cmd(self, ctx: commands.Context):
         prof = get_user_entry_profile(ctx.author.id)
-        equipped = prof.get("equipped", "airhorn")
-        exit_sound = prof.get("exit_sound", "bye_great_time")
-        enabled = prof.get("enabled", True)
-        exit_enabled = prof.get("exit_enabled", True)
+        equipped = prof.get("equipped")
+        exit_sound = prof.get("exit_sound")
+        enabled = prof.get("enabled", False)
+        exit_enabled = prof.get("exit_enabled", False)
         vol = prof.get("volume", 85)
         banner = "✨ On" if prof.get("banner_enabled", True) else "🚫 Off"
         unlocked = prof.get("unlocked", ["airhorn", "bye_great_time"])
@@ -1154,15 +1209,24 @@ class EntrySound(commands.Cog):
             c_name = prof.get("custom_name") or "Personal Custom File"
             sfx_in_name = f"🔮 {c_name}"
             sfx_in_emoji = "🔮"
-        else:
-            sfx_in = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
+        elif equipped and equipped in ENTRY_SOUNDS:
+            sfx_in = ENTRY_SOUNDS[equipped]
             sfx_in_name = sfx_in['name']
             sfx_in_emoji = sfx_in['emoji']
+        else:
+            sfx_in_name = "None (Not Set)"
+            sfx_in_emoji = "🚫"
 
-        sfx_out = ENTRY_SOUNDS.get(exit_sound, ENTRY_SOUNDS["bye_great_time"])
+        if exit_sound and exit_sound in ENTRY_SOUNDS:
+            sfx_out = ENTRY_SOUNDS[exit_sound]
+            sfx_out_name = sfx_out['name']
+            sfx_out_emoji = sfx_out['emoji']
+        else:
+            sfx_out_name = "None (Not Set)"
+            sfx_out_emoji = "🚫"
 
-        status_in = "🟢 Active" if enabled else "🔴 Muted"
-        status_out = "🟢 Active" if exit_enabled else "🔴 Muted"
+        status_in = "🟢 Active" if (enabled and equipped) else ("🔴 Muted" if equipped else "⚪ Not Set")
+        status_out = "🟢 Active" if (exit_enabled and exit_sound) else ("🔴 Muted" if exit_sound else "⚪ Not Set")
         total_unlocked = len(ALL_SOUND_KEYS) if ctx.author.id == OWNER_ID else len(unlocked)
 
         embed = discord.Embed(
@@ -1173,7 +1237,7 @@ class EntrySound(commands.Cog):
                 f"Customize your audio presence whenever you enter or leave a room!\n\n"
                 f"📊 **Your Audio Setup:**\n"
                 f"• 🔊 **Entrance Theme:** **{sfx_in_emoji} {sfx_in_name}** `{status_in}`\n"
-                f"• 🚪 **Exit Goodbye:** **{sfx_out['emoji']} {sfx_out['name']}** `{status_out}`\n"
+                f"• 🚪 **Exit Goodbye:** **{sfx_out_emoji} {sfx_out_name}** `{status_out}`\n"
                 f"• 🎚️ **Loudness:** `{vol}% Volume` • **Visual Banner:** `{banner}`\n"
                 f"• 🔓 **Unlocked Themes:** `{total_unlocked}/{len(ALL_SOUND_KEYS)}`\n\n"
                 f"✦ ───────────────────────────────────── ✦\n"
@@ -1186,6 +1250,90 @@ class EntrySound(commands.Cog):
 
         view = EntrySoundControlView(ctx.author.id)
         await ctx.send(embed=embed, view=view, ephemeral=True)
+
+    @entrysound_group.command(name="set", description="Equip an entrance or exit sound theme, or disable it.")
+    @app_commands.describe(theme="Theme name/key or 'none' to disable", mode="Set as entrance or exit sound")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="Entrance Sound", value="entry"),
+        app_commands.Choice(name="Exit Sound", value="exit")
+    ])
+    async def set_cmd(self, ctx: commands.Context, theme: str, mode: Optional[app_commands.Choice[str]] = None):
+        target_mode = mode.value if mode else "entry"
+        theme_clean = theme.lower().strip().replace(" ", "_")
+
+        data = load_entry_data()
+        u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
+            "volume": 85,
+            "banner_enabled": True,
+            "custom_url": None,
+            "custom_unlocked": False,
+            "unlocked": ["airhorn", "bye_great_time"]
+        })
+
+        if theme_clean in ("none", "disable", "off", "mute"):
+            if target_mode == "exit":
+                u_prof["exit_sound"] = None
+                u_prof["exit_enabled"] = False
+                msg = "🚫 Disabled your **Exit / Goodbye Sound**."
+            else:
+                u_prof["equipped"] = None
+                u_prof["enabled"] = False
+                msg = "🚫 Disabled your **Entrance Theme**."
+            save_entry_data(data)
+            return await ctx.send(msg, ephemeral=True)
+
+        if theme_clean == "custom":
+            if not u_prof.get("custom_url"):
+                return await ctx.send("❌ You don't have a custom audio stream or file set! Use `/entrysound upload` or `/entrysound custom <url>` first.", ephemeral=True)
+            u_prof["equipped"] = "custom"
+            u_prof["enabled"] = True
+            save_entry_data(data)
+            return await ctx.send("🔮 Equipped your **Personal Custom Audio** as Entrance Theme!", ephemeral=True)
+
+        sfx = ENTRY_SOUNDS.get(theme_clean)
+        if not sfx:
+            for k, v in ENTRY_SOUNDS.items():
+                if theme_clean in k or theme_clean in v["name"].lower():
+                    sfx = v
+                    theme_clean = k
+                    break
+
+        if not sfx:
+            return await ctx.send(f"❌ Unknown theme `{theme}`. Use `/entrysound panel` to view the catalog.", ephemeral=True)
+
+        unlocked = u_prof.get("unlocked", ["airhorn", "bye_great_time"])
+        if theme_clean not in unlocked and ctx.author.id != OWNER_ID:
+            return await ctx.send(f"🔒 **{sfx['name']}** is locked! Open `/entrysound panel` to unlock it for `{sfx['price']:,}` Coins.", ephemeral=True)
+
+        if target_mode == "exit":
+            u_prof["exit_sound"] = theme_clean
+            u_prof["exit_enabled"] = True
+            action_txt = f"Equipped as your **Exit / Goodbye Sound**! 👋"
+        else:
+            u_prof["equipped"] = theme_clean
+            u_prof["enabled"] = True
+            action_txt = f"Equipped as your **Entrance Theme**! 🔊"
+        save_entry_data(data)
+
+        embed = discord.Embed(
+            title=f"✨ THEME EQUIPPED: {sfx['name']}",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"{action_txt}\n\n"
+                f"• **Sound:** {sfx['emoji']} **{sfx['name']}**\n"
+                f"• **Category:** `{sfx['category']}`\n"
+                f"• **Effect:** {sfx['description']}\n\n"
+                f"✦ ───────────────────────────── ✦\n"
+                f"💡 *Use `/entrysound test` to preview it in VC!*"
+            ),
+            color=0x2ECC71
+        )
+        embed.set_footer(text="RAI FAM 💗 • Voice Entrance Themes", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, ephemeral=True)
 
     @entrysound_group.command(name="volume", description="Set your personal voice entrance audio volume (10-100%).")
     @app_commands.describe(percentage="Volume percentage (10 to 100)")
@@ -1214,7 +1362,10 @@ class EntrySound(commands.Cog):
             return await ctx.send("❌ You must join a voice channel first to test your sound!", ephemeral=True)
 
         prof = get_user_entry_profile(ctx.author.id)
-        equipped = prof.get("equipped", "airhorn")
+        equipped = prof.get("equipped")
+        if not equipped or equipped == "none":
+            return await ctx.send("⚠️ You do not have an entrance sound equipped! Use `/entrysound panel` to choose your theme.", ephemeral=True)
+
         custom_file = None
         for ext in [".mp3", ".wav", ".ogg", ".m4a"]:
             c_path = CUSTOM_SOUNDS_DIR / f"{ctx.author.id}_custom{ext}"
@@ -1234,7 +1385,10 @@ class EntrySound(commands.Cog):
                 "user_id": ctx.author.id
             }
         else:
-            sfx = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
+            sfx = ENTRY_SOUNDS.get(equipped)
+
+        if not sfx:
+            return await ctx.send("⚠️ Sound theme not found.", ephemeral=True)
 
         vol = prof.get("volume", 85) / 100.0
         await ctx.send(f"🎧 Previewing **{sfx['name']}** in {ctx.author.voice.channel.mention} at `{int(vol*100)}%` volume...", ephemeral=True)
@@ -1246,24 +1400,27 @@ class EntrySound(commands.Cog):
     async def toggle_cmd(self, ctx: commands.Context):
         data = load_entry_data()
         u_prof = data.setdefault("users", {}).setdefault(str(ctx.author.id), {
-            "equipped": "airhorn",
-            "enabled": True,
-            "exit_sound": "bye_great_time",
-            "exit_enabled": True,
+            "equipped": None,
+            "enabled": False,
+            "exit_sound": None,
+            "exit_enabled": False,
             "volume": 85,
             "banner_enabled": True,
             "custom_url": None,
             "custom_unlocked": False,
             "unlocked": ["airhorn", "bye_great_time"]
         })
-        curr_in = u_prof.get("enabled", True)
-        curr_out = u_prof.get("exit_enabled", True)
-        new_st = not (curr_in and curr_out)
+        curr_in = u_prof.get("enabled", False)
+        curr_out = u_prof.get("exit_enabled", False)
+        new_st = not (curr_in or curr_out)
         u_prof["enabled"] = new_st
         u_prof["exit_enabled"] = new_st
         save_entry_data(data)
 
-        st = "ENABLED 🔔 (Will play on join & leave)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
+        if not u_prof.get("equipped") and not u_prof.get("exit_sound"):
+            st = "ENABLED 🔔 (Note: You haven't equipped a sound yet! Use `/entrysound panel` to select one)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
+        else:
+            st = "ENABLED 🔔 (Will play on join & leave)" if new_st else "MUTED 🔕 (Silent joins & leaves)"
         await ctx.send(f"Voice Themes are now **{st}**!", ephemeral=True)
 
     @entrysound_group.command(name="upload", description="Upload an audio file (.mp3, .wav, .ogg, max 8MB) as your personal entrance sound.")

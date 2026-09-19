@@ -329,6 +329,10 @@ class Telemetry(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    @stats.command(name="live", description="Open an interactive live telemetry dashboard with a real-time refresh button.")
+    async def live_dashboard(self, interaction: discord.Interaction):
+        await self.telemetry_dashboard(interaction)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Telemetry(bot))

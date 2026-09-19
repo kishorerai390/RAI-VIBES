@@ -33,7 +33,9 @@ KNOWN_SCAM_PATTERNS = [
     "discord-free", "free-boost", "claim-steam", "discordapp.info", "nitro-free.org", "discord-gifts.ru",
     "discordapp.gg", "discord-app.net", "discord-nitro.su", "nitro-claim.xyz", "steam-trade.ru",
     "discordgift.site", "discord-halloween.com", "discord-promo.com", "nitro-generator", "steam-community.ru",
-    "free-robux", "roblox-gift", "free-vbucks", "grabify.link", "iplogger.org", "blasze.com", "2no.co"
+    "free-robux", "roblox-gift", "free-vbucks", "grabify.link", "iplogger.org", "blasze.com", "2no.co",
+    "discorcl.link", "discrod.gift", "steamcommunity.link", "dlscord.app", "boost-discord.com",
+    "nitro-drop.click", "discord-gift.me", "free-nitro.site", "discord-airdrop.com", "steam-trade.link"
 ]
 
 class AntiLink(commands.Cog):

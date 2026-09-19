@@ -379,6 +379,171 @@ class Tournaments(commands.Cog):
 
         await interaction.response.send_message(f"✅ Match #{match_id} recorded: **`{winner}`** won!", ephemeral=True)
 
+    # -------------------------------------------------------------
+    # ⚔️ SCRIM SPLIT & MERGE CONTROLS
+    # -------------------------------------------------------------
+    scrim_group = app_commands.Group(name="scrim", description="Tactical 5v5 scrim team split and merge controls.")
+
+    @scrim_group.command(name="split", description="Split players in your voice channel into two team channels.")
+    @app_commands.describe(team1_vc="Voice channel for Team 1", team2_vc="Voice channel for Team 2")
+    async def scrim_split(self, interaction: discord.Interaction, team1_vc: discord.VoiceChannel, team2_vc: discord.VoiceChannel):
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            return await interaction.response.send_message("❌ You must be in a voice channel with your squad to split teams!", ephemeral=True)
+
+        members = [m for m in interaction.user.voice.channel.members if not m.bot]
+        if len(members) < 2:
+            return await interaction.response.send_message("❌ Need at least 2 players in the voice channel to split.", ephemeral=True)
+
+        import random
+        random.shuffle(members)
+        mid = len(members) // 2
+        team1 = members[:mid]
+        team2 = members[mid:]
+
+        for m in team1:
+            try:
+                await m.move_to(team1_vc, reason="Scrim Team 1 Split")
+            except Exception:
+                pass
+
+        for m in team2:
+            try:
+                await m.move_to(team2_vc, reason="Scrim Team 2 Split")
+            except Exception:
+                pass
+
+        embed = discord.Embed(
+            title="⚔️ TACTICAL SCRIM SPLIT COMPLETE",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"**Team 1** ({len(team1)} players) ➔ {team1_vc.mention}\n"
+                f"{', '.join([m.mention for m in team1])}\n\n"
+                f"**Team 2** ({len(team2)} players) ➔ {team2_vc.mention}\n"
+                f"{', '.join([m.mention for m in team2])}\n\n"
+                f"✦ ───────────────────────────── ✦\n"
+                f"💡 *Use `/scrim merge` after the match to bring everyone back together!*"
+            ),
+            color=0x00F5D4
+        )
+        embed.set_footer(text="RAI VIBES 💗 Scrim Engine", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+    @scrim_group.command(name="merge", description="Merge players from both team channels back into one debrief lounge.")
+    @app_commands.describe(source_vc1="Team 1 Voice Channel", source_vc2="Team 2 Voice Channel", target_vc="Channel to merge into")
+    async def scrim_merge(self, interaction: discord.Interaction, source_vc1: discord.VoiceChannel, source_vc2: discord.VoiceChannel, target_vc: Optional[discord.VoiceChannel] = None):
+        dest = target_vc or (interaction.user.voice.channel if interaction.user.voice else source_vc1)
+        moved_count = 0
+        for vc in [source_vc1, source_vc2]:
+            for m in vc.members:
+                if not m.bot and m.voice and m.voice.channel and m.voice.channel.id != dest.id:
+                    try:
+                        await m.move_to(dest, reason="Scrim Merge Back")
+                        moved_count += 1
+                    except Exception:
+                        pass
+
+        await interaction.response.send_message(f"🤝 **Merged `{moved_count}` players** back into {dest.mention} for post-match debrief!", ephemeral=False)
+
+    @app_commands.command(name="veto", description="Start an interactive competitive map ban/pick phase.")
+    @app_commands.describe(game="Select game", team1="Team 1 Name", team2="Team 2 Name", captain1="Team 1 Captain", captain2="Team 2 Captain")
+    @app_commands.choices(game=[
+        app_commands.Choice(name="🎯 Valorant", value="valorant"),
+        app_commands.Choice(name="⚡ CS2", value="cs2"),
+        app_commands.Choice(name="💥 BGMI", value="bgmi"),
+        app_commands.Choice(name="🚗 Rocket League", value="rocketleague"),
+    ])
+    async def veto_cmd(self, interaction: discord.Interaction, game: app_commands.Choice[str], team1: str, team2: str, captain1: discord.Member, captain2: discord.Member):
+        view = MapVetoView(game.value, team1, team2, captain1, captain2)
+        embed = discord.Embed(
+            title=f"🗺️ MAP VETO: {game.name.upper()}",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"⚔️ **Matchup:** `{team1}` vs `{team2}`\n"
+                f"👑 **Captains:** {captain1.mention} vs {captain2.mention}\n\n"
+                f"👉 **First Ban:** {captain1.mention} (Click a button to ban a map)\n"
+                f"Available maps: `{len(view.maps)}`"
+            ),
+            color=0xFF4757
+        )
+        embed.set_footer(text="RAI VIBES 💗 Competitive Veto System", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed, view=view)
+
+
+MAP_POOLS = {
+    "valorant": ["Ascent", "Bind", "Breeze", "Haven", "Icebox", "Lotus", "Split", "Sunset"],
+    "cs2": ["Mirage", "Inferno", "Nuke", "Dust II", "Ancient", "Anubis", "Vertigo"],
+    "bgmi": ["Erangel", "Miramar", "Sanhok", "Vikendi"],
+    "rocketleague": ["DFH Stadium", "Mannfield", "Champions Field", "Urban Central"]
+}
+
+
+class MapVetoView(discord.ui.View):
+    def __init__(self, game: str, team1: str, team2: str, captain1: discord.Member, captain2: discord.Member):
+        super().__init__(timeout=300)
+        self.game = game
+        self.team1 = team1
+        self.team2 = team2
+        self.captain1 = captain1
+        self.captain2 = captain2
+        self.turn = captain1
+        self.maps = list(MAP_POOLS.get(game, MAP_POOLS["valorant"]))
+        self.banned_maps = []
+        self.decider = None
+        self._build_buttons()
+
+    def _build_buttons(self):
+        self.clear_items()
+        for idx, map_name in enumerate(self.maps):
+            btn = discord.ui.Button(
+                label=f"Ban {map_name}",
+                style=discord.ButtonStyle.danger,
+                custom_id=f"ban_{idx}"
+            )
+            btn.callback = self.make_ban_callback(map_name)
+            self.add_item(btn)
+
+    def make_ban_callback(self, map_name: str):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.turn.id:
+                return await interaction.response.send_message(f"❌ It's {self.turn.mention}'s turn to ban a map!", ephemeral=True)
+
+            if map_name in self.maps:
+                self.maps.remove(map_name)
+                self.banned_maps.append((map_name, self.turn.display_name))
+
+            if len(self.maps) == 1:
+                self.decider = self.maps[0]
+                embed = discord.Embed(
+                    title=f"🎯 MAP VETO COMPLETE: {self.decider.upper()}",
+                    description=(
+                        f"✦ ───────────────────────────── ✦\n\n"
+                        f"⚔️ **Matchup:** `{self.team1}` vs `{self.team2}`\n"
+                        f"🏆 **Decider Map:** **`{self.decider}`**\n\n"
+                        f"**Banned Maps:**\n" + "\n".join([f"• 🚫 ~~{m}~~ *(banned by {c})*" for m, c in self.banned_maps])
+                    ),
+                    color=0x2ED573
+                )
+                embed.set_footer(text="RAI VIBES 💗 Competitive Veto System", icon_url=config.RAI_ICON_URL)
+                return await interaction.response.edit_message(embed=embed, view=None)
+
+            self.turn = self.captain2 if self.turn == self.captain1 else self.captain1
+            self._build_buttons()
+
+            embed = discord.Embed(
+                title=f"🗺️ MAP VETO: {self.game.upper()}",
+                description=(
+                    f"⚔️ **Matchup:** `{self.team1}` vs `{self.team2}`\n"
+                    f"👉 **Current Turn:** {self.turn.mention} (Choose a map to BAN)\n"
+                    f"Remaining maps: `{len(self.maps)}`\n\n"
+                    f"**Banned So Far:**\n" + "\n".join([f"• 🚫 ~~{m}~~ *(by {c})*" for m, c in self.banned_maps])
+                ),
+                color=0xFF4757
+            )
+            embed.set_footer(text="RAI VIBES 💗 Competitive Veto System", icon_url=config.RAI_ICON_URL)
+            await interaction.response.edit_message(embed=embed, view=self)
+
+        return callback
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Tournaments(bot))

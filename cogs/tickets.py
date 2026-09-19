@@ -37,28 +37,77 @@ class TicketCloseConfirmView(discord.ui.View):
         channel = interaction.channel
         guild = interaction.guild
         
-        # 1. Compile Transcript
-        transcript_lines = [
-            f"==================================================",
-            f"       RAI FAM • TICKET TRANSCRIPT RECEIPT        ",
-            f"==================================================",
-            f"Channel: #{channel.name}",
-            f"Guild: {guild.name} ({guild.id})",
-            f"Closed By: {interaction.user.name} ({interaction.user.id})",
-            f"Closed At: {discord.utils.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
-            f"==================================================\n",
-        ]
+        # 1. Compile Rich HTML Transcript
+        html_head = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Transcript - #{channel.name}</title>
+<style>
+  body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1f22; color: #dbdee1; margin: 0; padding: 24px; }}
+  .container {{ max-width: 900px; margin: 0 auto; }}
+  .header {{ background-color: #2b2d31; padding: 20px 24px; border-radius: 12px; margin-bottom: 24px; border-left: 5px solid #5865f2; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }}
+  .header h1 {{ margin: 0; font-size: 22px; color: #ffffff; }}
+  .header p {{ margin: 6px 0 0; font-size: 13px; color: #949ba4; }}
+  .message {{ display: flex; margin-bottom: 18px; padding: 8px 12px; border-radius: 8px; transition: background 0.15s; }}
+  .message:hover {{ background-color: #2b2d31; }}
+  .avatar {{ width: 42px; height: 42px; border-radius: 50%; margin-right: 16px; flex-shrink: 0; background-color: #5865f2; object-fit: cover; }}
+  .msg-body {{ flex-grow: 1; }}
+  .msg-meta {{ display: flex; align-items: baseline; margin-bottom: 4px; }}
+  .username {{ font-weight: 600; color: #f2f3f5; margin-right: 10px; font-size: 15px; }}
+  .timestamp {{ font-size: 12px; color: #949ba4; }}
+  .content {{ font-size: 14px; line-height: 1.5; color: #dbdee1; word-break: break-word; }}
+  .attachment {{ margin-top: 8px; padding: 8px 12px; background: #232428; border-radius: 6px; display: inline-block; font-size: 12px; color: #00a8fc; text-decoration: none; border: 1px solid #35363c; }}
+  .attachment:hover {{ text-decoration: underline; }}
+  .footer {{ text-align: center; margin-top: 30px; font-size: 12px; color: #949ba4; border-top: 1px solid #35363c; padding-top: 16px; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🎫 Ticket Transcript: #{channel.name}</h1>
+    <p>Guild: <strong>{guild.name}</strong> • Closed by: <strong>{interaction.user.name}</strong> • Closed at: <strong>{discord.utils.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}</strong></p>
+  </div>
+  <div class="messages">
+"""
+        msg_blocks = []
         try:
+            import html
             async for msg in channel.history(limit=1000, oldest_first=True):
                 time_str = msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
-                transcript_lines.append(f"[{time_str}] {msg.author.name}: {msg.clean_content}")
+                avatar_url = msg.author.display_avatar.url if hasattr(msg.author, "display_avatar") else ""
+                clean_txt = html.escape(msg.clean_content).replace("\n", "<br>")
+                
+                att_html = ""
                 for att in msg.attachments:
-                    transcript_lines.append(f"    [Attachment: {att.url}]")
-        except Exception as e:
-            transcript_lines.append(f"Error fetching history: {e}")
+                    att_html += f'<br><a class="attachment" href="{att.url}" target="_blank">📎 Attachment: {html.escape(att.filename)}</a>'
 
-        transcript_text = "\n".join(transcript_lines)
-        transcript_bytes = transcript_text.encode("utf-8")
+                msg_blocks.append(f"""
+    <div class="message">
+      <img class="avatar" src="{avatar_url}" alt="Avatar" onerror="this.style.display='none'">
+      <div class="msg-body">
+        <div class="msg-meta">
+          <span class="username">{html.escape(msg.author.display_name)}</span>
+          <span class="timestamp">{time_str}</span>
+        </div>
+        <div class="content">{clean_txt}{att_html}</div>
+      </div>
+    </div>""")
+        except Exception as e:
+            msg_blocks.append(f'<div class="message"><div class="content" style="color:#f23f43">Error fetching complete history: {e}</div></div>')
+
+        html_footer = f"""
+  </div>
+  <div class="footer">
+    RAI SENTINEL 🛡️ Autonomous Ticket Archival Engine • RAI FAM 💗
+  </div>
+</div>
+</body>
+</html>"""
+
+        full_html = html_head + "".join(msg_blocks) + html_footer
+        transcript_bytes = full_html.encode("utf-8")
 
         # 2. Send transcript to mod-logs / audit-logs
         log_chan = (
@@ -77,13 +126,14 @@ class TicketCloseConfirmView(discord.ui.View):
                 description=(
                     f"**Ticket:** `#{channel.name}`\n"
                     f"**Closed By:** {interaction.user.mention} (`{interaction.user.id}`)\n"
-                    f"**Timestamp:** <t:{int(discord.utils.utcnow().timestamp())}:F>"
+                    f"**Timestamp:** <t:{int(discord.utils.utcnow().timestamp())}:F>\n"
+                    f"**Format:** Interactive Responsive HTML"
                 ),
                 color=0x2B2D31
             )
             embed.set_footer(text="RAI SENTINEL 🛡️ Ticket Transcript Service", icon_url=config.RAI_ICON_URL)
             try:
-                t_file = discord.File(io.BytesIO(transcript_bytes), filename=f"transcript-{channel.name}.txt")
+                t_file = discord.File(io.BytesIO(transcript_bytes), filename=f"transcript-{channel.name}.html")
                 await log_chan.send(embed=embed, file=t_file)
             except Exception as e:
                 logger.warning(f"Failed to send transcript to log channel: {e}")
@@ -97,13 +147,13 @@ class TicketCloseConfirmView(discord.ui.View):
                         title=f"🎫 Support Ticket Closed • #{channel.name}",
                         description=(
                             f"Hello {opener.mention}, your support ticket in **{guild.name}** has been marked as resolved.\n\n"
-                            f"Attached below is your official chat transcript for your records.\n"
+                            f"Attached below is your official **interactive HTML transcript** for your records.\n"
                             f"If you ever need further help, feel free to open a new ticket anytime in the support hub!"
                         ),
                         color=config.COLOR_PRIMARY
                     )
                     dm_embed.set_footer(text="RAI FAM Support Team 💗", icon_url=config.RAI_ICON_URL)
-                    t_file_dm = discord.File(io.BytesIO(transcript_bytes), filename=f"transcript-{channel.name}.txt")
+                    t_file_dm = discord.File(io.BytesIO(transcript_bytes), filename=f"transcript-{channel.name}.html")
                     await opener.send(embed=dm_embed, file=t_file_dm)
             except Exception:
                 pass

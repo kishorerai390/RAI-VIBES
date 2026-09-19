@@ -16,6 +16,65 @@ class AntiRaid(commands.Cog):
         self.bot = bot
         # Deque of join timestamps per guild
         self.join_tracker: Dict[int, deque] = defaultdict(lambda: deque(maxlen=100))
+        self.voice_join_tracker: Dict[int, deque] = defaultdict(lambda: deque(maxlen=100))
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        if member.bot or not after.channel or (before.channel and before.channel.id == after.channel.id):
+            return
+
+        guild = member.guild
+        now = time.time()
+        v_tracker = self.voice_join_tracker[guild.id]
+        v_tracker.append(now)
+
+        # Detect voice join surges: > 6 joins in < 8 seconds
+        recent_v_joins = [t for t in v_tracker if now - t <= 8]
+        if len(recent_v_joins) >= 6:
+            settings = await database.get_guild_settings(guild.id)
+            log_channel = await self.get_log_channel(guild, settings)
+
+            logger.warning(f"🚨 [VOICE RAID DETECTED] {len(recent_v_joins)} joins in 8s in {guild.name} ({after.channel.name})!")
+
+            # Emergency lock targeted voice channel
+            try:
+                await after.channel.set_permissions(guild.default_role, connect=False, reason="[Voice Raid Shield] Emergency lock")
+            except Exception as e:
+                logger.error(f"Failed to lock voice channel: {e}")
+
+            # Disconnect active music player if in that channel to prevent audio disruption
+            music_cog = self.bot.get_cog("Music")
+            if music_cog:
+                player = music_cog.get_player(guild)
+                if player and player.channel and player.channel.id == after.channel.id:
+                    await player.disconnect()
+
+            embed = discord.Embed(
+                title="🚨 VOICE RAID SHIELD TRIGGERED",
+                description=(
+                    f"**Abnormal voice join surge intercepted!**\n\n"
+                    f"• **Targeted Lounge:** {after.channel.mention} (`{after.channel.name}`)\n"
+                    f"• **Join Velocity:** `{len(recent_v_joins)} members` in `< 8 seconds`\n"
+                    f"• **Protective Action Taken:** Channel permissions locked to prevent further entry.\n"
+                    f"• **Staff Action:** Review members in {after.channel.mention}."
+                ),
+                color=0xFF0033
+            )
+            embed.set_footer(text="RAI SENTINEL 🛡️ Voice Defense Protocol")
+            embed.timestamp = discord.utils.utcnow()
+
+            if log_channel:
+                try:
+                    await log_channel.send(content="@everyone 🚨 **VOICE RAID SHIELD ACTIVATED**", embed=embed)
+                except Exception:
+                    pass
+
+            await database.record_security_event(
+                guild.id,
+                "VOICE_RAID_TRIGGERED",
+                f"Velocity: {len(recent_v_joins)} in 8s. Locked {after.channel.name}.",
+                severity="HIGH"
+            )
 
     async def get_log_channel(self, guild: discord.Guild, settings: dict) -> Optional[discord.TextChannel]:
         log_id = settings.get("log_channel_id")

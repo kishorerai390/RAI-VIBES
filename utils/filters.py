@@ -27,6 +27,7 @@ FILTER_PRESETS = {
     "subbass_engine": "equalizer=f=50:width_type=h:width=40:g=14,bass=g=12:f=90",
     "vocal_clarity": "highpass=f=120,equalizer=f=3000:width_type=h:width=1200:g=6,equalizer=f=5000:width_type=h:width=1500:g=4",
     "cinema": "stereotools=mlev=0.7:slev=1.45,equalizer=f=80:width_type=h:width=40:g=6",
+    "loudnorm": "loudnorm=I=-16:TP=-1.5:LRA=11",
 }
 
 def get_filter_string(active_filters: list[str], custom_speed: float = 1.0) -> str:

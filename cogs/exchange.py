@@ -448,12 +448,19 @@ class ExchangeBoothView(View):
             pass
 
         prof = get_user_entry_profile(interaction.user.id)
-        equipped = prof.get("equipped", "airhorn")
-        enabled = prof.get("enabled", True)
-        unlocked = prof.get("unlocked", ["airhorn"])
-        sfx = ENTRY_SOUNDS.get(equipped, ENTRY_SOUNDS["airhorn"])
+        equipped = prof.get("equipped")
+        enabled = prof.get("enabled", False)
+        unlocked = prof.get("unlocked", ["airhorn", "bye_great_time"])
 
-        status_str = "🟢 Active" if enabled else "🔴 Muted"
+        if equipped and equipped in ENTRY_SOUNDS:
+            sfx = ENTRY_SOUNDS[equipped]
+            sfx_name = f"{sfx['emoji']} {sfx['name']}"
+        elif equipped == "custom" and prof.get("custom_url"):
+            sfx_name = "🔮 Personal Custom Theme"
+        else:
+            sfx_name = "🚫 None (Not Set)"
+
+        status_str = "🟢 Active" if (enabled and equipped) else ("🔴 Muted" if equipped else "⚪ Not Equipped")
         total_unlocked = len(ALL_SOUND_KEYS) if interaction.user.id == OWNER_ID else len(unlocked)
 
         embed = discord.Embed(
@@ -463,7 +470,7 @@ class ExchangeBoothView(View):
                 f"Welcome to your **Voice Entrance Studio**, {interaction.user.mention}! 🌸\n"
                 f"Whenever you join a voice room, make an unforgettable grand entrance!\n\n"
                 f"📊 **Your Setup:**\n"
-                f"• 🎵 **Current Sound:** **{sfx['emoji']} {sfx['name']}**\n"
+                f"• 🎵 **Current Sound:** **{sfx_name}**\n"
                 f"• 🔔 **Status:** `{status_str}`\n"
                 f"• 🔓 **Unlocked Themes:** `{total_unlocked}/{len(ALL_SOUND_KEYS)}`\n\n"
                 f"✦ ───────────────────────────────────── ✦\n"

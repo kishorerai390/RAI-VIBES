@@ -368,6 +368,137 @@ class Productivity(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    # -------------------------------------------------------------
+    # 🔒 4. DEEP FOCUS DISTRACTION-FREE VOICE ROOM
+    # -------------------------------------------------------------
+    @app_commands.command(name="deepfocus", description="Create a temporary silent, distraction-free voice room (auto-mutes & deafens).")
+    @app_commands.describe(
+        minutes="Duration of the deep work session in minutes (10 to 180, default 45)",
+        name="Optional custom name for your focus sanctuary"
+    )
+    async def deepfocus_cmd(self, interaction: discord.Interaction, minutes: int = 45, name: Optional[str] = None):
+        if minutes < 10 or minutes > 180:
+            return await interaction.response.send_message("❌ Deep Focus duration must be between 10 and 180 minutes.", ephemeral=True)
+
+        guild = interaction.guild
+        cat = (
+            discord.utils.get(guild.categories, name="🍅 ＳＴＵＤＹ  ＆  ＦＯＣＵＳ")
+            or discord.utils.get(guild.categories, name="🥂 ＰＲＩＶＡＴＥ  ＳＵＩＴＥＳ")
+            or interaction.channel.category
+        )
+
+        room_title = f"🔒 ┊ {name[:20] if name else 'Deep Focus'} ({minutes}m)"
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                connect=True,
+                speak=False,
+                stream=False,
+                use_soundboard=False,
+                use_voice_activation=False
+            ),
+            interaction.user: discord.PermissionOverwrite(
+                connect=True,
+                speak=False,
+                deafen_members=False
+            )
+        }
+
+        try:
+            vc = await guild.create_voice_channel(
+                name=room_title,
+                category=cat,
+                overwrites=overwrites,
+                reason=f"Deep Focus session initiated by {interaction.user.name}"
+            )
+        except Exception as e:
+            return await interaction.response.send_message(f"❌ Failed to create focus room: {e}", ephemeral=True)
+
+        if interaction.user.voice and interaction.user.voice.channel:
+            try:
+                await interaction.user.move_to(vc, reason="Joined Deep Focus")
+            except Exception:
+                pass
+
+        embed = discord.Embed(
+            title="🔒 ┊ 𝐃𝐄𝐄Ｐ  𝐅𝐎ＣＵＳ  ＳＡＮＣＴＵＡＲＹ  ＣＲＥＡＴＥＤ",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"Welcome to your distraction-free workspace, {interaction.user.mention}!\n\n"
+                f"• 🎙️ **Channel:** {vc.mention}\n"
+                f"• ⏱️ **Timer:** `{minutes} Minutes`\n"
+                f"• 🔇 **Protocol:** Microphones are locked. Pure silent focus.\n\n"
+                f"✦ ───────────────────────────── ✦\n"
+                f"💡 *This room will automatically close once the session completes or everyone leaves.*"
+            ),
+            color=0x2ED573
+        )
+        embed.set_footer(text="RAI FAM 💗 • Deep Work & Flow State", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
+        # Scheduled auto-delete task
+        async def cleanup_room():
+            await asyncio.sleep(minutes * 60)
+            try:
+                if vc in guild.voice_channels:
+                    await vc.delete(reason="Deep Focus session time expired")
+            except Exception:
+                pass
+
+        asyncio.create_task(cleanup_room())
+
+    # -------------------------------------------------------------
+    # 📊 5. FOCUS STATS & MILESTONE BADGES
+    # -------------------------------------------------------------
+    @app_commands.command(name="focusstats", description="View your cumulative focus and study hours with milestone badges.")
+    @app_commands.describe(member="Member to view focus stats for (defaults to you)")
+    async def focusstats_cmd(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+        target = member or interaction.user
+        uid = str(target.id)
+
+        # Retrieve voice stats
+        total_sec = 0
+        if VOICE_STATS_FILE.exists():
+            try:
+                with open(VOICE_STATS_FILE, "r", encoding="utf-8") as f:
+                    vs = json.load(f)
+                    total_sec = vs.get(uid, {}).get("total_seconds", 0)
+            except Exception:
+                pass
+
+        total_hours = total_sec / 3600.0
+
+        # Calculate milestone badges
+        badges = []
+        if total_hours >= 1.0:
+            badges.append("🌱 **Focus Novice** (1+ Hours Logged)")
+        if total_hours >= 10.0:
+            badges.append("📖 **Dedicated Scholar** (10+ Hours Logged)")
+        if total_hours >= 25.0:
+            badges.append("⚡ **Deep Work Virtuoso** (25+ Hours Logged)")
+        if total_hours >= 50.0:
+            badges.append("🏆 **Flow State Champion** (50+ Hours Logged)")
+        if total_hours >= 100.0:
+            badges.append("👑 **Master of Flow** (100+ Hours Logged)")
+
+        if not badges:
+            badges.append("⚪ *No badges unlocked yet. Join study voice channels or start `/pomodoro` to log time!*")
+
+        embed = discord.Embed(
+            title=f"📊 ┊ {target.display_name}'𝐬  𝐅𝐎ＣＵＳ  ＳＴＡＴＳ",
+            description=(
+                f"✦ ───────────────────────────── ✦\n\n"
+                f"⏱️ **Total Focus Time:** `{total_hours:.1f} Hours` (`{int(total_sec // 60)} mins`)\n\n"
+                f"🎖️ **Milestone Achievements:**\n"
+                + "\n".join(badges) +
+                f"\n\n✦ ───────────────────────────── ✦\n"
+                f"💡 *Use `/pomodoro start` or join our study lounges to level up your focus!*"
+            ),
+            color=0x70A1FF
+        )
+        embed.set_thumbnail(url=target.display_avatar.url)
+        embed.set_footer(text="RAI FAM 💗 • Focus & Productivity Mastery", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Productivity(bot))

@@ -86,12 +86,12 @@ class Profile(commands.Cog):
 
         # 3. Audio & Voice Presence
         entry_prof = get_user_entry_profile(target.id)
-        eq_in = entry_prof.get("equipped", "airhorn")
-        eq_out = entry_prof.get("exit_sound", "bye_great_time")
-        in_sfx = ENTRY_SOUNDS.get(eq_in, ENTRY_SOUNDS.get("airhorn", {}))
-        out_sfx = ENTRY_SOUNDS.get(eq_out, ENTRY_SOUNDS.get("bye_great_time", {}))
-        in_name = f"{in_sfx.get('emoji', '🎵')} {in_sfx.get('name', 'Airhorn')}"
-        out_name = f"{out_sfx.get('emoji', '👋')} {out_sfx.get('name', 'Bye Have a Great Time')}"
+        eq_in = entry_prof.get("equipped")
+        eq_out = entry_prof.get("exit_sound")
+        in_sfx = ENTRY_SOUNDS.get(eq_in) if eq_in else None
+        out_sfx = ENTRY_SOUNDS.get(eq_out) if eq_out else None
+        in_name = f"{in_sfx.get('emoji', '🎵')} {in_sfx.get('name')}" if in_sfx else "🚫 None (Not Set)"
+        out_name = f"{out_sfx.get('emoji', '👋')} {out_sfx.get('name')}" if out_sfx else "🚫 None (Not Set)"
 
         # 4. Badges Calculation
         badges = []
