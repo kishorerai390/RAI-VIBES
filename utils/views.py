@@ -394,19 +394,20 @@ class AudioEffectsControlView(View):
 
 
 class QueuePaginationView(View):
-    """Pagination buttons for viewing large song queues."""
-    def __init__(self, player, current_page: int = 0):
-        super().__init__(timeout=60)
+    """Rythm-style Pagination buttons for viewing and controlling song queues."""
+    def __init__(self, player, music_cog=None, current_page: int = 0):
+        super().__init__(timeout=120)
         self.player = player
+        self.music_cog = music_cog or getattr(player, "cog", None) or (player.bot.get_cog("Music") if hasattr(player, "bot") else None)
         self.current_page = current_page
         self.update_buttons()
 
     def update_buttons(self):
-        total_pages = max(1, (len(self.player.queue) + 9) // 10)
+        total_pages = max(1, (len(self.player.queue) + 4) // 5)
         self.prev_button.disabled = self.current_page <= 0
         self.next_button.disabled = self.current_page >= total_pages - 1
 
-    @button(label="Previous", style=discord.ButtonStyle.secondary, emoji="⬅️")
+    @button(emoji="◀", style=discord.ButtonStyle.secondary, row=0, custom_id="queue_prev")
     async def prev_button(self, interaction: discord.Interaction, button: Button):
         if self.current_page > 0:
             self.current_page -= 1
@@ -416,10 +417,12 @@ class QueuePaginationView(View):
                 await interaction.response.edit_message(embed=embed, view=self)
             except Exception:
                 pass
+        else:
+            await interaction.response.defer()
 
-    @button(label="Next", style=discord.ButtonStyle.secondary, emoji="➡️")
+    @button(emoji="▶", style=discord.ButtonStyle.secondary, row=0, custom_id="queue_next")
     async def next_button(self, interaction: discord.Interaction, button: Button):
-        total_pages = max(1, (len(self.player.queue) + 9) // 10)
+        total_pages = max(1, (len(self.player.queue) + 4) // 5)
         if self.current_page < total_pages - 1:
             self.current_page += 1
             self.update_buttons()
@@ -428,6 +431,32 @@ class QueuePaginationView(View):
                 await interaction.response.edit_message(embed=embed, view=self)
             except Exception:
                 pass
+        else:
+            await interaction.response.defer()
+
+    @button(emoji="➕", style=discord.ButtonStyle.secondary, row=0, custom_id="queue_add")
+    async def add_button(self, interaction: discord.Interaction, button: Button):
+        if not self.music_cog and hasattr(self.player, "cog"):
+            self.music_cog = self.player.cog
+        await interaction.response.send_modal(AddSongModal(self.player, self.music_cog))
+
+    @button(emoji="🔍", style=discord.ButtonStyle.secondary, row=0, custom_id="queue_search")
+    async def search_button(self, interaction: discord.Interaction, button: Button):
+        if not self.music_cog and hasattr(self.player, "cog"):
+            self.music_cog = self.player.cog
+        await interaction.response.send_modal(SearchSongModal(self.player, self.music_cog))
+
+    @button(label="Open music controls", emoji="🎛️", style=discord.ButtonStyle.secondary, row=1, custom_id="queue_controls")
+    async def controls_button(self, interaction: discord.Interaction, button: Button):
+        if not self.music_cog and hasattr(self.player, "cog"):
+            self.music_cog = self.player.cog
+        view = RythmControllerView(self.player, self.music_cog)
+        embed = self.player.build_now_playing_embed() if self.player and self.player.current else discord.Embed(
+            title="🎛️ RAI VIBES 💗 Music Controller",
+            description="No track is currently playing. Use `➕` or `🔍` to play a song!",
+            color=config.COLOR_PRIMARY
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class AddSongModal(Modal, title="Add Song to Queue"):

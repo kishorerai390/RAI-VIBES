@@ -573,35 +573,63 @@ class GuildMusicPlayer:
         embed.set_footer(text="RAI VIBES 💗 • High Fidelity Sound Engine", icon_url=config.RAI_ICON_URL)
         return embed
 
-    def build_queue_embed(self, page: int = 0, per_page: int = 10) -> discord.Embed:
+    def build_queue_embed(self, page: int = 0, per_page: int = 5) -> discord.Embed:
         embed = discord.Embed(
-            title=f"📜 RAI VIBES 💗 • Active Queue ({len(self.queue)}/{config.MAX_QUEUE_SIZE} Tracks)",
+            title=f"Queue for {self.guild.name}",
             color=config.COLOR_PRIMARY
         )
-        embed.set_author(name="RAI VIBES 💗", icon_url=config.RAI_ICON_URL)
 
+        # Now Playing section
         if self.current:
-            embed.description = f"**Currently Playing:**\n[{self.current.title}]({self.current.webpage_url}) | Requested by: {self.current.requester.mention}\n\n**Up Next:**"
+            req_mention = self.current.requester.mention if self.current.requester else "Community"
+            now_playing_desc = (
+                f"**Now Playing**\n"
+                f"[{self.current.title}]({self.current.webpage_url})\n"
+                f"⊕ {req_mention}\n\n"
+            )
         else:
-            embed.description = "Queue is empty."
+            now_playing_desc = "**Now Playing**\n*Nothing currently playing*\n\n"
 
-        if not self.queue:
-            embed.add_field(name="No upcoming tracks", value="Add more tracks using `/play <song or link>`!", inline=False)
-            return embed
-
-        total_pages = max(1, (len(self.queue) + per_page - 1) // per_page)
+        total_songs = len(self.queue)
+        total_pages = max(1, (total_songs + per_page - 1) // per_page)
         page = max(0, min(page, total_pages - 1))
         start = page * per_page
         end = start + per_page
         page_songs = list(self.queue)[start:end]
 
-        lines = []
-        for i, song in enumerate(page_songs, start=start + 1):
-            dur_str = time.strftime("%M:%S", time.gmtime(song.duration)) if song.duration > 0 else "Live"
-            lines.append(f"`{i}.` [{song.title[:45]}]({song.webpage_url}) • `[{dur_str}]` • {song.requester.mention}")
+        if not page_songs:
+            queue_desc = "*No upcoming songs in queue. Use `/play` or `➕` to add tracks!*"
+        else:
+            song_blocks = []
+            for i, song in enumerate(page_songs, start=start + 1):
+                if song.duration >= 3600:
+                    dur_str = f"{song.duration // 3600}:{(song.duration % 3600) // 60:02d}:{song.duration % 60:02d}"
+                elif song.duration > 0:
+                    dur_str = f"{song.duration // 60}:{song.duration % 60:02d}"
+                else:
+                    dur_str = "Live"
 
-        embed.add_field(name=f"Page {page + 1}/{total_pages} ({len(self.queue)} total songs)", value="\n".join(lines), inline=False)
-        embed.set_footer(text=f"RAI VIBES 💗 Loop: {self.loop_mode.upper()} • Volume: {self.volume}% • Max Capacity: {config.MAX_QUEUE_SIZE}", icon_url=config.RAI_ICON_URL)
+                artist = song.uploader or "Artist"
+                s_req = f"⊕ {song.requester.mention}" if song.requester else "⊕ Community"
+                song_blocks.append(f"**{i}. {song.title}**\n{artist} • {dur_str} • {s_req}")
+
+            queue_desc = "\n\n".join(song_blocks)
+
+        embed.description = f"{now_playing_desc}{queue_desc}"
+
+        # Calculate Total Duration across all songs in queue + currently playing
+        total_seconds = sum(s.duration for s in self.queue if s.duration > 0)
+        if self.current and self.current.duration > 0:
+            total_seconds += self.current.duration
+
+        if total_seconds >= 3600:
+            total_dur_str = f"{total_seconds // 3600}:{(total_seconds % 3600) // 60:02d}:{total_seconds % 60:02d}"
+        else:
+            total_dur_str = f"{total_seconds // 60}:{total_seconds % 60:02d}"
+
+        embed.set_footer(
+            text=f"{total_songs} songs in queue • Page {page + 1}/{total_pages} • Total Duration: {total_dur_str}"
+        )
         return embed
 
     async def restart_current_with_filters(self):
