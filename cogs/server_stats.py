@@ -43,6 +43,7 @@ class ServerStats(commands.Cog):
         self.bot = bot
         self._last_edit_time: Dict[int, float] = {}  # channel_id -> timestamp
         self._config_cache: Dict[str, Dict[str, Any]] = {}
+        self.announced_milestones: Dict[int, set] = {}
         self.load_config()
 
     def load_config(self):
@@ -158,21 +159,41 @@ class ServerStats(commands.Cog):
 
     async def check_milestones(self, guild: discord.Guild, total_members: int):
         milestones_file = DATA_DIR / "milestones.json"
-        announced = []
-        if milestones_file.exists():
-            try:
-                with open(milestones_file, "r", encoding="utf-8") as f:
-                    announced = json.load(f)
-            except Exception:
-                announced = []
-
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        
         MILESTONES = [30, 50, 75, 100, 150, 200, 250, 500]
+
+        if guild.id not in self.announced_milestones:
+            announced_set = set()
+            if milestones_file.exists():
+                try:
+                    with open(milestones_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, list):
+                            announced_set = set(data)
+                        elif isinstance(data, dict):
+                            announced_set = set(data.get(str(guild.id), []))
+                except Exception:
+                    announced_set = set()
+            # Seed with all milestones already achieved up to current member count so we NEVER announce past ones!
+            for m in MILESTONES:
+                if total_members >= m:
+                    announced_set.add(m)
+            self.announced_milestones[guild.id] = announced_set
+            try:
+                with open(milestones_file, "w", encoding="utf-8") as f:
+                    json.dump({str(guild.id): list(announced_set)}, f, indent=2)
+            except Exception:
+                pass
+            return  # On bot boot/init, seed and exit without spamming
+
+        announced_set = self.announced_milestones[guild.id]
         for m in MILESTONES:
-            if total_members >= m and m not in announced:
-                announced.append(m)
+            if total_members >= m and m not in announced_set:
+                announced_set.add(m)
                 try:
                     with open(milestones_file, "w", encoding="utf-8") as f:
-                        json.dump(announced, f, indent=2)
+                        json.dump({str(guild.id): list(announced_set)}, f, indent=2)
                 except Exception:
                     pass
 
@@ -190,7 +211,8 @@ class ServerStats(commands.Cog):
                     icon_url = guild.icon.url if guild.icon else None
                     embed.set_footer(text=f"{guild.name} Milestone Tracker • {total_members} Members Strong", icon_url=icon_url)
                     try:
-                        await ch.send(content="@everyone 🎊", embed=embed)
+                        # SILENT CELEBRATION: Never ping @everyone
+                        await ch.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
                     except Exception:
                         pass
                 logger.info(f"Announced server milestone: {m} members in {guild.name}!")
