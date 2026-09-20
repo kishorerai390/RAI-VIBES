@@ -1,0 +1,53 @@
+=== CATEGORIES ===
+CAT ✦ 𝕊 𝔼 ℝ 𝕍 𝔼 ℝ  𝕊 𝕋 𝔸 𝕋 𝕊 ✦ (id=1546059369085534229): view_channel=None, send_messages=None
+CAT ✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦ (id=1545803464712650844): view_channel=None, send_messages=None
+CAT ✦ ℂ 𝕆 𝕄 𝕄 𝕌 ℕ 𝕀 𝕋 𝕐 ✦ (id=1545803478490812578): view_channel=False, send_messages=None
+CAT ✦ 🎵 𝕄 𝕌 𝕊 𝕀 ℂ  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦ (id=1550198448203112539): view_channel=True, send_messages=None
+CAT ✦ 🍿 ℂ 𝕀 ℕ 𝔼 𝕄 𝔸  ℍ 𝕌 𝔹 ✦ (id=1550197872006398014): view_channel=True, send_messages=None
+CAT ✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦ (id=1550186748364066827): view_channel=True, send_messages=None
+CAT ✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦ (id=1550186724137640006): view_channel=True, send_messages=None
+CAT ✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦ (id=1545803487093456906): view_channel=None, send_messages=None
+
+=== CHANNELS ===
+CH 🎬 𝑴𝒐𝒗𝒊𝒆 𝑻𝒊𝒎𝒆 𝑰 (type=voice, cat=✦ 🍿 ℂ 𝕀 ℕ 𝔼 𝕄 𝔸  ℍ 𝕌 𝔹 ✦): view_channel=True, send_messages=None
+CH 💤 𝐀𝐅𝐊 / 𝐒𝐥𝐞𝐞𝐩 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 👥 𝐓𝐫𝐢𝐨 𝐂𝐡𝐚𝐦𝐛𝐞𝐫 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 🎫・ᴛɪᴄᴋᴇᴛ-ꜱᴜᴘᴘᴏʀᴛ (type=text, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=True, send_messages=False
+CH 🌧️ 𝓜𝓲𝓭𝓷𝓲𝓰𝓱𝓽 𝓛𝓸-𝓕𝓲 (type=voice, cat=✦ 🎵 𝕄 𝕌 𝕊 𝕀 ℂ  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH ➕ 𝐉𝐨𝐢𝐧 𝐭𝐨 𝐂𝐫𝐞𝐚𝐭𝐞 𝐕𝐂 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 👥・All Members: 35 (type=voice, cat=✦ 𝕊 𝔼 ℝ 𝕍 𝔼 ℝ  𝕊 𝕋 𝔸 𝕋 𝕊 ✦): view_channel=True, send_messages=None
+CH 💬 𝓒𝓱𝓲𝓵𝓵 𝓛𝓸𝓾𝓷𝓰𝓮 𝓘𝓘 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 📜・ʀᴜʟᴇꜱ-ᴀɴᴅ-ɪɴꜰᴏ (type=text, cat=✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦): view_channel=True, send_messages=False
+CH 🎧 𝐅𝐨𝐜𝐮𝐬 𝐋𝐨𝐮𝐧𝐠𝐞 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 🛡️・ꜱᴛᴀꜰꜰ-ᴏᴘᴇʀᴀᴛɪᴏɴꜱ (type=text, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=False, send_messages=None
+CH 🎯 𝗩𝗮𝗹𝗼𝗿𝗮𝗻𝘁 / 𝗖𝗦𝟮 𝗦𝗾𝘂𝗮𝗱 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH 🤖・ʙᴏᴛ-ᴄᴍᴅꜱ (type=text, cat=✦ ℂ 𝕆 𝕄 𝕄 𝕌 ℕ 𝕀 𝕋 𝕐 ✦): view_channel=False, send_messages=None
+CH 🤝・ᴘᴀʀᴛɴᴇʀꜱʜɪᴘꜱ (type=text, cat=✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦): view_channel=False, send_messages=None
+CH 👑 𝐄𝐱𝐞𝐜𝐮𝐭𝐢𝐯𝐞 𝐒𝐮𝐢𝐭𝐞 (type=voice, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=False, send_messages=None
+CH 👥 𝐒𝐪𝐮𝐚𝐝 𝐂𝐡𝐚𝐦𝐛𝐞𝐫 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 🎬 𝑴𝒐𝒗𝒊𝒆 𝑻𝒊𝒎𝒆 𝑰𝑰 (type=voice, cat=✦ 🍿 ℂ 𝕀 ℕ 𝔼 𝕄 𝔸  ℍ 𝕌 𝔹 ✦): view_channel=True, send_messages=None
+CH 🚨・ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ (type=text, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=False, send_messages=None
+CH 🎮・ɢᴀᴍɪɴɢ-ᴄʜᴀᴛ (type=text, cat=✦ ℂ 𝕆 𝕄 𝕄 𝕌 ℕ 𝕀 𝕋 𝕐 ✦): view_channel=False, send_messages=None
+CH 🎧・ᴍᴜꜱɪᴄ-ꜱʜᴀʀɪɴɢ (type=text, cat=✦ 🎵 𝕄 𝕌 𝕊 𝕀 ℂ  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=False, send_messages=None
+CH 👑・ᴇxᴇᴄᴜᴛɪᴠᴇ-ʟᴏᴜɴɢᴇ (type=text, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=False, send_messages=None
+CH 🌸・ᴡᴇʟᴄᴏᴍᴇ (type=text, cat=✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦): view_channel=False, send_messages=None
+CH 💬・ɢᴇɴᴇʀᴀʟ-ᴄʜᴀᴛ (type=text, cat=✦ ℂ 𝕆 𝕄 𝕄 𝕌 ℕ 𝕀 𝕋 𝕐 ✦): view_channel=False, send_messages=None
+CH ⚔️ 𝟭𝘃𝟭 𝗗𝘂𝗲𝗹 𝗔𝗿𝗲𝗻𝗮 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH ⚡ 𝗚𝗧𝗔 𝗥𝗣 & 𝗖𝗵𝗶𝗹𝗹 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH ⚡ 𝗕𝗚𝗠𝗜 𝗦𝗾𝘂𝗮𝗱 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH 📢・ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛꜱ (type=news, cat=✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦): view_channel=False, send_messages=None
+CH 👥 𝐃𝐮𝐨 𝐂𝐡𝐚𝐦𝐛𝐞𝐫 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 📝・ᴍᴏᴅᴇʀᴀᴛɪᴏɴ-ʟᴏɢꜱ (type=text, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=False, send_messages=None
+CH 📋・ᴀᴜᴅɪᴛ-ʟᴏɢꜱ (type=text, cat=✦ 𝕊 𝕋 𝔸 𝔽 𝔉  ℍ ℚ ✦): view_channel=False, send_messages=None
+CH 🎧 𝟐𝟒/𝟕 𝐌𝐮𝐬𝐢𝐜 𝐒𝐭𝐮𝐝𝐢𝐨 (type=voice, cat=✦ 🎵 𝕄 𝕌 𝕊 𝕀 ℂ  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 🎮・ʟꜰɢ-ᴍᴀᴛᴄʜᴍᴀᴋɪɴɢ (type=text, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH 👤・Members: 32 (type=voice, cat=✦ 𝕊 𝔼 ℝ 𝕍 𝔼 ℝ  𝕊 𝕋 𝔸 𝕋 𝕊 ✦): view_channel=True, send_messages=None
+CH 🏷️・ʀᴏʟᴇꜱ (type=text, cat=✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦): view_channel=True, send_messages=False
+CH ⚡ 𝗙𝗿𝗲𝗲 𝗙𝗶𝗿𝗲 𝗦𝗾𝘂𝗮𝗱 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH ✨・ᴠᴇʀɪꜰʏ-ʜᴇʀᴇ (type=text, cat=✦ 𝕀 ℕ 𝔽 𝕆 ℝ 𝕄 𝔸 𝕋 𝕀 𝕆 ℕ ✦): view_channel=True, send_messages=False
+CH 💬 𝓒𝓱𝓲𝓵𝓵 𝓛𝓸𝓾𝓷𝓰𝓮 𝓘 (type=voice, cat=✦ 𝕍 𝕆 𝕀 ℂ 𝔼  𝕃 𝕆 𝕌 ℕ 𝔾 𝔼 ✦): view_channel=True, send_messages=None
+CH 🤖・Bots: 3 (type=voice, cat=✦ 𝕊 𝔼 ℝ 𝕍 𝔼 ℝ  𝕊 𝕋 𝔸 𝕋 𝕊 ✦): view_channel=True, send_messages=None
+CH ⚡ 𝗖𝘂𝘀𝘁𝗼𝗺 𝗥𝗼𝗼𝗺 / 𝗦𝗰𝗿𝗶𝗺𝘀 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH 🍿・ᴄɪɴᴇᴍᴀ-ᴄʜᴀᴛ (type=text, cat=✦ 🍿 ℂ 𝕀 ℕ 𝔼 𝕄 𝔸  ℍ 𝕌 𝔹 ✦): view_channel=False, send_messages=None
+CH 🏆 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 𝗙𝗶𝗻𝗮𝗹𝘀 (type=voice, cat=✦ 𝔾 𝔸 𝕄 𝕀 ℕ 𝔾  ℤ 𝕆 ℕ 𝔼 ✦): view_channel=True, send_messages=None
+CH 💸・ᴏᴡᴏ-ᴀʀᴄᴀᴅᴇ (type=text, cat=✦ ℂ 𝕆 𝕄 𝕄 𝕌 ℕ 𝕀 𝕋 𝕐 ✦): view_channel=False, send_messages=None
