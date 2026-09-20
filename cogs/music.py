@@ -2199,6 +2199,27 @@ class Music(commands.Cog):
         else:
             await self.play(ctx, queue=url)
 
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Allows all bots (RAI VIBES, RAI SENTINEL, RAI ARCADE, and other music bots) to play audio in AFK without being muted."""
+        if member.bot and after.channel:
+            ch = after.channel
+            is_afk = (ch.guild.afk_channel and ch.id == ch.guild.afk_channel.id) or ("afk" in (ch.name or "").lower()) or ("sleep" in (ch.name or "").lower())
+            if is_afk:
+                # Automatically un-server-mute any bot in the AFK channel
+                if after.mute:
+                    try:
+                        await member.edit(mute=False, reason="AFK audio playback: Allow bot audio in AFK")
+                        logger.info(f"🔊 Unmuted bot {member.display_name} in AFK channel '{ch.name}'")
+                    except Exception as e:
+                        logger.debug(f"Could not unmute bot {member.display_name} in AFK: {e}")
+                # Automatically undeafen if deafened
+                if after.deaf:
+                    try:
+                        await member.edit(deafen=False, reason="AFK audio playback: Undeafen bot")
+                    except Exception as e:
+                        logger.debug(f"Could not undeafen bot {member.display_name} in AFK: {e}")
+
 
 class HistorySelect(Select):
     def __init__(self, cog, player: GuildMusicPlayer, history_list: list):
