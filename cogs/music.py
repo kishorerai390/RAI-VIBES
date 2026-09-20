@@ -756,20 +756,21 @@ class GuildMusicPlayer:
                         pass
                     # Wait for inactivity timeout or new songs
                     try:
-                        timeout_val = None if self.mode_247 else config.INACTIVITY_TIMEOUT
+                        is_afk_channel = bool(self.voice_client and self.guild.afk_channel and self.voice_client.channel.id == self.guild.afk_channel.id)
+                        timeout_val = None if (self.mode_247 or is_afk_channel) else config.INACTIVITY_TIMEOUT
                         if timeout_val:
                             await asyncio.wait_for(self.wait_for_song(), timeout=timeout_val)
                         else:
                             await self.wait_for_song()
                     except asyncio.TimeoutError:
-                        if not self.mode_247 and self.text_channel and self.is_connected:
+                        if not self.mode_247 and not is_afk_channel and self.text_channel and self.is_connected:
                             embed = discord.Embed(
                                 title="⚡ RAI VIBES 💗 Rest Mode",
                                 description="Left voice channel due to inactivity. Call me back with `/play` anytime!",
                                 color=config.COLOR_DARK
                             )
                             await self.text_channel.send(embed=embed)
-                        if not self.mode_247:
+                        if not self.mode_247 and not is_afk_channel:
                             await self.stop()
                             break
 
@@ -1104,13 +1105,12 @@ class Music(commands.Cog):
                 player.audio_task = self.bot.loop.create_task(player.player_loop())
         return player
 
-    async def ensure_voice(self, ctx_or_interaction) -> Optional[discord.VoiceClient]:
-        """Ensures the bot connects to or moves to the user's active voice channel."""
-        guild = ctx_or_interaction.guild
+    async def ensure_voice(self, ctx_or_interaction, target_channel: Optional[discord.VoiceChannel] = None) -> Optional[discord.VoiceClient]:
+        guild = getattr(ctx_or_interaction, "guild", None)
         if not guild:
             return None
 
-        voice_client = guild.voice_client
+        voice_client: Optional[discord.VoiceClient] = guild.voice_client
 
         author = getattr(ctx_or_interaction, "author", None) or getattr(ctx_or_interaction, "user", None)
         user_vc = None
@@ -1132,8 +1132,8 @@ class Music(commands.Cog):
                         user_vc = ch
                         break
 
-        # Target VC must be the user's voice channel or the bot's current active voice channel
-        target_vc = user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None)
+        # Target VC must be specified channel, user's voice channel, or bot's current active voice channel
+        target_vc = target_channel or user_vc or (voice_client.channel if voice_client and voice_client.is_connected() else None)
 
         # If user ran command directly inside a voice channel's text chat, target that voice channel
         if not target_vc:
@@ -1141,12 +1141,16 @@ class Music(commands.Cog):
             if ch_obj and isinstance(ch_obj, (discord.VoiceChannel, discord.StageChannel)):
                 target_vc = ch_obj
 
+        # If user is in AFK channel or wants to play in AFK, target that
+        if not target_vc and guild.afk_channel and user_vc and user_vc.id == guild.afk_channel.id:
+            target_vc = guild.afk_channel
+
         if not target_vc:
             embed = discord.Embed(
                 title="🎧 Voice Channel Required",
                 description=(
-                    "❌ **You must be in a voice channel to play music!**\n\n"
-                    "👉 Please join a voice channel (e.g. **・𝗹𝗼-𝗳𝗶・** or **・𝗿𝗮𝗶-𝗳𝗮𝗺-𝗹𝗼𝘂𝗻𝗴𝗲・**) and send your command again!"
+                    "❌ **You must be in a voice channel or AFK lounge to play music!**\n\n"
+                    "👉 Please join a voice channel (e.g. **・𝗹𝗼-𝗳𝗶・** or **💤 ╎ AFK / Sleeping**) and send your command again!"
                 ),
                 color=config.COLOR_DANGER
             )
@@ -1177,18 +1181,18 @@ class Music(commands.Cog):
                 print(f"[Voice Connect] Successfully connected to '{target_vc.name}' in '{guild.name}'")
             except discord.ClientException:
                 voice_client = guild.voice_client
-                if user_vc and voice_client and voice_client.channel != user_vc:
+                if target_vc and voice_client and voice_client.channel != target_vc:
                     try:
-                        await voice_client.move_to(user_vc)
+                        await voice_client.move_to(target_vc)
                     except Exception:
                         pass
             except Exception as e:
                 print(f"[Voice Connect Error] {e}")
                 voice_client = guild.voice_client
-        elif user_vc and voice_client.channel != user_vc:
+        elif target_vc and voice_client.channel != target_vc:
             try:
-                await voice_client.move_to(user_vc)
-                print(f"[Voice Move] Moved RAI VIBES to {user_vc.name}")
+                await voice_client.move_to(target_vc)
+                print(f"[Voice Move] Moved RAI VIBES to {target_vc.name}")
             except Exception as e:
                 print(f"[Voice Move Error] {e}")
 
@@ -1689,20 +1693,69 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: JOIN / SUMMON
     # =========================================================================
-    @commands.hybrid_command(name="join", aliases=["summon", "connect", "j"], description="Summon RAI VIBES 💗 to your active voice channel.")
-    async def join(self, ctx: commands.Context):
-        if not ctx.author.voice or not ctx.author.voice.channel:
-            return await ctx.send("❌ Please connect to a voice channel first!", ephemeral=True)
+    @commands.hybrid_command(name="join", aliases=["summon", "connect", "j"], description="Summon RAI VIBES 💗 to your active voice channel or AFK lounge.")
+    @app_commands.describe(channel="Voice or AFK channel to connect to (defaults to your current channel)")
+    async def join(self, ctx: commands.Context, channel: Optional[discord.VoiceChannel] = None):
+        target_vc = channel or (ctx.author.voice.channel if ctx.author.voice else None)
+        if not target_vc:
+            if ctx.guild.afk_channel:
+                target_vc = ctx.guild.afk_channel
+            else:
+                return await ctx.send("❌ Please connect to a voice channel or specify a channel!", ephemeral=True)
         
-        target_vc = ctx.author.voice.channel
-        vc = await self.ensure_voice(ctx)
+        vc = await self.ensure_voice(ctx, target_channel=target_vc)
         if vc and vc.is_connected():
             player = self.get_or_create_player(ctx.guild)
             player.voice_client = vc
             player.text_channel = ctx.channel
-            await ctx.send(f"🎧 **Joined:** {target_vc.mention}! Ready to play music.")
+            is_afk = bool(ctx.guild.afk_channel and target_vc.id == ctx.guild.afk_channel.id)
+            if is_afk:
+                player.mode_247 = True
+            await ctx.send(f"🎧 **Joined:** {target_vc.mention}! Ready to play music{' in 24/7 AFK Lounge mode' if is_afk else ''}.")
         else:
-            await ctx.send("❌ Could not connect to your voice channel.", ephemeral=True)
+            await ctx.send("❌ Could not connect to the voice channel.", ephemeral=True)
+
+    # =========================================================================
+    # COMMAND: 247 / TIMEOUT
+    # =========================================================================
+    @commands.hybrid_command(name="247", aliases=["stay", "mode247"], description="Toggle 24/7 playback mode so RAI VIBES never disconnects on inactivity.")
+    async def mode_247_cmd(self, ctx: commands.Context):
+        player = self.get_or_create_player(ctx.guild)
+        player.mode_247 = not player.mode_247
+        status_str = "🟢 **Enabled** (RAI VIBES will stay in voice 24/7 without timing out)" if player.mode_247 else "🔴 **Disabled** (RAI VIBES will disconnect after 5 minutes of inactivity)"
+        embed = discord.Embed(
+            title="📻 24/7 Audio Stream Mode",
+            description=f"24/7 Mode is now: {status_str}",
+            color=config.COLOR_PRIMARY if player.mode_247 else config.COLOR_DARK
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Rythm Sound Engine", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="timeout", description="View or customize the music bot's voice inactivity timeout.")
+    @app_commands.describe(minutes="Minutes before auto-disconnecting when inactive (0 for 24/7 mode / never)")
+    async def timeout_cmd(self, ctx: commands.Context, minutes: Optional[int] = None):
+        player = self.get_or_create_player(ctx.guild)
+        if minutes is None:
+            status = "24/7 Mode (Never times out)" if player.mode_247 else f"{config.INACTIVITY_TIMEOUT // 60} Minutes"
+            embed = discord.Embed(
+                title="⏱️ Music Voice Inactivity Timeout",
+                description=(
+                    f"• **Current Timeout:** `{status}`\n"
+                    f"• **24/7 Mode:** `{'Enabled' if player.mode_247 else 'Disabled'}`\n"
+                    f"• **AFK Channel Status:** `{'Allowed & 24/7 Immune' if ctx.guild.afk_channel else 'Allowed'}`\n\n"
+                    f"💡 *Set `/timeout minutes: 0` or use `/247` to keep the bot in voice forever!*"
+                ),
+                color=config.COLOR_PRIMARY
+            )
+            return await ctx.send(embed=embed)
+
+        if minutes <= 0:
+            player.mode_247 = True
+            await ctx.send("✅ **24/7 Mode Enabled:** RAI VIBES will never disconnect due to inactivity or empty channels!")
+        else:
+            player.mode_247 = False
+            config.INACTIVITY_TIMEOUT = minutes * 60
+            await ctx.send(f"✅ **Inactivity timeout set to `{minutes}` minutes.** Bot will leave if idle for `{minutes}` min.")
 
     # =========================================================================
     # COMMAND: STOP / DISCONNECT
