@@ -7,6 +7,21 @@ import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
+# Prevent discord.errors.InteractionResponded by making deferrals idempotent
+_orig_context_defer = commands.Context.defer
+async def _safe_context_defer(self, *args, **kwargs):
+    if self.interaction and self.interaction.response.is_done():
+        return
+    return await _orig_context_defer(self, *args, **kwargs)
+commands.Context.defer = _safe_context_defer
+
+_orig_interaction_defer = discord.InteractionResponse.defer
+async def _safe_interaction_defer(self, *args, **kwargs):
+    if self.is_done():
+        return
+    return await _orig_interaction_defer(self, *args, **kwargs)
+discord.InteractionResponse.defer = _safe_interaction_defer
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -76,6 +91,8 @@ ARCADE_EXTENSIONS = [
     "cogs.profile",
     "cogs.telemetry",
     "cogs.general",
+    "cogs.lfg",
+    "cogs.stream_alerts",
 ]
 
 def create_arcade_bot(use_members: bool = True, use_message_content: bool = True) -> commands.Bot:

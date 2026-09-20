@@ -225,6 +225,10 @@ class AutoProvision(commands.Cog):
             except Exception as e:
                 logger.error(f"Watchdog error in {guild.name}: {e}")
 
+    @threat_cooldown_watchdog.before_loop
+    async def before_threat_watchdog(self):
+        await self.bot.wait_until_ready()
+
     # -------------------------------------------------------------
     # SLASH COMMANDS: /backup
     # -------------------------------------------------------------

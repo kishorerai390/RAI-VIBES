@@ -24,6 +24,21 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+# Prevent discord.errors.InteractionResponded by making deferrals idempotent
+_orig_context_defer = commands.Context.defer
+async def _safe_context_defer(self, *args, **kwargs):
+    if self.interaction and self.interaction.response.is_done():
+        return
+    return await _orig_context_defer(self, *args, **kwargs)
+commands.Context.defer = _safe_context_defer
+
+_orig_interaction_defer = discord.InteractionResponse.defer
+async def _safe_interaction_defer(self, *args, **kwargs):
+    if self.is_done():
+        return
+    return await _orig_interaction_defer(self, *args, **kwargs)
+discord.InteractionResponse.defer = _safe_interaction_defer
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -192,14 +207,26 @@ async def start_sentinel(token: str, use_members: bool = True, use_message_conte
     import database
     await database.init_db()
 
-    for ext in security_extensions:
-        try:
-            await bot.load_extension(ext)
-            logger.info(f"Loaded Sentinel module: {ext}")
-        except Exception as e:
-            logger.error(f"Could not load {ext}: {e}")
+    async with bot:
+        for ext in security_extensions:
+            try:
+                await bot.load_extension(ext)
+                logger.info(f"Loaded Sentinel module: {ext}")
+            except Exception as e:
+                logger.error(f"Could not load {ext}: {e}")
 
-    await bot.start(token)
+        try:
+            await bot.start(token)
+        except discord.errors.PrivilegedIntentsRequired:
+            logger.warning("[RAI SENTINEL] Privileged intents not enabled in portal. Falling back to basic intents.")
+            fallback_bot = create_security_bot(use_members=False, use_message_content=False)
+            async with fallback_bot:
+                for ext in security_extensions:
+                    try:
+                        await fallback_bot.load_extension(ext)
+                    except Exception:
+                        pass
+                await fallback_bot.start(token)
 
 async def main():
     token = os.getenv("SECURITY_BOT_TOKEN")
@@ -207,8 +234,8 @@ async def main():
         print("[RAI SENTINEL] Missing bot token! Please set SECURITY_BOT_TOKEN in .env")
         return
 
-    logger.info("[RAI SENTINEL] Connecting with standard intents...")
-    await start_sentinel(token, use_members=False, use_message_content=False)
+    logger.info("[RAI SENTINEL] Connecting Sentinel Defense...")
+    await start_sentinel(token, use_members=True, use_message_content=True)
 
 if __name__ == "__main__":
     acquire_instance_lock(59125)

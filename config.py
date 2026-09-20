@@ -31,7 +31,10 @@ COLOR_GOLD = 0xF1C40F        # Radiant Gold
 COLOR_SUCCESS = 0x2ECC71     # Emerald Green
 COLOR_WARNING = 0xE67E22     # Amber Orange
 COLOR_ERROR = 0xE74C3C       # Crimson Red
+COLOR_DANGER = COLOR_ERROR   # Alias for error/danger embeds
+COLOR_PURPLE = COLOR_SECONDARY # Alias for purple embeds
 COLOR_DARK = 0x18191C        # Midnight Dark
+TARGET_GUILD_ID = int(os.getenv("TARGET_GUILD_ID", "1457382179981099090"))
 
 # Assets & Icons
 RAI_ICON_URL = "https://cdn.discordapp.com/avatars/1546239150775078922/a_296e933a181d5342f239885193c8c2a1.gif?size=1024"

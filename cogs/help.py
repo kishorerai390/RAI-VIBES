@@ -164,4 +164,6 @@ class Help(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    if "help" in bot.all_commands:
+        bot.remove_command("help")
     await bot.add_cog(Help(bot))

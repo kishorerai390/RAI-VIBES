@@ -26,6 +26,22 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 import discord
 from discord.ext import commands, tasks
+
+# Prevent discord.errors.InteractionResponded by making deferrals idempotent
+_orig_context_defer = commands.Context.defer
+async def _safe_context_defer(self, *args, **kwargs):
+    if self.interaction and self.interaction.response.is_done():
+        return
+    return await _orig_context_defer(self, *args, **kwargs)
+commands.Context.defer = _safe_context_defer
+
+_orig_interaction_defer = discord.InteractionResponse.defer
+async def _safe_interaction_defer(self, *args, **kwargs):
+    if self.is_done():
+        return
+    return await _orig_interaction_defer(self, *args, **kwargs)
+discord.InteractionResponse.defer = _safe_interaction_defer
+
 import colorama
 from colorama import Fore, Style
 
@@ -204,7 +220,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         if ctx.interaction and not ctx.interaction.response.is_done():
             cmd_name = ctx.command.name if ctx.command else ""
             ephemeral_commands = {
-                "mutesoundboard", "unmutesoundboard", "entrysound",
+                "mutesoundboard", "unmutesoundboard",
                 "movienight", "movie", "movieend", "cinemamute", "cinemaunmute", "moviesuggest",
                 "moviecountdown", "moviealert", "cinemaintro", "cinemastage", "cinemaambience", "movierename",
                 "controller", "remote", "panel", "player", "controls"

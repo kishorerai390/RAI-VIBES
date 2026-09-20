@@ -263,11 +263,7 @@ class ServerGuideSelect(discord.ui.Select):
                     "• **👻 Ghost Mode**: Make your room completely invisible to uninvited users.\n"
                     "• **👥 Member Limit**: Cap the maximum squad capacity (0 = unlimited).\n"
                     "• **✉️ Permit / 🚫 Revoke**: Grant or deny channel access to specific friends.\n"
-                    "• **👑 Transfer Host**: Pass room ownership to a squadmate.\n\n"
-                    "**🔊 VIP Entrance Fanfares (`/entrysound`):**\n"
-                    "• `/entrysound preview [theme]` — Listen to available entrance themes.\n"
-                    "• `/entrysound set [theme]` — Equip your signature entry & exit sound.\n"
-                    "• `/entrysound upload [file]` — VIPs can upload custom audio files (mp3/wav/ogg) directly!"
+                    "• **👑 Transfer Host**: Pass room ownership to a squadmate."
                 ),
                 color=0xFF69B4
             )
