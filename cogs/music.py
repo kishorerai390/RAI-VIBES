@@ -978,7 +978,8 @@ class Music(commands.Cog):
             return
 
         ch_name = getattr(message.channel, "name", "").lower()
-        if message.channel.id != 1545534637122527332 and "song-request" not in ch_name:
+        raw_ch_name = getattr(message.channel, "name", "")
+        if message.channel.id != 1545534637122527332 and not any(k in ch_name for k in ["song-request", "requests"]) and "ꜱᴏɴɢ" not in raw_ch_name:
             return
 
         content = message.content.strip()
@@ -1088,14 +1089,6 @@ class Music(commands.Cog):
         finally:
             if status_card:
                 asyncio.create_task(self._auto_delete(status_card, 1))
-
-    def get_player(self, guild_id: int) -> Optional[GuildMusicPlayer]:
-        if guild_id in self.players:
-            return self.players[guild_id]
-        guild = self.bot.get_guild(guild_id)
-        if guild:
-            return self.get_or_create_player(guild)
-        return None
 
     def get_player(self, guild_id: int) -> Optional[GuildMusicPlayer]:
         return self.players.get(guild_id)
@@ -1642,43 +1635,6 @@ class Music(commands.Cog):
             else:
                 await ctx.send(f"❌ Error while queuing track: `{e}`")
 
-    # =========================================================================
-    # COMMAND: JOIN / SUMMON
-    # =========================================================================
-    @commands.hybrid_command(name="join", aliases=["summon", "connect", "j"], description="Summon RAI VIBES to your current voice channel.")
-    async def join(self, ctx: commands.Context):
-        vc = await self.ensure_voice(ctx)
-        if vc:
-            await ctx.send(f"🔊 **Connected to:** `{vc.channel.name}` • Ready for music!")
-
-    # =========================================================================
-    # COMMAND: SEARCH (TOP 5 INTERACTIVE SELECTOR)
-    # =========================================================================
-    @commands.hybrid_command(name="search", description="Search YouTube and choose from top 5 results interactively.")
-    @app_commands.describe(query="Song name or keywords to search")
-    async def search(self, ctx: commands.Context, *, query: str):
-        await ctx.defer()
-        results = await Song.search_multiple(query, limit=5, loop=self.bot.loop)
-        if not results:
-            return await ctx.send(f"❌ No search results found for: `{query}`")
-
-        embed = discord.Embed(
-            title=f"⚡ Search Results for: {query[:50]}",
-            description="Select an option from the dropdown menu below to add it to the queue:",
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_thumbnail(url=results[0].get("thumbnail", config.RAI_ICON_URL))
-
-        for i, item in enumerate(results, 1):
-            dur = time.strftime("%M:%S", time.gmtime(item.get("duration", 0)))
-            embed.add_field(
-                name=f"{i}. {item.get('title', 'Track')[:45]}",
-                value=f"👤 `{item.get('uploader', 'Artist')[:25]}` | ⏱️ `{dur}`",
-                inline=False
-            )
-
-        view = SearchSelectView(self, ctx, results)
-        await ctx.send(embed=embed, view=view)
 
     # =========================================================================
     # COMMAND: PAUSE & RESUME
@@ -1733,7 +1689,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: JOIN / SUMMON
     # =========================================================================
-    @commands.hybrid_command(name="join", aliases=["summon", "connect"], description="Summon RAI VIBES 💗 to your active voice channel.")
+    @commands.hybrid_command(name="join", aliases=["summon", "connect", "j"], description="Summon RAI VIBES 💗 to your active voice channel.")
     async def join(self, ctx: commands.Context):
         if not ctx.author.voice or not ctx.author.voice.channel:
             return await ctx.send("❌ Please connect to a voice channel first!", ephemeral=True)

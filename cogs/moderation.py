@@ -713,27 +713,6 @@ class Moderation(commands.Cog):
         else:
             await ctx.send(f"❌ Clear error: `{orig}`", ephemeral=True)
 
-    @commands.Cog.listener()
-    async def on_message_delete(self, message: discord.Message):
-        """Anti-Ghost Ping Detector."""
-        if message.author.bot or not message.guild:
-            return
-
-        if message.mentions:
-            pings = ", ".join([m.mention for m in message.mentions if not m.bot and m.id != message.author.id])
-            if pings:
-                embed = discord.Embed(
-                    title="👻 [ANTI-GHOST PING] Message Deleted With Mentions",
-                    description=(
-                        f"**Author:** {message.author.mention} (`{message.author.id}`)\n"
-                        f"**Channel:** {message.channel.mention}\n"
-                        f"**Pinged Users:** {pings}\n"
-                        f"**Content:** `{message.content[:300]}`"
-                    ),
-                    color=config.COLOR_WARNING,
-                    timestamp=datetime.datetime.now()
-                )
-                await self.log_mod_action(message.guild, embed)
 
     @commands.command(name="lockdown", description="Emergency Lockdown: Lock down all public channels in a raid.")
     @commands.has_permissions(administrator=True)

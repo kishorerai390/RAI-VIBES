@@ -149,7 +149,6 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         # Register Persistent Views for instant interaction without timeout
         from cogs.voicehub import VoiceControlView
         from utils.views import MusicPlayerView
-        from cogs.entry_sound import PublicEntrySoundLaunchView
         from cogs.verify import VerifyButtonView
         from utils.persistent_views import TicketCreateView, TicketCloseView
         from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
@@ -161,7 +160,6 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(IdentityRolesView())
         b.add_view(VoiceControlView())
         b.add_view(MusicPlayerView())
-        b.add_view(PublicEntrySoundLaunchView())
         b.add_view(ServerGuideView())
         b.add_view(VerifyButtonView())
         b.add_view(TicketCreateView())
@@ -297,17 +295,7 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
             except Exception:
                 pass
 
-        # 1. Dedicated Song Requests Channel Direct Queue (Zero-prefix)
-        if message.channel.id == 1545534637122527332 or "song-request" in message.channel.name.lower() or "requests" in message.channel.name.lower() or "ꜱᴏɴɢ" in message.channel.name:
-            if content and not content.startswith("/"):
-                ctx = await b.get_context(message)
-                try:
-                    await message.delete()
-                except Exception:
-                    pass
-                music_cog = b.get_cog("Music")
-                if music_cog:
-                    return await music_cog.play(ctx, song=content)
+        # Note: Dedicated Song Requests Channel Direct Queue is handled cleanly by cogs/music.py listener
 
         # 2. Check if bot is mentioned (e.g. @RAI VIBES /play song, @RAI VIBES 💗/play song, @RAI VIBES song)
         if b.user in message.mentions and not message.mention_everyone:
@@ -446,7 +434,6 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.dj",
         "cogs.music_quiz",
         "cogs.radio",
-        "cogs.entry_sound",
         "cogs.ai_dj",
         "cogs.intercom",
         "cogs.auto_updater",

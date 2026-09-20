@@ -438,51 +438,6 @@ class ExchangeBoothView(View):
         embed.set_footer(text="RAI FAM 💗 • Mystery Fortune Booth", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @button(label="Voice Entry Sounds", style=discord.ButtonStyle.primary, emoji="🔊", custom_id="booth_entry_sound", row=2)
-    async def entry_sound_btn(self, interaction: discord.Interaction, button: Button):
-        from cogs.entry_sound import get_user_entry_profile, ENTRY_SOUNDS, ALL_SOUND_KEYS, EntrySoundControlView
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
-        prof = get_user_entry_profile(interaction.user.id)
-        equipped = prof.get("equipped")
-        enabled = prof.get("enabled", False)
-        unlocked = prof.get("unlocked", ["airhorn", "bye_great_time"])
-
-        if equipped and equipped in ENTRY_SOUNDS:
-            sfx = ENTRY_SOUNDS[equipped]
-            sfx_name = f"{sfx['emoji']} {sfx['name']}"
-        elif equipped == "custom" and prof.get("custom_url"):
-            sfx_name = "🔮 Personal Custom Theme"
-        else:
-            sfx_name = "🚫 None (Not Set)"
-
-        status_str = "🟢 Active" if (enabled and equipped) else ("🔴 Muted" if equipped else "⚪ Not Equipped")
-        total_unlocked = len(ALL_SOUND_KEYS) if interaction.user.id == OWNER_ID else len(unlocked)
-
-        embed = discord.Embed(
-            title="🔊 VC ENTRANCE SOUND STUDIO",
-            description=(
-                f"✦ ───────────────────────────────────── ✦\n\n"
-                f"Welcome to your **Voice Entrance Studio**, {interaction.user.mention}! 🌸\n"
-                f"Whenever you join a voice room, make an unforgettable grand entrance!\n\n"
-                f"📊 **Your Setup:**\n"
-                f"• 🎵 **Current Sound:** **{sfx_name}**\n"
-                f"• 🔔 **Status:** `{status_str}`\n"
-                f"• 🔓 **Unlocked Themes:** `{total_unlocked}/{len(ALL_SOUND_KEYS)}`\n\n"
-                f"✦ ───────────────────────────────────── ✦\n"
-                f"👉 *Select any theme from the menu below to unlock or equip!*"
-            ),
-            color=0x00F5D4
-        )
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        embed.set_footer(text="RAI FAM 💗 • Voice Entrance Themes", icon_url=config.RAI_ICON_URL)
-
-        view = EntrySoundControlView(interaction.user.id)
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @button(label="Redeem Promo Code", style=discord.ButtonStyle.secondary, emoji="🎟️", custom_id="booth_redeem_code", row=2)
     async def redeem_code_btn(self, interaction: discord.Interaction, button: Button):
