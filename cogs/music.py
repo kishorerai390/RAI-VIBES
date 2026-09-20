@@ -371,6 +371,121 @@ class ResumePlaybackView(View):
         await interaction.response.edit_message(content="✨ Dismissed resume prompt.", embed=None, view=None)
 
 
+class SpotifySleepTimerView(View):
+    """Interactive Spotify-style Sleep Timer View with 1-tap buttons and dropdown."""
+    def __init__(self, cog, player: 'GuildMusicPlayer', user: discord.Member):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.player = player
+        self.user = user
+
+        options = [
+            discord.SelectOption(label="5 Minutes", value="5", description="Stop playback in 5 minutes", emoji="⏱️"),
+            discord.SelectOption(label="15 Minutes", value="15", description="Stop playback in 15 minutes", emoji="⏱️"),
+            discord.SelectOption(label="30 Minutes", value="30", description="Stop playback in 30 minutes", emoji="⏱️"),
+            discord.SelectOption(label="45 Minutes", value="45", description="Stop playback in 45 minutes", emoji="⏱️"),
+            discord.SelectOption(label="1 Hour", value="60", description="Stop playback in 1 hour", emoji="⏱️"),
+            discord.SelectOption(label="End of Current Track", value="track", description="Stop playback when this song finishes", emoji="🎵"),
+            discord.SelectOption(label="Turn Off Timer (Cancel)", value="cancel", description="Disable active sleep timer", emoji="❌"),
+        ]
+        select = Select(placeholder="🌙 Choose when to stop playback...", options=options, row=0)
+        select.callback = self.select_callback
+        self.add_item(select)
+
+        # Quick 1-tap buttons (Spotify style)
+        b15 = Button(label="15m", style=discord.ButtonStyle.secondary, row=1)
+        b15.callback = self.make_quick_button_callback(15)
+        self.add_item(b15)
+
+        b30 = Button(label="30m", style=discord.ButtonStyle.primary, row=1)
+        b30.callback = self.make_quick_button_callback(30)
+        self.add_item(b30)
+
+        b45 = Button(label="45m", style=discord.ButtonStyle.secondary, row=1)
+        b45.callback = self.make_quick_button_callback(45)
+        self.add_item(b45)
+
+        b60 = Button(label="1h", style=discord.ButtonStyle.secondary, row=1)
+        b60.callback = self.make_quick_button_callback(60)
+        self.add_item(b60)
+
+        b_track = Button(label="End of Track", style=discord.ButtonStyle.success, emoji="🎵", row=2)
+        b_track.callback = self.track_end_callback
+        self.add_item(b_track)
+
+        b_cancel = Button(label="Turn Off Timer", style=discord.ButtonStyle.danger, emoji="❌", row=2)
+        b_cancel.callback = self.cancel_callback
+        self.add_item(b_cancel)
+
+    def _build_status_embed(self) -> discord.Embed:
+        if self.player.sleep_at_track_end:
+            status_desc = "🎵 **Timer Active:** Music will stop at the **end of the current track**."
+            color = 0x1DB954  # Spotify Green
+        elif self.player.sleep_timer_end and self.player.sleep_timer_end > time.time():
+            remaining = int(self.player.sleep_timer_end - time.time())
+            m, s = divmod(remaining, 60)
+            status_desc = f"⏱️ **Timer Active:** Music will stop in **{m}m {s:02d}s**."
+            color = 0x1DB954  # Spotify Green
+        else:
+            status_desc = "⚪ **Timer Inactive:** Music will play continuously."
+            color = config.COLOR_PRIMARY
+
+        embed = discord.Embed(
+            title="🌙 ┊ 𝐒𝐏𝐎𝐓𝐈𝐅𝐘  𝐒𝐋𝐄𝐄𝐏  𝐓𝐈𝐌𝐄𝐑",
+            description=(
+                f"{status_desc}\n\n"
+                f"Choose an option below to automatically pause music and disconnect the bot "
+                f"so you can fall asleep peacefully without running your device battery.\n\n"
+                f"• **15m / 30m / 45m / 1h**: Countdown timer\n"
+                f"• **End of Track**: Stops after the song currently playing\n"
+                f"• **Turn Off Timer**: Keep playing normally"
+            ),
+            color=color
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2111/2111624.png")
+        embed.set_footer(text="RAI VIBES 💗 • Spotify Sleep Engine", icon_url=config.SPOTIFY_ICON_URL)
+        return embed
+
+    def make_quick_button_callback(self, minutes: int):
+        async def btn_callback(interaction: discord.Interaction):
+            if interaction.user.id != self.user.id:
+                return await interaction.response.send_message("❌ This sleep timer menu belongs to another user.", ephemeral=True)
+            self.player.set_sleep_timer(minutes)
+            embed = self._build_status_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+        return btn_callback
+
+    async def track_end_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ This sleep timer menu belongs to another user.", ephemeral=True)
+        self.player.cancel_sleep_timer()
+        self.player.sleep_at_track_end = True
+        embed = self._build_status_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def cancel_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ This sleep timer menu belongs to another user.", ephemeral=True)
+        self.player.cancel_sleep_timer()
+        embed = self._build_status_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            return await interaction.response.send_message("❌ This sleep timer menu belongs to another user.", ephemeral=True)
+        val = interaction.data["values"][0]
+        if val == "cancel":
+            self.player.cancel_sleep_timer()
+        elif val == "track":
+            self.player.cancel_sleep_timer()
+            self.player.sleep_at_track_end = True
+        else:
+            mins = int(val)
+            self.player.set_sleep_timer(mins)
+        embed = self._build_status_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
 class GuildMusicPlayer:
     """Manages audio playback, queue, state, and UI for a specific Discord Guild."""
     def __init__(self, cog, guild: discord.Guild):
@@ -959,6 +1074,24 @@ class GuildMusicPlayer:
                     print(f"[Embed Error] {e}")
 
             await self.play_next_song.wait()
+
+            # Spotify Sleep Timer: Check if timer was set to stop at end of current track
+            if self.sleep_at_track_end and not self.is_restarting_for_filters:
+                self.sleep_at_track_end = False
+                if self.text_channel and self.is_connected:
+                    embed = discord.Embed(
+                        title="🌙 ┊ 𝐒𝐋𝐄𝐄𝐏  𝐓𝐈𝐌𝐄𝐑  𝐂𝐎𝐌𝐏𝐋𝐄𝐓𝐄",
+                        description="Track finished playing.\nPlayback stopped & bot disconnected so you can rest peacefully. Sweet dreams! ✨",
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/3094/3094837.png")
+                    embed.set_footer(text="RAI VIBES 💗 • Spotify Sleep Timer", icon_url=config.SPOTIFY_ICON_URL)
+                    try:
+                        await self.text_channel.send(embed=embed)
+                    except Exception:
+                        pass
+                await self.stop()
+                break
 
             # Automatic Failover: If YouTube track exited prematurely (< 3.0s), seamlessly recover via SoundCloud
             played_duration = (time.time() - self.start_time) if self.start_time else 0
@@ -1799,6 +1932,42 @@ class Music(commands.Cog):
             player.mode_247 = False
             config.INACTIVITY_TIMEOUT = minutes * 60
             await ctx.send(f"✅ **Inactivity timeout set to `{minutes}` minutes.** Bot will leave if idle for `{minutes}` min.")
+
+    # =========================================================================
+    # COMMAND: SLEEP TIMER (SPOTIFY-STYLE)
+    # =========================================================================
+    @commands.hybrid_command(name="sleeptimer", aliases=["timer", "sleep", "bedtime"], description="Set a Spotify-style sleep timer to automatically stop music and disconnect.")
+    @app_commands.describe(minutes="Minutes before stopping playback (e.g., 15, 30, 45, 60), or 0 to cancel")
+    async def sleeptimer_cmd(self, ctx: commands.Context, minutes: Optional[int] = None):
+        player = self.get_or_create_player(ctx.guild)
+        if minutes is not None:
+            if minutes <= 0:
+                player.cancel_sleep_timer()
+                embed = discord.Embed(
+                    title="🌙 ┊ 𝐒𝐋𝐄𝐄𝐏  𝐓𝐈𝐌𝐄𝐑  𝐂𝐀𝐍𝐂𝐄𝐋𝐄𝐃",
+                    description="Sleep timer has been turned off. Music will play continuously.",
+                    color=config.COLOR_DARK
+                )
+                embed.set_footer(text="RAI VIBES 💗 • Spotify Sleep Timer", icon_url=config.SPOTIFY_ICON_URL)
+                return await ctx.send(embed=embed)
+            else:
+                player.set_sleep_timer(minutes)
+                embed = discord.Embed(
+                    title="🌙 ┊ 𝐒𝐏𝐎𝐓𝐈𝐅𝐘  𝐒𝐋𝐄𝐄𝐏  𝐓𝐈𝐌𝐄𝐑  𝐒𝐄𝐓",
+                    description=(
+                        f"✅ **Sleep timer set for {minutes} minutes!**\n\n"
+                        f"Music will automatically fade/stop and disconnect in `{minutes}` minutes so you can sleep peacefully without running your phone battery.\n\n"
+                        f"💡 *Use `/sleeptimer minutes: 0` or `/sleeptimer` anytime to adjust or cancel.*"
+                    ),
+                    color=0x1DB954
+                )
+                embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2111/2111624.png")
+                embed.set_footer(text="RAI VIBES 💗 • Spotify Sleep Timer", icon_url=config.SPOTIFY_ICON_URL)
+                return await ctx.send(embed=embed)
+
+        view = SpotifySleepTimerView(self, player, ctx.author)
+        embed = view._build_status_embed()
+        await ctx.send(embed=embed, view=view)
 
     # =========================================================================
     # COMMAND: STOP / DISCONNECT
