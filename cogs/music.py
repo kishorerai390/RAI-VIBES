@@ -396,6 +396,11 @@ class GuildMusicPlayer:
         self.mode_247: bool = True
         self.autoplay: bool = True
 
+        # Spotify Sleep Timer
+        self.sleep_timer_task: Optional[asyncio.Task] = None
+        self.sleep_timer_end: Optional[float] = None
+        self.sleep_at_track_end: bool = False
+
         self.play_next_song = asyncio.Event()
         self.audio_task: Optional[asyncio.Task] = None
         self.start_time: float = 0.0
@@ -504,7 +509,45 @@ class GuildMusicPlayer:
         random.shuffle(temp)
         self.queue = deque(temp)
 
+    def cancel_sleep_timer(self):
+        """Cancels any active sleep timer."""
+        if self.sleep_timer_task and not self.sleep_timer_task.done():
+            self.sleep_timer_task.cancel()
+        self.sleep_timer_task = None
+        self.sleep_timer_end = None
+        self.sleep_at_track_end = False
+
+    def set_sleep_timer(self, minutes: int):
+        """Sets a timer to stop playback and disconnect after the specified minutes."""
+        self.cancel_sleep_timer()
+        self.sleep_timer_end = time.time() + (minutes * 60)
+
+        async def _sleep_timer_worker():
+            try:
+                await asyncio.sleep(minutes * 60)
+                if self.text_channel and self.is_connected:
+                    embed = discord.Embed(
+                        title="🌙 ┊ 𝐒𝐋𝐄𝐄𝐏  𝐓𝐈𝐌𝐄𝐑  𝐂𝐎𝐌𝐏𝐋𝐄𝐓𝐄",
+                        description=f"Sleep timer of **{minutes} minutes** has ended.\nPlayback stopped & bot disconnected so you can rest peacefully. Sweet dreams! ✨",
+                        color=config.COLOR_PRIMARY
+                    )
+                    embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/3094/3094837.png")
+                    embed.set_footer(text="RAI VIBES 💗 • Spotify Sleep Timer", icon_url=config.SPOTIFY_ICON_URL)
+                    try:
+                        await self.text_channel.send(embed=embed)
+                    except Exception:
+                        pass
+                await self.stop()
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self.sleep_timer_task = None
+                self.sleep_timer_end = None
+
+        self.sleep_timer_task = asyncio.create_task(_sleep_timer_worker())
+
     async def stop(self):
+        self.cancel_sleep_timer()
         if self.current:
             elapsed = max(0, int(time.time() - self.start_time)) if self.start_time else 0
             if elapsed > 10:

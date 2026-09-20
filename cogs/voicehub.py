@@ -354,6 +354,7 @@ class VoiceHub(commands.Cog):
         self.temp_db_path = os.path.join("data", "temp_vcs.json")
         self.deletion_tasks: Dict[int, asyncio.Task] = {}
         self.deaf_tracker: Dict[int, float] = {}
+        self.afk_stay_tracker: Dict[int, float] = {}
         self._load_temp_channels()
 
     async def cog_load(self):
@@ -361,10 +362,13 @@ class VoiceHub(commands.Cog):
             self.cleanup_temp_channels_task.start()
         if not self.afk_mover_task.is_running():
             self.afk_mover_task.start()
+        if not self.afk_battery_saver_task.is_running():
+            self.afk_battery_saver_task.start()
 
     def cog_unload(self):
         self.cleanup_temp_channels_task.cancel()
         self.afk_mover_task.cancel()
+        self.afk_battery_saver_task.cancel()
         for task in self.deletion_tasks.values():
             task.cancel()
         self.deletion_tasks.clear()
@@ -493,6 +497,63 @@ class VoiceHub(commands.Cog):
 
     @afk_mover_task.before_loop
     async def before_afk_mover(self):
+        while not self.bot.is_ready():
+            await asyncio.sleep(1)
+
+    @tasks.loop(seconds=60)
+    async def afk_battery_saver_task(self):
+        """Bedtime Battery Saver: Automatically disconnects human members after 15 minutes in AFK to protect phone battery & mobile data."""
+        await self.bot.wait_until_ready()
+        now = time.time()
+        for guild in self.bot.guilds:
+            afk_ch = guild.afk_channel or guild.get_channel(1550187298115551272)
+            if not afk_ch:
+                for ch in guild.voice_channels:
+                    c_name = (ch.name or "").lower()
+                    if "afk" in c_name or "sleep" in c_name:
+                        afk_ch = ch
+                        break
+            if not afk_ch:
+                continue
+
+            current_human_ids = {m.id for m in afk_ch.members if not m.bot}
+
+            # Prune members who have left the AFK channel
+            for m_id in list(self.afk_stay_tracker.keys()):
+                if m_id not in current_human_ids:
+                    self.afk_stay_tracker.pop(m_id, None)
+
+            # Check human members currently in AFK
+            for member in afk_ch.members:
+                if member.bot:
+                    continue
+
+                if member.id not in self.afk_stay_tracker:
+                    self.afk_stay_tracker[member.id] = now
+                elif now - self.afk_stay_tracker[member.id] >= 900:  # 15 minutes = 900 seconds
+                    try:
+                        await member.move_to(None, reason="AFK Bedtime Battery Saver: Disconnected after 15 minutes to save device battery")
+                        self.afk_stay_tracker.pop(member.id, None)
+                        logger.info(f"🌙 Disconnected {member.display_name} from '{afk_ch.name}' (15m Bedtime Battery Saver).")
+                        try:
+                            embed = discord.Embed(
+                                title="🌙 ┊ 𝐁𝐄𝐃𝐓𝐈𝐌𝐄  𝐁𝐀𝐓𝐓𝐄𝐑𝐘  𝐒𝐀𝐕𝐄𝐑",
+                                description=(
+                                    f"Hey **{member.display_name}**!\n\n"
+                                    f"You were gently disconnected from **{afk_ch.name}** after **15 minutes** of inactivity to protect your phone battery, prevent overnight heating, and save mobile data.\n\n"
+                                    f"Rest well and sweet dreams! ✨"
+                                ),
+                                color=config.COLOR_PRIMARY
+                            )
+                            embed.set_footer(text="RAI VIBES 💗 • Healthy Sleep & Battery Protection", icon_url=config.RAI_ICON_URL)
+                            await member.send(embed=embed)
+                        except Exception:
+                            pass  # User has DMs disabled
+                    except Exception as e:
+                        logger.debug(f"Could not disconnect {member.display_name} from AFK: {e}")
+
+    @afk_battery_saver_task.before_loop
+    async def before_afk_battery_saver(self):
         while not self.bot.is_ready():
             await asyncio.sleep(1)
 
@@ -647,6 +708,16 @@ class VoiceHub(commands.Cog):
         if before.channel and before.channel != after.channel and self.is_temporary_channel(before.channel):
             if len(before.channel.members) == 0:
                 self.schedule_inactivity_deletion(before.channel, delay=self.INACTIVITY_GRACE_SECONDS)
+
+        # 4. AFK Bedtime Battery Saver: Track join and leave timestamps for human members in AFK
+        if not member.bot:
+            afk_ch = guild.afk_channel or guild.get_channel(1550187298115551272)
+            if afk_ch:
+                if after.channel and after.channel.id == afk_ch.id:
+                    if member.id not in self.afk_stay_tracker:
+                        self.afk_stay_tracker[member.id] = time.time()
+                elif before.channel and before.channel.id == afk_ch.id and (not after.channel or after.channel.id != afk_ch.id):
+                    self.afk_stay_tracker.pop(member.id, None)
 
     @commands.hybrid_command(name="vctune", description="Auto-optimize all voice channels to maximum allowable studio bitrate (up to 384kbps).")
     @commands.has_permissions(manage_channels=True)
