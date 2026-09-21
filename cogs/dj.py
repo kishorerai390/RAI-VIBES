@@ -211,6 +211,94 @@ class DJ(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • VIP Priority DJ System", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
+    DJ_SOUNDDROPS = {
+        "airhorn": {
+            "name": "🎺 Hype Airhorn",
+            "url": "https://www.myinstants.com/media/sounds/air-horn-club-sample_1.mp3"
+        },
+        "scratch": {
+            "name": "🎛️ Vinyl Record Scratch",
+            "url": "https://www.myinstants.com/media/sounds/record-scratch_1.mp3"
+        },
+        "laser": {
+            "name": "⚡ Laser Beam Synth",
+            "url": "https://www.myinstants.com/media/sounds/laser_2.mp3"
+        },
+        "drumroll": {
+            "name": "🥁 Rimshot / Ba-Dum-Tss",
+            "url": "https://www.myinstants.com/media/sounds/ba-dum-tss.mp3"
+        },
+        "bassdrop": {
+            "name": "💥 Heavy Bass Drop",
+            "url": "https://www.myinstants.com/media/sounds/heavy-bass-drop.mp3"
+        },
+        "rewind": {
+            "name": "⏪ DJ Wheel Rewind",
+            "url": "https://www.myinstants.com/media/sounds/rewind-sound-effect.mp3"
+        }
+    }
+
+    @dj_group.command(name="sounddrop", description="Trigger an instant DJ audio stinger or hype sound effect.")
+    @app_commands.describe(effect="Select a sound effect stinger")
+    @app_commands.choices(effect=[
+        app_commands.Choice(name="🎺 Hype Airhorn", value="airhorn"),
+        app_commands.Choice(name="🎛️ Vinyl Record Scratch", value="scratch"),
+        app_commands.Choice(name="⚡ Laser Beam Synth", value="laser"),
+        app_commands.Choice(name="🥁 Ba-Dum-Tss Rimshot", value="drumroll"),
+        app_commands.Choice(name="💥 Heavy Bass Drop", value="bassdrop"),
+        app_commands.Choice(name="⏪ DJ Wheel Rewind", value="rewind")
+    ])
+    async def dj_sounddrop(self, ctx: commands.Context, effect: app_commands.Choice[str]):
+        author = ctx.author
+        if not author.voice or not author.voice.channel:
+            return await ctx.send("❌ You must be connected to an active voice channel to drop audio stingers!", ephemeral=True)
+
+        if not self.is_dj_or_admin(author):
+            return await ctx.send("❌ Only designated DJs, Boosters, or Server Staff can trigger DJ sounddrops.", ephemeral=True)
+
+        drop_data = self.DJ_SOUNDDROPS.get(effect.value)
+        if not drop_data:
+            return await ctx.send("❌ Unknown sounddrop effect.", ephemeral=True)
+
+        soundboard_cog = self.bot.get_cog("Soundboard")
+        if soundboard_cog and hasattr(soundboard_cog, "play_sound"):
+            await ctx.defer(ephemeral=True)
+            await soundboard_cog.play_sound(author.voice.channel, drop_data["url"], effect.value, author)
+            await ctx.send(f"🎧 **DJ Stinger Dropped:** `{drop_data['name']}` into {author.voice.channel.mention}!", ephemeral=True)
+        else:
+            await ctx.send("❌ Audio soundboard engine currently busy.", ephemeral=True)
+
+    @dj_group.command(name="stage_announce", description="Broadcast a Stage / Music Listening Party announcement to community.")
+    @app_commands.describe(
+        topic="Theme or music genre for the listening session",
+        voice_channel="Voice or Stage channel where session is hosted"
+    )
+    async def stage_announce(self, ctx: commands.Context, topic: str, voice_channel: Optional[discord.VoiceChannel] = None):
+        if not self.is_dj_or_admin(ctx.author):
+            return await ctx.send("❌ Only designated DJs and Server Staff can announce listening sessions.", ephemeral=True)
+
+        target_vc = voice_channel or (ctx.author.voice.channel if ctx.author.voice else None)
+        if not target_vc:
+            return await ctx.send("❌ Please specify a voice channel or join one first!", ephemeral=True)
+
+        embed = discord.Embed(
+            title="🎧 LIVE MUSIC & STAGE LISTENING SESSION",
+            description=(
+                f"### **Topic / Vibe:** {topic}\n\n"
+                f"🎙️ **DJ Host:** {ctx.author.mention}\n"
+                f"🔊 **Live Channel:** {target_vc.mention}\n"
+                f"🎶 **Sound Quality:** `384 kbps Lossless Audio Engine`\n\n"
+                f"👉 **Join the channel and vibe with the community! Use `/play` or `/request` to add your favorite songs.**"
+            ),
+            color=0xFF007F
+        )
+        embed.set_thumbnail(url=config.RAI_ICON_URL)
+        embed.set_footer(text="RAI VIBES 💗 • Stage Listening Party", icon_url=config.RAI_ICON_URL)
+
+        # Announce in current channel or general-chat
+        await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(DJ(bot))
+

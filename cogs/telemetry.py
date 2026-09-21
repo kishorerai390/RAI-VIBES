@@ -43,6 +43,56 @@ def record_song_play(song_title: str):
     save_telemetry(data)
 
 
+def get_telemetry_summary() -> dict:
+    """Provides an aggregated summary dictionary for the Web Dashboard & API."""
+    data = load_telemetry()
+    users = data.get("users", {})
+    songs = data.get("songs", {})
+
+    total_mins = sum(u.get("total_minutes", 0) for u in users.values())
+    total_voice_hours = round(total_mins / 60, 1)
+    total_streams = sum(songs.values())
+
+    # Top 5 voice users
+    sorted_users = sorted(users.items(), key=lambda x: x[1].get("total_minutes", 0), reverse=True)[:5]
+    top_listeners = [
+        {
+            "user_id": uid,
+            "minutes": uinfo.get("total_minutes", 0),
+            "hours": round(uinfo.get("total_minutes", 0) / 60, 1),
+            "fav_lounge": max(uinfo.get("vc_counts", {}), key=uinfo.get("vc_counts", {}).get) if uinfo.get("vc_counts") else "N/A"
+        }
+        for uid, uinfo in sorted_users
+    ]
+
+    # Top 5 songs
+    sorted_songs = sorted(songs.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_tracks = [
+        {"title": title, "plays": count}
+        for title, count in sorted_songs
+    ]
+
+    # Lounges breakdown
+    ch_totals = {}
+    for u in users.values():
+        for ch_name, mins in u.get("vc_counts", {}).items():
+            ch_totals[ch_name] = ch_totals.get(ch_name, 0) + mins
+    sorted_channels = sorted(ch_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_lounges = [
+        {"channel": name, "minutes": mins, "hours": round(mins / 60, 1)}
+        for name, mins in sorted_channels
+    ]
+
+    return {
+        "total_voice_hours": total_voice_hours,
+        "total_streams": total_streams,
+        "total_tracked_users": len(users),
+        "top_listeners": top_listeners,
+        "top_tracks": top_tracks,
+        "top_lounges": top_lounges
+    }
+
+
 class Telemetry(commands.Cog):
     """Clean Voice Analytics, Time Tracking & Server Telemetry."""
     def __init__(self, bot: commands.Bot):
