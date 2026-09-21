@@ -1,0 +1,6 @@
+Owner: rf.rai_006 (id=1457380609641938981)
+General Chat overwrites for category ✦ ℂ 𝕆 𝕄 𝕄 𝕌 ℕ 𝕀 𝕋 𝕐 ✦:
+  [CH] @everyone (Role): view=False, send=None
+  [CH] ✨・Verified (Role): view=True, send=True
+  [CAT] @everyone (Role): view=False, send=None
+  [CAT] ✨・Verified (Role): view=True, send=True

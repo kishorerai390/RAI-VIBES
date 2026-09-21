@@ -409,4 +409,74 @@ async def get_leaderboard(guild_id: int, limit: int = 10) -> list:
             for idx, r in enumerate(rows)
         ]
 
+async def log_security_event(guild_id: int, event_type: str, details: str, severity: str = "HIGH"):
+    """Record a security or anti-nuke audit event."""
+    async with get_db() as db:
+        await db.execute(
+            "INSERT INTO security_events (guild_id, event_type, details, severity) VALUES (?, ?, ?, ?)",
+            (guild_id, event_type, details, severity)
+        )
+        await db.commit()
+
+# Alias for security dashboard compatibility
+record_security_event = log_security_event
+
+
+async def get_recent_security_events(guild_id: Optional[int] = None, limit: int = 15) -> list:
+    """Retrieve the most recent security events."""
+    async with get_db() as db:
+        if guild_id:
+            cur = await db.execute(
+                "SELECT id, guild_id, event_type, details, severity, timestamp FROM security_events WHERE guild_id = ? ORDER BY id DESC LIMIT ?",
+                (guild_id, limit)
+            )
+        else:
+            cur = await db.execute(
+                "SELECT id, guild_id, event_type, details, severity, timestamp FROM security_events ORDER BY id DESC LIMIT ?",
+                (limit,)
+            )
+        rows = await cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "guild_id": r[1],
+                "event_type": r[2],
+                "details": r[3],
+                "severity": r[4],
+                "timestamp": str(r[5])
+            }
+            for r in rows
+        ]
+
+async def get_security_summary(guild_id: int) -> dict:
+    """Return an aggregated defense status dictionary for the guild."""
+    settings = await get_guild_settings(guild_id)
+    whitelist = await get_whitelist(guild_id)
+    events = await get_recent_security_events(guild_id, limit=5)
+    return {
+        "guild_id": guild_id,
+        "shields": {
+            "antinuke": bool(settings.get("antinuke_enabled", 1)),
+            "antiraid": bool(settings.get("antiraid_enabled", 1)),
+            "antispam": bool(settings.get("antispam_enabled", 1)),
+            "antilink": bool(settings.get("antilink_enabled", 1)),
+            "antimention": bool(settings.get("antimention_enabled", 1)),
+        },
+        "states": {
+            "raid_mode": bool(settings.get("raid_mode", 0)),
+            "lockdown": bool(settings.get("lockdown", 0)),
+            "whitelisted_users": len(whitelist.get("users", [])),
+            "whitelisted_roles": len(whitelist.get("roles", []))
+        },
+        "limits": {
+            "channel_delete_limit": settings.get("channel_delete_limit", 3),
+            "role_delete_limit": settings.get("role_delete_limit", 3),
+            "ban_limit": settings.get("ban_limit", 4),
+            "kick_limit": settings.get("kick_limit", 4),
+            "time_window": settings.get("time_window", 10)
+        },
+        "recent_events": events
+    }
+
+
 

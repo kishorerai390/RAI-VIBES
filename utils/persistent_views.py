@@ -7,6 +7,18 @@ ROLE_ID_MAP = {
     "DJ": 1545834928221069522,       # ✦ dj
     "Member": 1545494584203673740,   # ✦ member
     "Verified": 1549504522953695269, # ✦ verified
+    "Valorant": 1551184094313062470,
+    "BGMI": 1551184098834251786,
+    "Free Fire": 1551184102957523048,
+    "GTA RP": 1551184108053467176,
+    "Rocket League": 1551184114978132019,
+    "Announcements": 1550199913093144649,
+    "Giveaways": 1550199917262143560,
+    "Tournaments": 1550199921007792188,
+    "Movie Nights": 1550199924614758480,
+    "Live DJ & Radio": 1551184129347817483,
+    "VIP": 1551184081067450451,
+    "Tournament Champion": 1551184085630718044
 }
 
 COLOR_ROLE_IDS = []
@@ -25,7 +37,7 @@ def find_role_by_key(guild: discord.Guild, key: str) -> discord.Role | None:
 
 class SelfRoleButton(Button):
     def __init__(self, key: str, label: str, emoji: str, style: discord.ButtonStyle, row: int = 0):
-        super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"selfrole_{key.replace(' ', '_').lower()}")
+        super().__init__(label=label, emoji=emoji, style=style, row=row, custom_id=f"selfrole_{key.replace(' ', '_').replace('&', 'and').lower()}")
         self.key = key
 
     async def callback(self, interaction: discord.Interaction):
@@ -85,10 +97,11 @@ class ColorRoleButton(Button):
 class GamingRolesView(View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SelfRoleButton("Free Fire", "Free Fire", "💥", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("Valorant", "Valorant", "🎯", discord.ButtonStyle.danger, row=0))
         self.add_item(SelfRoleButton("BGMI", "BGMI", "⚡", discord.ButtonStyle.primary, row=0))
-        self.add_item(SelfRoleButton("GTA RP", "GTA RP", "🔫", discord.ButtonStyle.secondary, row=0))
-        self.add_item(SelfRoleButton("Roblox", "Roblox", "🧸", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Free Fire", "Free Fire", "🔥", discord.ButtonStyle.danger, row=0))
+        self.add_item(SelfRoleButton("GTA RP", "GTA RP", "🏎️", discord.ButtonStyle.secondary, row=1))
+        self.add_item(SelfRoleButton("Rocket League", "Rocket League", "🚀", discord.ButtonStyle.primary, row=1))
 
 
 class NotificationRolesView(View):
@@ -97,7 +110,8 @@ class NotificationRolesView(View):
         self.add_item(SelfRoleButton("Announcements", "Announcements", "📢", discord.ButtonStyle.primary, row=0))
         self.add_item(SelfRoleButton("Giveaways", "Giveaways", "🎁", discord.ButtonStyle.success, row=0))
         self.add_item(SelfRoleButton("Tournaments", "Tournaments", "🏆", discord.ButtonStyle.danger, row=0))
-        self.add_item(SelfRoleButton("Movie Nights", "Movie Nights", "🍿", discord.ButtonStyle.secondary, row=0))
+        self.add_item(SelfRoleButton("Movie Nights", "Movie Nights", "🍿", discord.ButtonStyle.secondary, row=1))
+        self.add_item(SelfRoleButton("Live DJ & Radio", "Live DJ / Radio", "📻", discord.ButtonStyle.primary, row=1))
 
 
 class ColorRolesView(View):

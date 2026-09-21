@@ -336,12 +336,24 @@ class Tournaments(commands.Cog):
                         credit_coins(payout_captain, t["prize_pool"])
                         break
 
+                # Grant Tournament Champion role to winner
+                if payout_captain and interaction.guild:
+                    champ_role = discord.utils.get(interaction.guild.roles, name="🏆・Tournament Champion")
+                    if champ_role:
+                        try:
+                            champ_member = interaction.guild.get_member(payout_captain)
+                            if champ_member:
+                                await champ_member.add_roles(champ_role, reason=f"Won tournament: {t['name']}")
+                        except Exception as e:
+                            logger.warning(f"Could not assign Tournament Champion role: {e}")
+
                 embed = discord.Embed(
                     title="👑 ✦ TOURNAMENT GRAND CHAMPION DECLARED ✦ 👑",
                     description=(
                         f"🎉 Huge congratulations to **`{champ_name}`** for winning **{t['name']}**!\n\n"
                         f"💰 **Prize Pool Awarded:** `+{t['prize_pool']:,} Rai Coins`!\n"
-                        f"🏆 **Champion Captain:** <@{payout_captain}>\n\n"
+                        f"🏆 **Champion Captain:** <@{payout_captain}>\n"
+                        f"🎖️ **Exclusive Role Awarded:** `🏆・Tournament Champion`\n\n"
                         f"Thank you to all {len(t['teams'])} teams for competing with honor!"
                     ),
                     color=0xFFD700

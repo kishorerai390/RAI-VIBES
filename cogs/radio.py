@@ -61,6 +61,30 @@ RADIO_STATIONS = {
         "url": "https://stream.nightride.fm/chillsynth.mp3",
         "thumb": "https://cdn-icons-png.flaticon.com/512/2917/2917995.png",
         "desc": "Soothing ambient soundscapes and lounge music."
+    },
+    "binaural_study": {
+        "name": "🧠 432Hz Deep Focus & Binaural Study Waves",
+        "url": "https://ice5.somafm.com/dronezone-128-mp3",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/3233/3233514.png",
+        "desc": "Atmospheric soundscapes and deep theta wave focus music for study & productivity."
+    },
+    "anime_lofi": {
+        "name": "🍜 Tokyo Nights Anime Chill & Melodies",
+        "url": "https://ice5.somafm.com/groovesalad-128-mp3",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/3075/3075908.png",
+        "desc": "Chill anime-inspired instrumental lo-fi and calming night beats."
+    },
+    "phonk_drift": {
+        "name": "🏎️ Drift Phonk & Bass Energy",
+        "url": "https://stream.simulatorradio.com/stream.mp3",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/4397/4397571.png",
+        "desc": "High-octane drift phonk, cowbell beats, and adrenaline electronic audio."
+    },
+    "citypop": {
+        "name": "🏙️ 80s Japanese City Pop & Future Funk",
+        "url": "https://stream.nightride.fm/nightride.mp3",
+        "thumb": "https://cdn-icons-png.flaticon.com/512/2917/2917995.png",
+        "desc": "Nostalgic 80s groove, retro anime aesthetics, and disco funk."
     }
 }
 
@@ -227,6 +251,10 @@ class Radio(commands.Cog):
         app_commands.Choice(name="🌆 Synthwave / 80s Retrowave", value="synthwave"),
         app_commands.Choice(name="🎮 Gaming EDM / Simulator", value="gaming"),
         app_commands.Choice(name="🌊 Chillout Lounge / Ambient", value="chill"),
+        app_commands.Choice(name="🧠 432Hz Deep Focus & Binaural Study", value="binaural_study"),
+        app_commands.Choice(name="🍜 Tokyo Nights Anime Chill Lo-Fi", value="anime_lofi"),
+        app_commands.Choice(name="🏎️ Drift Phonk & Bass Energy", value="phonk_drift"),
+        app_commands.Choice(name="🏙️ 80s Japanese City Pop & Funk", value="citypop"),
     ])
     async def radio(self, ctx: commands.Context, station: Optional[app_commands.Choice[str]] = None):
         key = station.value if station else "tamilnadu_fm"
