@@ -18,10 +18,19 @@ ROLE_ID_MAP = {
     "Movie Nights": 1550199924614758480,
     "Live DJ & Radio": 1551184129347817483,
     "VIP": 1551184081067450451,
-    "Tournament Champion": 1551184085630718044
+    "Tournament Champion": 1551184085630718044,
+    "Sakura Pink": 1552378045615177788,
+    "Neon Purple": 1552378050023399454,
+    "Cyber Cyan": 1552378054150717520,
+    "Royal Gold": 1552378057866608768
 }
 
-COLOR_ROLE_IDS = []
+COLOR_ROLE_IDS = [
+    1552378045615177788,
+    1552378050023399454,
+    1552378054150717520,
+    1552378057866608768
+]
 
 def find_role_by_key(guild: discord.Guild, key: str) -> discord.Role | None:
     role_id = ROLE_ID_MAP.get(key)

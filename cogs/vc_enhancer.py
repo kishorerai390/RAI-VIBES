@@ -249,13 +249,67 @@ class VCEnhancer(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Competitive Tournament Engine", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed, view=view)
 
+    @app_commands.command(name="voteskip", description="Democratically vote to skip the currently playing music track.")
+    async def voteskip_command(self, interaction: discord.Interaction):
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            return await interaction.response.send_message("❌ You must be in a voice channel listening to music to start a vote skip.", ephemeral=True)
+
+        vc = interaction.user.voice.channel
+        listeners = [m for m in vc.members if not m.bot]
+        if not listeners:
+            return await interaction.response.send_message("❌ No active listeners in voice.", ephemeral=True)
+
+        required = max(1, (len(listeners) + 1) // 2)
+
+        view = VoteSkipView(required, vc, self.bot)
+        view.voters.add(interaction.user.id)
+        current = len(view.voters)
+
+        embed = discord.Embed(
+            title="🗳️ ┊ 𝐕𝐎𝐓𝐄  𝐓𝐎  𝐒𝐊𝐈𝐏  𝐓𝐑𝐀𝐂𝐊",
+            description=(
+                f"✦ ───────────────────────────────────── ✦\n\n"
+                f"**Caller:** {interaction.user.mention}\n"
+                f"**Channel:** `{vc.name}`\n"
+                f"**Required Votes:** `{required}` votes needed *(50% of listeners)*\n"
+                f"**Current Votes:** `{current} / {required}`\n\n"
+                f"⚡ *Click **`Vote Skip ⏭️`** below to vote to skip this track!*"
+            ),
+            color=0xF1C40F
+        )
+        embed.set_footer(text="RAI VIBES 💗 • Democratic Audio Controls", icon_url=config.RAI_ICON_URL)
+
+        if current >= required:
+            vc_client = discord.utils.get(self.bot.voice_clients, guild=interaction.guild)
+            if vc_client and (vc_client.is_playing() or vc_client.is_paused()):
+                vc_client.stop()
+                embed.description += "\n\n✅ **Vote Passed immediately!** Skipping track... 🎵"
+                return await interaction.response.send_message(embed=embed)
+
+        await interaction.response.send_message(embed=embed, view=view)
+
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-        """Monitors special voice channels like Recording Studio."""
+        """Monitors special voice channels and manages @In Voice dynamic role."""
         if member.bot:
             return
 
-        # 1. Recording Studio Privacy Notification
+        # 1. Dynamic 'In Voice' Active Role Management (1552358758972137506)
+        in_voice_role = member.guild.get_role(1552358758972137506)
+        if in_voice_role:
+            is_in_active_vc = after.channel and not any(k in after.channel.name.lower() for k in ["afk", "sleep"])
+            if is_in_active_vc and in_voice_role not in member.roles:
+                try:
+                    await member.add_roles(in_voice_role, reason="Connected to active voice channel")
+                except Exception:
+                    pass
+            elif not is_in_active_vc and in_voice_role in member.roles:
+                try:
+                    await member.remove_roles(in_voice_role, reason="Disconnected from active voice channel")
+                except Exception:
+                    pass
+
+        # 2. Recording Studio Privacy Notification
         if after.channel and after.channel.id == RECORDING_STUDIO_ID and before.channel != after.channel:
             now = time.time()
             last_notice = self.recent_studio_notices.get(RECORDING_STUDIO_ID, 0)

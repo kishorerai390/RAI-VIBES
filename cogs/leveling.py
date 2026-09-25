@@ -212,14 +212,32 @@ class Leveling(commands.Cog):
         """Sends luxury level-up celebration canvas and awards coin bonus with milestone perks."""
         coin_bonus = new_level * 50
 
-        # Milestone Perks Definition
+        # Milestone Perks Definition (Everglow Activity Tiers)
         MILESTONES = {
-            5: {"title": "🥉 Bronze Voyager", "bonus": 250, "perk": "Custom chat titles & shop discount eligibility!"},
-            10: {"title": "🥈 Silver Challenger", "bonus": 500, "perk": "Priority reactions & VIP chat recognition!"},
-            15: {"title": "🥇 Gold Champion", "bonus": 1000, "perk": "Unlocked **✦ ᴅᴊ** role & DJ deck permissions!", "role_id": 1545834928221069522},
-            20: {"title": "💎 Diamond Virtuoso", "bonus": 2000, "perk": "Unlocked `/priority` DJ queue bump & VIP lounge access!"},
-            25: {"title": "👑 RAI Legend", "bonus": 5000, "perk": "Permanent Hall-of-Fame glory & custom personal status!"},
-            30: {"title": "✨ Celestial Apex", "bonus": 10000, "perk": "Immortalized server legend status & maximum perks!"}
+            5: {
+                "title": "✨ Starlight Initiate",
+                "bonus": 500,
+                "perk": "Unlocked external emojis & stickers across the server!",
+                "role_id": 1552378037276901547
+            },
+            15: {
+                "title": "🌸 Aurora Voyager",
+                "bonus": 1500,
+                "perk": "Unlocked custom server nicknames!",
+                "role_id": 1552378030855290931
+            },
+            30: {
+                "title": "💫 Nebula Elite",
+                "bonus": 5000,
+                "perk": "Unlocked embed links & priority perks!",
+                "role_id": 1552378026367647887
+            },
+            50: {
+                "title": "👑 Celestial Sovereign",
+                "bonus": 15000,
+                "perk": "VIP Celestial badge, exclusive colored name glow & legend status!",
+                "role_id": 1552378020352884756
+            }
         }
 
         milestone_data = MILESTONES.get(new_level)
@@ -227,20 +245,20 @@ class Leveling(commands.Cog):
         if milestone_data:
             extra = milestone_data["bonus"]
             coin_bonus += extra
-            milestone_text = f"\n\n🏆 **MILESTONE REACHED: {milestone_data['title']}**\n🎁 **Milestone Perk:** {milestone_data['perk']}"
+            milestone_text = f"\n\n🏆 **EVERGLOW TIER REACHED: {milestone_data['title']}**\n🎁 **Tier Perk:** {milestone_data['perk']}"
             if "role_id" in milestone_data:
                 role = guild.get_role(milestone_data["role_id"])
                 if role and role not in member.roles:
                     try:
-                        await member.add_roles(role, reason=f"Level {new_level} Milestone Unlock")
+                        await member.add_roles(role, reason=f"Level {new_level} Everglow Activity Tier Unlock")
                         milestone_text += f"\n✨ **Role Awarded:** {role.mention}"
                     except Exception as re:
                         logger.warning(f"Could not assign milestone role: {re}")
 
         award_vc_coins(member.id, coin_bonus)
 
-        # Target announcement channel: #⭐・ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ (1549407114861215815)
-        target_channel = guild.get_channel(1549407114861215815) or channel
+        # Target announcement channel: #⭐・starboard (1551184190073213071) or local channel
+        target_channel = guild.get_channel(1551184190073213071) or channel
 
         card_file = None
         try:
