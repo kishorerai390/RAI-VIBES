@@ -273,7 +273,7 @@ class Radio(commands.Cog):
         embed.set_thumbnail(url=st_data["thumb"])
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="stay247", aliases=["247", "alwayson"], description="Toggle or set 24/7 mode (prevents bot from leaving voice channel).")
+    @commands.hybrid_command(name="stay247", aliases=["alwayson", "radio247"], description="Toggle or set 24/7 mode (prevents bot from leaving voice channel).")
     @app_commands.describe(mode="Choose to explicitly Enable or Disable 24/7 mode")
     async def stay_247(self, ctx: commands.Context, mode: Optional[Literal["enable", "disable"]] = None):
         music_cog = self.bot.get_cog("Music")

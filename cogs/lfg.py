@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import asyncio
@@ -9,7 +10,7 @@ from typing import Optional, Dict, List, Literal
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from discord.ui import View, Button, button
+from discord.ui import View, Button, button, Modal, TextInput
 
 import config
 
@@ -190,30 +191,135 @@ class LFGView(View):
         await interaction.followup.send("⚪ You left the squad.", ephemeral=True)
 
 
+class CopyCodeView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @button(label="Copy Code 📋", style=discord.ButtonStyle.secondary, custom_id="lfg_copy_code_btn")
+    async def copy_btn(self, interaction: discord.Interaction, btn: Button):
+        code = "CODE"
+        if interaction.message.embeds:
+            emb = interaction.message.embeds[0]
+            for f in emb.fields:
+                if f.name == "📋 Code":
+                    code = f.value.replace("`", "").strip()
+                    break
+            if code == "CODE":
+                m = re.search(r"TEAM CODE:\s*([^\n]+)", emb.description or "")
+                if m:
+                    code = m.group(1).strip()
+
+        await interaction.response.send_message(
+            f"**Team Code:**\n```{code}```\n*(Long press or tap above to copy)*",
+            ephemeral=True
+        )
+
+
+class DropCodeModal(Modal, title="Drop In-Game Team Code 🔑"):
+    game_name = TextInput(
+        label="Game Title",
+        placeholder="e.g. Free Fire, BGMI, Valorant, GTA V, Roblox...",
+        max_length=40,
+        required=True
+    )
+    team_code = TextInput(
+        label="Team Code / Room ID",
+        placeholder="e.g. 7482910 or Custom Room ID & Password",
+        max_length=60,
+        required=True
+    )
+    mode_note = TextInput(
+        label="Mode & Objective (Optional)",
+        placeholder="e.g. Clash Squad Rank push / Need 2 with mic",
+        max_length=150,
+        required=False,
+        default="Looking for squadmates! Join up."
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        hub = (
+            discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
+            or discord.utils.get(interaction.guild.text_channels, name="lfg-matchmaking")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
+            or discord.utils.get(interaction.guild.text_channels, name="gaming-hub")
+            or interaction.channel
+        )
+        game_str = self.game_name.value.strip()
+        code_str = self.team_code.value.strip()
+        note_str = self.mode_note.value.strip() or "Looking for squadmates! Join up."
+
+        role_mention = ""
+        game_lower = game_str.lower()
+        role_keywords = {
+            "bgmi": ["bgmi", "battlegrounds"],
+            "free fire": ["free fire", "freefire"],
+            "freefire": ["free fire", "freefire"],
+            "roblox": ["roblox"],
+            "gta": ["gta", "fivem"],
+            "valorant": ["valorant"]
+        }
+        for key, kws in role_keywords.items():
+            if any(kw in game_lower for kw in kws):
+                for r in interaction.guild.roles:
+                    if any(kw in r.name.lower() for kw in kws):
+                        role_mention = f" {r.mention}"
+                        break
+                break
+
+        embed = discord.Embed(
+            title=f"🔑 IN-GAME TEAM CODE • {game_str.upper()}",
+            description=(
+                f"**Host:** {interaction.user.mention}\n"
+                f"**Mission:** *{note_str}*\n\n"
+                f"```yaml\n"
+                f"TEAM CODE: {code_str}\n"
+                f"```\n"
+                f"⚡ *Open **{game_str}**, enter the code above, or click **`Copy Code 📋`** below!*"
+            ),
+            color=0x00D2D3
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        embed.add_field(name="📋 Code", value=f"`{code_str}`", inline=True)
+        embed.add_field(name="🎮 Game", value=game_str, inline=True)
+        embed.set_footer(text="RAI VIBES Matchmaker • Fast Code Drop", icon_url=config.RAI_ICON_URL)
+
+        msg = await hub.send(
+            content=f"🔑 **{interaction.user.mention} dropped a team code for {game_str}!**{role_mention}",
+            embed=embed,
+            view=CopyCodeView()
+        )
+        await interaction.followup.send(f"✅ Team code dropped in {hub.mention}! [Jump to Card]({msg.jump_url})", ephemeral=True)
+
+
 class LFGHubLauncherView(View):
     """1-Click Squad Matchmaker Panel with Persistent Buttons."""
     def __init__(self):
         super().__init__(timeout=None)
 
-    @button(label="Valorant (4P)", style=discord.ButtonStyle.primary, emoji="🎯", custom_id="lfg_quick_valorant")
+    @button(label="Valorant (4P)", style=discord.ButtonStyle.primary, emoji="🎯", row=0, custom_id="lfg_quick_valorant")
     async def valo_btn(self, interaction: discord.Interaction, btn: Button):
         await self._launch(interaction, "valorant", 4, "Ranked / Competitive Grind")
 
-    @button(label="BGMI Squad (4P)", style=discord.ButtonStyle.success, emoji="⚡", custom_id="lfg_quick_bgmi")
+    @button(label="BGMI Squad (4P)", style=discord.ButtonStyle.success, emoji="⚡", row=0, custom_id="lfg_quick_bgmi")
     async def bgmi_btn(self, interaction: discord.Interaction, btn: Button):
         await self._launch(interaction, "bgmi", 4, "Classic / Rank Push")
 
-    @button(label="Free Fire (4P)", style=discord.ButtonStyle.danger, emoji="💥", custom_id="lfg_quick_freefire")
+    @button(label="Free Fire (4P)", style=discord.ButtonStyle.danger, emoji="💥", row=0, custom_id="lfg_quick_freefire")
     async def ff_btn(self, interaction: discord.Interaction, btn: Button):
         await self._launch(interaction, "freefire", 4, "BR Ranked / Clash Squad")
 
-    @button(label="Roblox (3P)", style=discord.ButtonStyle.secondary, emoji="🧸", custom_id="lfg_quick_roblox")
+    @button(label="Roblox (3P)", style=discord.ButtonStyle.secondary, emoji="🧸", row=1, custom_id="lfg_quick_roblox")
     async def roblox_btn(self, interaction: discord.Interaction, btn: Button):
         await self._launch(interaction, "roblox", 3, "Minigames & Chill Hangout")
 
-    @button(label="GTA RP (2P)", style=discord.ButtonStyle.secondary, emoji="🔫", custom_id="lfg_quick_gtarp")
+    @button(label="GTA RP (2P)", style=discord.ButtonStyle.secondary, emoji="🔫", row=1, custom_id="lfg_quick_gtarp")
     async def gtarp_btn(self, interaction: discord.Interaction, btn: Button):
         await self._launch(interaction, "gtarp", 2, "FiveM / Heists / Patrol")
+
+    @button(label="Drop Team Code 🔑", style=discord.ButtonStyle.secondary, row=1, custom_id="lfg_drop_code_btn")
+    async def drop_code_btn(self, interaction: discord.Interaction, btn: Button):
+        await interaction.response.send_modal(DropCodeModal())
 
     async def _launch(self, interaction: discord.Interaction, game: str, slots: int, default_note: str):
         await interaction.response.defer(ephemeral=True)
@@ -223,7 +329,9 @@ class LFGHubLauncherView(View):
                 return await interaction.followup.send("⚠️ You already have an active recruiting squad! Please wait for it or finish before opening another.", ephemeral=True)
 
         hub = (
-            discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
+            discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
+            or discord.utils.get(interaction.guild.text_channels, name="lfg-matchmaking")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="gaming-hub")
             or interaction.channel
         )
@@ -444,3 +552,4 @@ async def setup(bot: commands.Bot):
     await bot.add_cog(cog)
     bot.add_view(LFGView())
     bot.add_view(LFGHubLauncherView())
+    bot.add_view(CopyCodeView())

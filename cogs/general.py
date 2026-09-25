@@ -150,8 +150,7 @@ class CommandCategorySelect(discord.ui.Select):
                     "`/tictactoe @user` — Interactive button Tic-Tac-Toe\n"
                     "`/connect4 @user` — Interactive Connect 4 board game\n"
                     "`/truthordare` — Random community Truth or Dare prompt\n"
-                    "`/poll <question>` — Create multi-choice interactive poll\n"
-                    "`/qotd` — Question of the Day prompt"
+                    "`/poll <question>` — Create multi-choice interactive poll"
                 ),
                 inline=False
             )

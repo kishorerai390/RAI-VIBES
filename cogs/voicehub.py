@@ -582,6 +582,23 @@ class VoiceHub(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         guild = member.guild
+        # 0. Dynamic In-Voice Member Role Assignment & Removal
+        if not member.bot:
+            in_voice_role = discord.utils.get(guild.roles, name="🎧 ┊ In Voice")
+            if in_voice_role:
+                afk_ch = guild.afk_channel or guild.get_channel(1550187298115551272)
+                if after.channel and (not afk_ch or after.channel.id != afk_ch.id):
+                    if in_voice_role not in member.roles:
+                        try:
+                            await member.add_roles(in_voice_role, reason="Connected to voice channel")
+                        except Exception:
+                            pass
+                else:
+                    if in_voice_role in member.roles:
+                        try:
+                            await member.remove_roles(in_voice_role, reason="Disconnected from voice or moved to AFK")
+                        except Exception:
+                            pass
 
         # 1. Member joined/rejoined an existing temporary voice room that was counting down to auto-delete
         if after.channel and self.is_temporary_channel(after.channel):

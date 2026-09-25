@@ -2240,38 +2240,6 @@ class Music(commands.Cog):
         view = SearchResultView(self, ctx, results, message=msg)
         await msg.edit(embed=search_embed, view=view)
 
-    @commands.command(name="sleeptimer", aliases=["sleep"])
-    async def sleeptimer(self, ctx: commands.Context, minutes: int):
-        if minutes <= 0 or minutes > 240:
-            return await ctx.send("❌ Sleep timer must be between 1 and 240 minutes.", ephemeral=True)
-
-        player = self.get_player(ctx.guild.id)
-        if not player or not player.is_connected:
-            return await ctx.send("❌ Bot is not currently connected to voice.", ephemeral=True)
-
-        embed = discord.Embed(
-            title="🌙 AUDIO SLEEP TIMER ACTIVATED",
-            description=f"Music will gently stop in **{minutes} minutes**.\nRest easy and sweet dreams! 💤",
-            color=0x9B59B6
-        )
-        embed.set_footer(text="RAI VIBES 💗 • Sleep Well", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
-        async def _sleep_countdown():
-            await asyncio.sleep(minutes * 60)
-            p = self.get_player(ctx.guild.id)
-            if p and p.voice_client and p.voice_client.is_connected():
-                p.queue.clear()
-                p.mode_247 = False
-                await p.voice_client.disconnect()
-                if p.text_channel:
-                    try:
-                        await p.text_channel.send("🌙 **Sleep timer expired.** Playback stopped. Goodnight! 💤")
-                    except Exception:
-                        pass
-
-        self.bot.loop.create_task(_sleep_countdown())
-
     @commands.command(name="history", aliases=["recent", "recentlyplayed"])
     async def history_cmd(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)

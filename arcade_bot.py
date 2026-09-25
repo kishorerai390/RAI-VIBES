@@ -80,7 +80,7 @@ ARCADE_EXTENSIONS = [
     "cogs.duels",
     "cogs.wyr",
     "cogs.quotes",
-    "cogs.qotd",
+    # "cogs.qotd",  # Disabled Question of the Day per server preferences
     "cogs.bump_reminder",
     "cogs.welcome",
     "cogs.server_stats",

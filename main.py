@@ -168,6 +168,10 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(TicketChannelControlView())
         b.add_view(MovieRSVPView())
         b.add_view(MovieVoteView())
+        from cogs.lfg import LFGView, LFGHubLauncherView, CopyCodeView
+        b.add_view(LFGView())
+        b.add_view(LFGHubLauncherView())
+        b.add_view(CopyCodeView())
 
         # Update bot profile banner to 3D animated GIF
         banner_path = os.path.join("assets", "rai_vibes_3d_banner.gif")
@@ -272,6 +276,13 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
                 try:
                     await message.add_reaction("💻")
                     await message.add_reaction("🔥")
+                except Exception:
+                    pass
+        elif any(k in ch_name for k in ["media", "clips"]):
+            if message.attachments or "http" in content:
+                try:
+                    await message.add_reaction("🔥")
+                    await message.add_reaction("👑")
                 except Exception:
                     pass
         elif any(k in ch_name for k in ["ᴄʀᴇᴀᴛɪᴠᴇ", "art", "creative"]):
@@ -440,6 +451,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.verify",
         "cogs.movie_party",
         "cogs.telemetry",
+        "cogs.vc_enhancer",
         "cogs.help",
     ]
 

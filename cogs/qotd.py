@@ -49,10 +49,12 @@ class QOTD(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.last_posted_date: Optional[str] = None
-        self.daily_qotd_loop.start()
+        # Automated daily broadcast disabled per server configuration
+        # self.daily_qotd_loop.start()
 
     def cog_unload(self):
-        self.daily_qotd_loop.cancel()
+        if self.daily_qotd_loop.is_running():
+            self.daily_qotd_loop.cancel()
 
     @tasks.loop(minutes=15)
     async def daily_qotd_loop(self):
