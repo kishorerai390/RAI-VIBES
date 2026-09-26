@@ -65,6 +65,7 @@ BANNER = """
 
 ARCADE_EXTENSIONS = [
     "cogs.economy",
+    "cogs.quests",
     "cogs.casino",
     "cogs.leveling",
     "cogs.pets",
