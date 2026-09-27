@@ -15,6 +15,18 @@ import config
 
 logger = logging.getLogger("VoiceHub")
 
+SMALL_CAPS_TRANS = str.maketrans(
+    "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ",
+    "abcdefghijklmnopqrstuvwxyz"
+)
+
+def normalize_vc_name(name: str) -> str:
+    """Normalizes voice channel names across all Unicode fonts, small-caps, and NFKD formatting."""
+    if not name:
+        return ""
+    return unicodedata.normalize('NFKD', name).translate(SMALL_CAPS_TRANS).lower()
+
+
 class RenameVoiceModal(discord.ui.Modal, title="Rename Your Voice Room"):
     new_name = discord.ui.TextInput(
         label="New Voice Channel Name",
@@ -397,7 +409,10 @@ class VoiceHub(commands.Cog):
             return True
         # Also check name patterns in case bot restarted
         name = channel.name
+        norm = normalize_vc_name(name)
         if any(name.startswith(p) for p in self.TEMP_PREFIXES) and any(name.endswith(s) for s in self.TEMP_SUFFIXES):
+            return True
+        if any(s in norm for s in ("'s lounge", "'s solo", "'s duo", "'s trio", "'s squad", "'s private", "'s ghost", "'s 5-man", "'s 6-man")):
             return True
         return False
 
@@ -428,7 +443,9 @@ class VoiceHub(commands.Cog):
                 # Fetch fresh channel state from bot cache/API
                 ch = self.bot.get_channel(channel.id)
                 if ch and isinstance(ch, discord.VoiceChannel):
-                    if len(ch.members) == 0:
+                    # Consider empty if 0 human members are present
+                    human_count = len([m for m in ch.members if not m.bot])
+                    if human_count == 0:
                         if ch.id in self.temp_channels:
                             del self.temp_channels[ch.id]
                             self._save_temp_channels()
@@ -455,9 +472,11 @@ class VoiceHub(commands.Cog):
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
             for channel in guild.voice_channels:
-                if self.is_temporary_channel(channel) and len(channel.members) == 0:
-                    if channel.id not in self.deletion_tasks or self.deletion_tasks[channel.id].done():
-                        self.schedule_inactivity_deletion(channel, delay=self.INACTIVITY_GRACE_SECONDS)
+                if self.is_temporary_channel(channel):
+                    human_count = len([m for m in channel.members if not m.bot])
+                    if human_count == 0:
+                        if channel.id not in self.deletion_tasks or self.deletion_tasks[channel.id].done():
+                            self.schedule_inactivity_deletion(channel, delay=self.INACTIVITY_GRACE_SECONDS)
 
     @cleanup_temp_channels_task.before_loop
     async def before_cleanup_task(self):
@@ -617,17 +636,18 @@ class VoiceHub(commands.Cog):
                     pass
 
         # 2. User Joined a "Join to Create" / Generator channel
-        if after.channel:
-            norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
+        if after.channel and not member.bot:
+            ch_norm = normalize_vc_name(after.channel.name)
             is_generator = (
-                "join to create" in norm_name
-                or "create ghost" in norm_name
-                or "generator" in norm_name
-                or (("➕" in after.channel.name or "[+]" in norm_name) and any(w in norm_name for w in ("create", "join", "hub")))
+                after.channel.id in (1550187295821402114, 1550204648516755536)
+                or "join to create" in ch_norm
+                or "create ghost" in ch_norm
+                or "generator" in ch_norm
+                or (("➕" in after.channel.name or "[+]" in ch_norm) and any(w in ch_norm for w in ("create", "join", "hub", "vc")))
             )
             if is_generator:
                 category = after.channel.category
-                ch_name_lower = norm_name
+                ch_name_lower = ch_norm
 
                 # Check if this is a Private / Hidden / Ghost VC generator
                 is_private_hidden = any(w in ch_name_lower for w in ("private", "ghost", "secret", "hidden"))
@@ -723,7 +743,8 @@ class VoiceHub(commands.Cog):
 
         # 3. User Left a temporary voice channel -> Schedule auto-delete after inactivity grace period
         if before.channel and before.channel != after.channel and self.is_temporary_channel(before.channel):
-            if len(before.channel.members) == 0:
+            human_members = [m for m in before.channel.members if not m.bot]
+            if len(human_members) == 0:
                 self.schedule_inactivity_deletion(before.channel, delay=self.INACTIVITY_GRACE_SECONDS)
 
         # 4. AFK Bedtime Battery Saver: Track join and leave timestamps for human members in AFK

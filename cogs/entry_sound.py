@@ -33,7 +33,10 @@ def is_channel_suppressed(channel: Optional[discord.VoiceChannel]) -> bool:
         return True
     if is_channel_soundboard_muted(channel.id):
         return True
-    norm_name = unicodedata.normalize('NFKD', channel.name).lower()
+    if channel.id in (1550187295821402114, 1550204648516755536):
+        return True
+    small_caps_tr = str.maketrans("ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ", "abcdefghijklmnopqrstuvwxyz")
+    norm_name = unicodedata.normalize('NFKD', channel.name).translate(small_caps_tr).lower()
     # Generators
     if any(w in norm_name for w in ("join to create", "create ghost", "generator")):
         return True

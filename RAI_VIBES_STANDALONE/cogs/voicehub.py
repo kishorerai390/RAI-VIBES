@@ -14,6 +14,18 @@ import config
 
 logger = logging.getLogger("VoiceHub")
 
+SMALL_CAPS_TRANS = str.maketrans(
+    "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ",
+    "abcdefghijklmnopqrstuvwxyz"
+)
+
+def normalize_vc_name(name: str) -> str:
+    """Normalizes voice channel names across all Unicode fonts, small-caps, and NFKD formatting."""
+    if not name:
+        return ""
+    return unicodedata.normalize('NFKD', name).translate(SMALL_CAPS_TRANS).lower()
+
+
 class RenameVoiceModal(discord.ui.Modal, title="Rename Your Voice Room"):
     new_name = discord.ui.TextInput(
         label="New Voice Channel Name",
@@ -538,11 +550,19 @@ class VoiceHub(commands.Cog):
                     pass
 
         # 2. User Joined a "Join to Create" / Chamber generator channel
-        if after.channel:
-            norm_name = unicodedata.normalize('NFKD', after.channel.name).lower()
-            if "join to create" in norm_name or "create" in norm_name or "➕" in after.channel.name or "chamber" in norm_name:
+        if after.channel and not member.bot:
+            ch_norm = normalize_vc_name(after.channel.name)
+            is_generator = (
+                after.channel.id in (1550187295821402114, 1550204648516755536)
+                or "join to create" in ch_norm
+                or "create" in ch_norm
+                or "➕" in after.channel.name
+                or "chamber" in ch_norm
+                or "[+]" in ch_norm
+            )
+            if is_generator:
                 category = after.channel.category
-                ch_name_lower = norm_name
+                ch_name_lower = ch_norm
 
                 # Check if this is a Private / Hidden / Ghost VC generator
                 is_private_hidden = any(w in ch_name_lower for w in ("private", "ghost", "secret", "hidden"))
