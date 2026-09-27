@@ -26,6 +26,18 @@ def normalize_vc_name(name: str) -> str:
         return ""
     return unicodedata.normalize('NFKD', name).translate(SMALL_CAPS_TRANS).lower()
 
+async def safe_send(interaction: discord.Interaction, content: str = None, **kwargs):
+    """Safely responds to an interaction even if it was already deferred or acknowledged by another process."""
+    kwargs.setdefault("ephemeral", True)
+    try:
+        if interaction.response.is_done():
+            return await interaction.followup.send(content, **kwargs)
+        else:
+            return await interaction.response.send_message(content, **kwargs)
+    except Exception as e:
+        logger.debug(f"safe_send notice: {e}")
+
+
 
 class RenameVoiceModal(discord.ui.Modal, title="Rename Your Voice Room"):
     new_name = discord.ui.TextInput(
@@ -232,6 +244,46 @@ class TransferOwnerSelectView(discord.ui.View):
         await interaction.response.send_message(f"👑 **Ownership Transferred!** {new_owner.mention} is now the host of `{self.vc.name}`!", ephemeral=False)
 
 
+class RegionSelectView(discord.ui.View):
+    """Dropdown menu to switch voice channel RTC region."""
+    def __init__(self, vc: discord.VoiceChannel, owner: discord.Member):
+        super().__init__(timeout=60)
+        self.vc = vc
+        self.owner = owner
+
+    @discord.ui.select(
+        placeholder="Select a Voice Server Region...",
+        options=[
+            discord.SelectOption(label="Automatic (Optimal)", value="automatic", emoji="⚡", description="Let Discord automatically select the best server"),
+            discord.SelectOption(label="India", value="india", emoji="🇮🇳", description="Lowest latency for South Asia & India"),
+            discord.SelectOption(label="Singapore", value="singapore", emoji="🇸🇬", description="Optimal for Southeast Asia"),
+            discord.SelectOption(label="Rotterdam (Europe)", value="rotterdam", emoji="🇳🇱", description="Optimal for Europe / UK"),
+            discord.SelectOption(label="Frankfurt (Europe)", value="frankfurt", emoji="🇩🇪", description="Central Europe hub"),
+            discord.SelectOption(label="US East", value="us-east", emoji="🇺🇸", description="United States East Coast"),
+            discord.SelectOption(label="US Central", value="us-central", emoji="🇺🇸", description="United States Central"),
+            discord.SelectOption(label="US West", value="us-west", emoji="🇺🇸", description="United States West Coast"),
+            discord.SelectOption(label="Japan", value="japan", emoji="🇯🇵", description="Tokyo, East Asia"),
+            discord.SelectOption(label="Hong Kong", value="hongkong", emoji="🇭🇰", description="Hong Kong / Asia-Pacific"),
+            discord.SelectOption(label="Sydney", value="sydney", emoji="🇦🇺", description="Australia / Oceania"),
+            discord.SelectOption(label="Brazil", value="brazil", emoji="🇧🇷", description="South America"),
+        ]
+    )
+    async def select_region(self, interaction: discord.Interaction, select: discord.ui.Select):
+        cog = interaction.client.get_cog("VoiceHub")
+        if cog and self.vc.id in cog.temp_channels and cog.temp_channels[self.vc.id] != interaction.user.id:
+            return await interaction.response.send_message("❌ Only the room owner can change the voice region.", ephemeral=True)
+
+        chosen = select.values[0]
+        region_val = None if chosen == "automatic" else chosen
+        try:
+            await self.vc.edit(rtc_region=region_val)
+            name_map = {opt.value: opt.label for opt in select.options}
+            display_name = name_map.get(chosen, chosen)
+            await safe_send(interaction, f"🌐 Voice region switched to **{display_name}**!", ephemeral=True)
+        except Exception as e:
+            await safe_send(interaction, f"❌ Could not change region: {e}", ephemeral=True)
+
+
 class VoiceControlView(discord.ui.View):
     """Persistent 24/7 Voice Room Controls for Dynamic Voice Hub."""
     def __init__(self):
@@ -244,114 +296,143 @@ class VoiceControlView(discord.ui.View):
     async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to lock it.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to lock it.", ephemeral=True)
         await vc.set_permissions(interaction.guild.default_role, connect=False)
-        await interaction.response.send_message("🔒 **Room Locked!** Only users you permit can join.", ephemeral=True)
+        await safe_send(interaction, "🔒 **Room Locked!** Only users you permit can join.", ephemeral=True)
 
     @discord.ui.button(label="Unlock", style=discord.ButtonStyle.success, emoji="🔓", row=0, custom_id="vc_unlock")
     async def unlock(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to unlock it.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to unlock it.", ephemeral=True)
         await vc.set_permissions(interaction.guild.default_role, connect=None)
-        await interaction.response.send_message("🔓 **Room Unlocked!** Everyone can join.", ephemeral=True)
+        await safe_send(interaction, "🔓 **Room Unlocked!** Everyone can join.", ephemeral=True)
 
     @discord.ui.button(label="Rename", style=discord.ButtonStyle.primary, emoji="🏷️", row=0, custom_id="vc_rename")
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to rename it.", ephemeral=True)
-        await interaction.response.send_modal(RenameVoiceModal())
+            return await safe_send(interaction, "❌ You must be inside your voice channel to rename it.", ephemeral=True)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_modal(RenameVoiceModal())
+            else:
+                await safe_send(interaction, "⚠️ Please click Rename again to open the rename popup.", ephemeral=True)
+        except Exception:
+            pass
 
     @discord.ui.button(label="Limit", style=discord.ButtonStyle.secondary, emoji="👥", row=0, custom_id="vc_limit")
     async def limit(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to change limits.", ephemeral=True)
-        await interaction.response.send_modal(LimitVoiceModal())
+            return await safe_send(interaction, "❌ You must be inside your voice channel to change limits.", ephemeral=True)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_modal(LimitVoiceModal())
+            else:
+                await safe_send(interaction, "⚠️ Please click Limit again to open the limit popup.", ephemeral=True)
+        except Exception:
+            pass
 
-    @discord.ui.button(label="Ghost (Hide)", style=discord.ButtonStyle.secondary, emoji="👻", row=1, custom_id="vc_ghost")
+    @discord.ui.button(label="Hide", style=discord.ButtonStyle.secondary, emoji="👻", row=1, custom_id="vc_ghost")
     async def ghost(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to ghost/hide it.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to hide it.", ephemeral=True)
         
-        current_perms = vc.overwrites_for(interaction.guild.default_role)
-        is_hidden = current_perms.view_channel is False
+        # Ghost / Hide from @everyone
+        await vc.set_permissions(interaction.guild.default_role, view_channel=False)
+        verified_role = discord.utils.get(interaction.guild.roles, id=1549504522953695269) or discord.utils.get(interaction.guild.roles, name="✨・Verified") or discord.utils.get(interaction.guild.roles, name="Verified")
+        if verified_role:
+            await vc.set_permissions(verified_role, view_channel=False)
+        # Ensure owner can always see & connect
+        await vc.set_permissions(interaction.user, view_channel=True, connect=True, speak=True)
+        # Ensure any current members in room can also see
+        for m in vc.members:
+            if not m.bot:
+                await vc.set_permissions(m, view_channel=True, connect=True, speak=True)
+        await safe_send(
+            interaction,
+            "👻 **Voice room is now HIDDEN!**\n"
+            "• Completely invisible to other members in the server.\n"
+            "• Only you and permitted squadmates can see and join.\n"
+            "• Click **`👁️ Unhide`** anytime to reveal it again!",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="Unhide", style=discord.ButtonStyle.success, emoji="👁️", row=1, custom_id="vc_unhide")
+    async def unhide(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await safe_send(interaction, "❌ You must be inside your voice channel to unhide it.", ephemeral=True)
         
-        if is_hidden:
-            # Un-ghost (make visible to @everyone again)
-            await vc.set_permissions(interaction.guild.default_role, view_channel=None)
-            verified_role = discord.utils.get(interaction.guild.roles, id=1549504522953695269) or discord.utils.get(interaction.guild.roles, name="✨・Verified") or discord.utils.get(interaction.guild.roles, name="Verified")
-            if verified_role:
-                await vc.set_permissions(verified_role, view_channel=None)
-            await interaction.response.send_message("👁️ **Voice room is now VISIBLE to everyone in the server!**", ephemeral=True)
-        else:
-            # Ghost / Hide from @everyone
-            await vc.set_permissions(interaction.guild.default_role, view_channel=False)
-            verified_role = discord.utils.get(interaction.guild.roles, id=1549504522953695269) or discord.utils.get(interaction.guild.roles, name="✨・Verified") or discord.utils.get(interaction.guild.roles, name="Verified")
-            if verified_role:
-                await vc.set_permissions(verified_role, view_channel=False)
-            # Ensure owner can always see & connect
-            await vc.set_permissions(interaction.user, view_channel=True, connect=True, speak=True)
-            # Ensure any current members in room can also see
-            for m in vc.members:
-                if not m.bot:
-                    await vc.set_permissions(m, view_channel=True, connect=True, speak=True)
-            await interaction.response.send_message(
-                "👻 **Voice room is now GHOSTED (HIDDEN)!**\n"
-                "• Completely invisible to other members in the server.\n"
-                "• Only you and permitted squadmates can see and join.\n"
-                "• Click **`✉️ Permit / Invite`** to select specific members to show this room to!",
-                ephemeral=True
-            )
+        await vc.set_permissions(interaction.guild.default_role, view_channel=None)
+        verified_role = discord.utils.get(interaction.guild.roles, id=1549504522953695269) or discord.utils.get(interaction.guild.roles, name="✨・Verified") or discord.utils.get(interaction.guild.roles, name="Verified")
+        if verified_role:
+            await vc.set_permissions(verified_role, view_channel=None)
+        await safe_send(interaction, "👁️ **Voice room is now UNHIDDEN!** Everyone on the server can see it.", ephemeral=True)
 
     @discord.ui.button(label="Permit", style=discord.ButtonStyle.primary, emoji="✉️", row=1, custom_id="vc_permit")
     async def permit(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to invite members.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to invite members.", ephemeral=True)
         
         view = InviteUserSelectView(vc, interaction.user)
-        await interaction.response.send_message("✉️ **Select members below to reveal & permit into your hidden room:**", view=view, ephemeral=True)
+        await safe_send(interaction, "✉️ **Select members below to reveal & permit into your hidden room:**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Revoke", style=discord.ButtonStyle.danger, emoji="🚫", row=1, custom_id="vc_revoke")
     async def revoke(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to revoke access.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to revoke access.", ephemeral=True)
         
         view = RevokeUserSelectView(vc, interaction.user)
-        await interaction.response.send_message("🚫 **Select members below to revoke access & hide this channel from:**", view=view, ephemeral=True)
+        await safe_send(interaction, "🚫 **Select members below to revoke access & hide this channel from:**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Kick Member", style=discord.ButtonStyle.danger, emoji="👢", row=2, custom_id="vc_kick")
     async def kick_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to kick members.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to kick members.", ephemeral=True)
         
         view = KickUserSelectView(vc, interaction.user)
-        await interaction.response.send_message("👢 **Select member(s) to disconnect from this voice room:**", view=view, ephemeral=True)
+        await safe_send(interaction, "👢 **Select member(s) to disconnect from this voice room:**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Transfer Host", style=discord.ButtonStyle.primary, emoji="👑", row=2, custom_id="vc_transfer")
     async def transfer_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to transfer ownership.", ephemeral=True)
+            return await safe_send(interaction, "❌ You must be inside your voice channel to transfer ownership.", ephemeral=True)
         
         cog = interaction.client.get_cog("VoiceHub")
         if not cog or vc.id not in cog.temp_channels or cog.temp_channels[vc.id] != interaction.user.id:
-            return await interaction.response.send_message("❌ You can only transfer ownership of rooms you created.", ephemeral=True)
+            return await safe_send(interaction, "❌ You can only transfer ownership of rooms you created.", ephemeral=True)
 
         view = TransferOwnerSelectView(vc, interaction.user, cog)
-        await interaction.response.send_message("👑 **Select a squadmate to become the new room host:**", view=view, ephemeral=True)
+        await safe_send(interaction, "👑 **Select a squadmate to become the new room host:**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, emoji="💬", row=2, custom_id="vc_status")
     async def status(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = self.get_user_vc(interaction)
         if not vc:
-            return await interaction.response.send_message("❌ You must be inside your voice channel to set status.", ephemeral=True)
-        await interaction.response.send_modal(SetStatusVoiceModal())
+            return await safe_send(interaction, "❌ You must be inside your voice channel to set status.", ephemeral=True)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_modal(SetStatusVoiceModal())
+            else:
+                await safe_send(interaction, "⚠️ Please click Status again to open the status popup.", ephemeral=True)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="Region", style=discord.ButtonStyle.secondary, emoji="🌐", row=2, custom_id="vc_region")
+    async def region_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.get_user_vc(interaction)
+        if not vc:
+            return await safe_send(interaction, "❌ You must be inside your voice channel to change the region.", ephemeral=True)
+        
+        view = RegionSelectView(vc, interaction.user)
+        await safe_send(interaction, "🌐 **Select a Voice Server Region below:**", view=view, ephemeral=True)
 
 
 class VoiceHub(commands.Cog):
@@ -585,12 +666,13 @@ class VoiceHub(commands.Cog):
                 "• 🔒 **Lock** / 🔓 **Unlock**: Toggle public access\n"
                 "• 🏷️ **Rename**: Change room title\n"
                 "• 👥 **Limit**: Set maximum player capacity (0–99)\n"
-                "• 👻 **Ghost (Hide)**: Make room invisible to everyone except friends\n"
+                "• 👻 **Hide** / 👁️ **Unhide**: Toggle room visibility to everyone\n"
                 "• ✉️ **Permit**: Choose squadmates to reveal and invite into your room\n"
                 "• 🚫 **Revoke**: Eject users and re-hide channel\n"
                 "• 👢 **Kick**: Instantly disconnect someone from your room\n"
                 "• 👑 **Transfer Host**: Pass room ownership to a squadmate\n"
-                "• 💬 **Status**: Set customized activity text\n\n"
+                "• 💬 **Status**: Set customized activity text\n"
+                "• 🌐 **Region**: Switch voice server region (India, Singapore, Europe, US, etc.)\n\n"
                 "*Note: You must be inside your voice channel to use these controls.*"
             ),
             color=config.COLOR_PRIMARY
