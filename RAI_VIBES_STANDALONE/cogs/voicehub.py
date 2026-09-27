@@ -620,39 +620,6 @@ class VoiceHub(commands.Cog):
                     await member.move_to(temp_vc)
                     logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}, private: {is_private_hidden}) for {member.name}")
 
-                    # Send interactive control dashboard in text-in-voice
-                    if is_private_hidden:
-                        desc = (
-                            f"👻 **Welcome to your Private Hidden Voice Room, {member.mention}!**\n\n"
-                            f"🔒 **This room is 100% INVISIBLE to everyone else on the server.**\n\n"
-                            f"• Click **`✉️ Permit / Invite`** below to select squadmates to reveal and invite into this room\n"
-                            f"• Click **`👻 Ghost`** anytime to toggle visibility back to public\n"
-                            f"• Use the buttons below to lock, rename, set limits, or kick members\n\n"
-                            f"*This room will automatically delete after {self.INACTIVITY_GRACE_SECONDS} seconds of inactivity once everyone leaves.*"
-                        )
-                    else:
-                        desc = (
-                            f"Welcome to your private voice channel, {member.mention}!\n\n"
-                            f"Use the buttons below to customize and secure your room:\n"
-                            f"• 🔒 **Lock / 🔓 Unlock**: Control who can enter\n"
-                            f"• 🏷️ **Rename**: Customize room title\n"
-                            f"• 👥 **Limit**: Set max member count\n"
-                            f"• 👻 **Ghost (Hide)**: Hide room so only you & permitted friends can see it\n"
-                            f"• ✉️ **Permit / Invite**: Pick members to reveal this hidden channel to\n"
-                            f"• 🚫 **Revoke**: Remove access & hide room from members\n\n"
-                            f"*This room will automatically delete after {self.INACTIVITY_GRACE_SECONDS} seconds of inactivity once everyone leaves.*"
-                        )
-
-                    embed = discord.Embed(
-                        title=f"🎛️ Voice Room Controls • {member.display_name}",
-                        description=desc,
-                        color=config.COLOR_PRIMARY
-                    )
-                    embed.set_footer(text="RAI VIBES 💗 • Dynamic Voice Hub", icon_url=config.RAI_ICON_URL)
-                    
-                    view = VoiceControlView()
-                    await temp_vc.send(content=member.mention, embed=embed, view=view)
-
                 except Exception as e:
                     logger.error(f"Failed to create temp voice channel: {e}")
 
