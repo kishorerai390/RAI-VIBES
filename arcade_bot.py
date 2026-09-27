@@ -66,6 +66,8 @@ BANNER = """
 ARCADE_EXTENSIONS = [
     "cogs.economy",
     "cogs.quests",
+    "cogs.battlepass",
+    "cogs.boss_raid",
     "cogs.casino",
     "cogs.leveling",
     "cogs.pets",
@@ -74,14 +76,12 @@ ARCADE_EXTENSIONS = [
     "cogs.arcade_panel",
     "cogs.anime",
     "cogs.lottery",
-    "cogs.productivity",
     "cogs.suggestions",
     "cogs.giveaway",
     "cogs.exchange",
     "cogs.duels",
     "cogs.wyr",
     "cogs.quotes",
-    # "cogs.qotd",  # Disabled Question of the Day per server preferences
     "cogs.bump_reminder",
     "cogs.welcome",
     "cogs.server_stats",
@@ -93,6 +93,8 @@ ARCADE_EXTENSIONS = [
     "cogs.telemetry",
     "cogs.general",
     "cogs.lfg",
+    "cogs.tournaments",
+    "cogs.music_quiz",
     "cogs.stream_alerts",
 ]
 

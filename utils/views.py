@@ -355,20 +355,58 @@ class MusicPlayerView(View):
 
 class AudioEffectsControlView(View):
     """Interactive popup to manage advanced audio effects and speed."""
-    def __init__(self, player, parent_view):
-        super().__init__(timeout=60)
+    def __init__(self, player, parent_view=None):
+        super().__init__(timeout=90)
         self.player = player
         self.parent_view = parent_view
 
-    @button(label="Karaoke (Vocal Cut)", style=discord.ButtonStyle.secondary, emoji="🎤", row=0)
-    async def karaoke_btn(self, interaction: discord.Interaction, button: Button):
-        await self.parent_view.toggle_filter(interaction, "karaoke", "Karaoke (Vocal Cut)")
+    async def toggle_filter(self, interaction: discord.Interaction, filter_key: str, name: str):
+        if not self.player or not self.player.current:
+            return await interaction.response.send_message("❌ Nothing is currently playing in voice.", ephemeral=True)
 
-    @button(label="Vaporwave", style=discord.ButtonStyle.secondary, emoji="📼", row=0)
+        if filter_key in self.player.active_filters:
+            self.player.active_filters.remove(filter_key)
+            status_text = f"⚪ Disabled `{name}`"
+        else:
+            if filter_key.startswith("bassboost_") or filter_key == "subbass_engine":
+                self.player.active_filters = [f for f in self.player.active_filters if not f.startswith("bassboost_") and f != "subbass_engine"]
+            self.player.active_filters.append(filter_key)
+            status_text = f"⚡ Activated `{name}`"
+
+        await self.player.restart_current_with_filters()
+        active_list = ", ".join([f"`{f}`" for f in self.player.active_filters]) if self.player.active_filters else "`Flat / Natural`"
+        await interaction.response.send_message(
+            f"{status_text}\n🎚️ **Active Filters:** {active_list}",
+            ephemeral=True
+        )
+
+    # Row 0: Signature DSP Audio Filters
+    @button(label="8D Spatial", style=discord.ButtonStyle.primary, emoji="🌌", row=0)
+    async def eight_d_btn(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "8d", "8D Spatial Audio")
+
+    @button(label="Sub-Bass 3D", style=discord.ButtonStyle.primary, emoji="⚡", row=0)
+    async def bass_btn(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "subbass_engine", "Sub-Bass 3D Engine")
+
+    @button(label="Nightcore", style=discord.ButtonStyle.primary, emoji="🌙", row=0)
+    async def nightcore_btn(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "nightcore", "Nightcore")
+
+    @button(label="Lo-Fi Mellow", style=discord.ButtonStyle.primary, emoji="☕", row=0)
+    async def lofi_btn(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "lofi_mellow", "Lo-Fi Mellow")
+
+    # Row 1: Retro & Vocal FX
+    @button(label="Vaporwave", style=discord.ButtonStyle.secondary, emoji="📼", row=1)
     async def vaporwave_btn(self, interaction: discord.Interaction, button: Button):
-        await self.parent_view.toggle_filter(interaction, "vaporwave", "Vaporwave Retro")
+        await self.toggle_filter(interaction, "vaporwave", "Vaporwave Retro")
 
-    @button(label="Speed 1.25x", style=discord.ButtonStyle.secondary, emoji="⏩", row=0)
+    @button(label="Karaoke (Vocal Cut)", style=discord.ButtonStyle.secondary, emoji="🎤", row=1)
+    async def karaoke_btn(self, interaction: discord.Interaction, button: Button):
+        await self.toggle_filter(interaction, "karaoke", "Karaoke (Vocal Cut)")
+
+    @button(label="Speed 1.25x", style=discord.ButtonStyle.secondary, emoji="⏩", row=1)
     async def speed_fast_btn(self, interaction: discord.Interaction, button: Button):
         self.player.custom_speed = 1.25 if self.player.custom_speed != 1.25 else 1.0
         await self.player.restart_current_with_filters()
@@ -380,12 +418,13 @@ class AudioEffectsControlView(View):
         await self.player.restart_current_with_filters()
         await interaction.response.send_message(f"⏪ **Playback Speed:** `{self.player.custom_speed}x`", ephemeral=True)
 
-    @button(label="Reset All Audio FX", style=discord.ButtonStyle.danger, emoji="🔄", row=1)
+    # Row 2: Reset
+    @button(label="Reset All Audio FX", style=discord.ButtonStyle.danger, emoji="🔄", row=2)
     async def reset_fx_btn(self, interaction: discord.Interaction, button: Button):
         self.player.active_filters.clear()
         self.player.custom_speed = 1.0
         await self.player.restart_current_with_filters()
-        await interaction.response.send_message("✨ **All audio filters reset to Natural Sound!**", ephemeral=True)
+        await interaction.response.send_message("✨ **All audio filters reset to Flat / Natural Sound!**", ephemeral=True)
         if self.player.now_playing_message:
             try:
                 await self.player.now_playing_message.edit(embed=self.player.build_now_playing_embed(), view=self.parent_view)

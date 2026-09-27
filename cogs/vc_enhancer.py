@@ -249,7 +249,7 @@ class VCEnhancer(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Competitive Tournament Engine", icon_url=config.RAI_ICON_URL)
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="voteskip", description="Democratically vote to skip the currently playing music track.")
+    @app_commands.command(name="votedemocracy", description="Democratically vote to skip the currently playing music track.")
     async def voteskip_command(self, interaction: discord.Interaction):
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.response.send_message("❌ You must be in a voice channel listening to music to start a vote skip.", ephemeral=True)
