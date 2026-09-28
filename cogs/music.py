@@ -2004,9 +2004,10 @@ class Music(commands.Cog):
     @commands.hybrid_command(name="disconnect", aliases=["dc", "leave"], description="Disconnect from voice channel and clear queue.")
     async def disconnect_cmd(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
-        if player:
-            player.stop()
-        if ctx.guild.voice_client:
+        if player and player.is_connected:
+            await player.stop()
+            await ctx.send("👋 **Disconnected from voice channel.**")
+        elif ctx.guild.voice_client:
             await ctx.guild.voice_client.disconnect(force=True)
             await ctx.send("👋 **Disconnected from voice channel.**")
         else:
@@ -2093,7 +2094,7 @@ class Music(commands.Cog):
     # =========================================================================
     # COMMAND: STOP / DISCONNECT
     # =========================================================================
-    @commands.hybrid_command(name="stop", aliases=["leave", "disconnect", "dc"], description="Stop music, clear queue, and leave voice.")
+    @commands.hybrid_command(name="stop", aliases=["halt"], description="Stop music, clear queue, and leave voice.")
     async def stop(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.is_connected:
