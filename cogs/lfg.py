@@ -85,13 +85,14 @@ class LFGView(View):
             # Auto-create temporary private voice room
             guild = interaction.guild
             cat = (
-                discord.utils.get(guild.categories, name="🥂 ＰＲＩＶＡＴＥ  ＳＵＩＴＥＳ")
-                or discord.utils.get(guild.categories, name="🎮 ＧＡＭＩＮＧ  ＺＯＮＥ")
+                discord.utils.get(guild.categories, name="⚡ ┃ 𝙎𝙌𝙐𝘼𝘿 𝘼𝙍𝙀𝙉𝘼")
+                or discord.utils.get(guild.categories, name="🎭 ┃ 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝙎𝙐𝙄𝙏𝙀𝙎")
+                or discord.utils.get(guild.categories, name="🔊 ┃ 𝙑𝙊𝙄𝘾𝙀 𝙇𝙊𝙐𝙉𝙂𝙀𝙎")
                 or interaction.channel.category
             )
 
             game_label = GAME_EMOJIS.get(squad["game"], "Gaming").split(" ")[1]
-            vc_name = f"🎮 ┊ {game_label} Squad"
+            vc_name = f"⚡┃・{game_label.lower()} ꜱǫᴜᴀᴅ"
 
             try:
                 created_vc = await guild.create_voice_channel(
@@ -239,10 +240,10 @@ class DropCodeModal(Modal, title="Drop In-Game Team Code 🔑"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         hub = (
-            discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
-            or discord.utils.get(interaction.guild.text_channels, name="lfg-matchmaking")
+            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="gaming-hub")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
             or interaction.channel
         )
         game_str = self.game_name.value.strip()
@@ -329,10 +330,10 @@ class LFGHubLauncherView(View):
                 return await interaction.followup.send("⚠️ You already have an active recruiting squad! Please wait for it or finish before opening another.", ephemeral=True)
 
         hub = (
-            discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
-            or discord.utils.get(interaction.guild.text_channels, name="lfg-matchmaking")
+            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="gaming-hub")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
             or interaction.channel
         )
 

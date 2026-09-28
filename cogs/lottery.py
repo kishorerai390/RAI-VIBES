@@ -18,7 +18,7 @@ logger = logging.getLogger("Lottery")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 LOTTERY_FILE = DATA_DIR / "lottery.json"
 ECONOMY_FILE = DATA_DIR / "economy.json"
-HALL_OF_FAME_CH_ID = 1549407114861215815
+HALL_OF_FAME_CH_ID = 1554174876749791342
 GENERAL_CHAT_ID = 1545502730699808768
 
 TICKET_PRICE = 100

@@ -150,7 +150,7 @@ def create_arcade_bot(use_members: bool = True, use_message_content: bool = True
         from cogs.suggestions import SuggestionVoteView
         from cogs.movie_party import MovieRSVPView
         from cogs.pets import PetCareView
-        from cogs.lfg import LFGView
+        from cogs.lfg import LFGView, LFGHubLauncherView
         from cogs.party_games import PartyGamesView
         from cogs.arcade_panel import ArcadeStationView
 
@@ -162,6 +162,7 @@ def create_arcade_bot(use_members: bool = True, use_message_content: bool = True
             MovieRSVPView(),
             PetCareView(owner_id=0),
             LFGView(),
+            LFGHubLauncherView(),
             PartyGamesView(),
             ArcadeStationView(),
         ]

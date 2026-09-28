@@ -212,31 +212,42 @@ class Leveling(commands.Cog):
         """Sends luxury level-up celebration canvas and awards coin bonus with milestone perks."""
         coin_bonus = new_level * 50
 
-        # Milestone Perks Definition (Everglow Activity Tiers)
+        # Milestone Perks Definition (Thor Apex Prestige Tiers)
         MILESTONES = {
             5: {
-                "title": "✨ Starlight Initiate",
+                "title": "⚡ Apex Rookie",
+                "role_name": "⚡・Apex Rookie",
+                "color": 0x00F5D4,
                 "bonus": 500,
-                "perk": "Unlocked external emojis & stickers across the server!",
-                "role_id": 1552378037276901547
+                "perk": "Unlocked external emojis & stickers across the server!"
             },
-            15: {
-                "title": "🌸 Aurora Voyager",
-                "bonus": 1500,
-                "perk": "Unlocked custom server nicknames!",
-                "role_id": 1552378030855290931
+            10: {
+                "title": "🔥 Apex Vanguard",
+                "role_name": "🔥・Apex Vanguard",
+                "color": 0xFF7700,
+                "bonus": 1000,
+                "perk": "Unlocked custom nicknames & voice soundboard access!"
+            },
+            20: {
+                "title": "💎 Apex Elite",
+                "role_name": "💎・Apex Elite",
+                "color": 0x00D2FF,
+                "bonus": 2500,
+                "perk": "Unlocked high-tier VIP lounges & priority sound quality!"
             },
             30: {
-                "title": "💫 Nebula Elite",
+                "title": "👑 Apex Legend",
+                "role_name": "👑・Apex Legend",
+                "color": 0xFFD700,
                 "bonus": 5000,
-                "perk": "Unlocked embed links & priority perks!",
-                "role_id": 1552378026367647887
+                "perk": "Unlocked embed links, media priority & Legend status!"
             },
             50: {
-                "title": "👑 Celestial Sovereign",
+                "title": "⚡ Thor Immortal",
+                "role_name": "⚡・Thor Immortal",
+                "color": 0xFF007F,
                 "bonus": 15000,
-                "perk": "VIP Celestial badge, exclusive colored name glow & legend status!",
-                "role_id": 1552378020352884756
+                "perk": "VIP Thor Immortal aura, exclusive pink neon glow & eternal champion standing!"
             }
         }
 
@@ -245,20 +256,35 @@ class Leveling(commands.Cog):
         if milestone_data:
             extra = milestone_data["bonus"]
             coin_bonus += extra
-            milestone_text = f"\n\n🏆 **EVERGLOW TIER REACHED: {milestone_data['title']}**\n🎁 **Tier Perk:** {milestone_data['perk']}"
-            if "role_id" in milestone_data:
-                role = guild.get_role(milestone_data["role_id"])
-                if role and role not in member.roles:
-                    try:
-                        await member.add_roles(role, reason=f"Level {new_level} Everglow Activity Tier Unlock")
-                        milestone_text += f"\n✨ **Role Awarded:** {role.mention}"
-                    except Exception as re:
-                        logger.warning(f"Could not assign milestone role: {re}")
+            milestone_text = f"\n\n🏆 **APEX PRESTIGE TIER REACHED: {milestone_data['title']}**\n🎁 **Tier Perk:** {milestone_data['perk']}"
+            
+            target_role_name = milestone_data["role_name"]
+            role = discord.utils.get(guild.roles, name=target_role_name)
+            if not role:
+                try:
+                    role = await guild.create_role(
+                        name=target_role_name,
+                        color=discord.Color(milestone_data["color"]),
+                        reason=f"Auto-created Thor Apex Prestige Milestone Role for Level {new_level}"
+                    )
+                except Exception as ce:
+                    logger.debug(f"Could not create milestone role: {ce}")
+
+            if role and role not in member.roles and role < guild.me.top_role:
+                try:
+                    await member.add_roles(role, reason=f"Level {new_level} Thor Apex Milestone Unlock")
+                    milestone_text += f"\n✨ **Prestige Role Awarded:** {role.mention}"
+                except Exception as re:
+                    logger.warning(f"Could not assign milestone role: {re}")
 
         award_vc_coins(member.id, coin_bonus)
 
-        # Target announcement channel: #⭐・starboard (1551184190073213071) or local channel
-        target_channel = guild.get_channel(1551184190073213071) or channel
+        # Target announcement channel: #🏆｜ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ (1554174876749791342) or local channel
+        target_channel = (
+            guild.get_channel(1554174876749791342)
+            or discord.utils.get(guild.text_channels, name="🏆｜ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ")
+            or channel
+        )
 
         card_file = None
         try:
