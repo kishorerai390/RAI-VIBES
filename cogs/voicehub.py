@@ -582,7 +582,7 @@ class VoiceControlView(discord.ui.View):
 
 
 class VoiceHub(commands.Cog):
-    TEMP_PREFIXES = ("🥂┃・", "🥂┃", "🥂", "🔒┃・", "🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ", "👻 ", "🔒 ")
+    TEMP_PREFIXES = ("🎧┃・", "🎧 ", "⚡┃・", "👥┃・", "👤┃・", "🥂┃・", "🥂┃", "🥂", "🔒┃・", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ", "👻 ", "🔒 ")
     TEMP_SUFFIXES = (
         "'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man", "'s Private", "'s Ghost",
         "'ꜱ ʟᴏᴜɴɢᴇ", "'ꜱ ꜱᴏʟᴏ", "'ꜱ ᴅᴜᴏ", "'ꜱ ᴛʀɪᴏ", "'ꜱ ꜱǫᴜᴀᴅ", "'ꜱ 5-ᴍᴀɴ", "'ꜱ 6-ᴍᴀɴ", "'ꜱ ᴘᴠᴛ", "ꜱᴏʟᴏ", "ᴅᴜᴏ", "ᴛʀɪᴏ", "ʟᴏᴜɴɢᴇ"
@@ -939,33 +939,34 @@ class VoiceHub(commands.Cog):
                 initial_limit = 0
                 if "solo" in ch_name_lower or "limit 1" in ch_name_lower:
                     initial_limit = 1
-                    room_name = f"🥂┃・{clean_name}'ꜱ ꜱᴏʟᴏ"
+                    room_name = f"👤┃・{clean_name}'ꜱ ꜱᴏʟᴏ"
                 elif "duo" in ch_name_lower or "limit 2" in ch_name_lower:
                     initial_limit = 2
-                    room_name = f"🥂┃・{clean_name}'ꜱ ᴅᴜᴏ"
+                    room_name = f"👥┃・{clean_name}'ꜱ ᴅᴜᴏ"
                 elif "trio" in ch_name_lower or "limit 3" in ch_name_lower:
                     initial_limit = 3
-                    room_name = f"🥂┃・{clean_name}'ꜱ ᴛʀɪᴏ"
+                    room_name = f"⚡┃・{clean_name}'ꜱ ᴛʀɪᴏ"
                 elif "squad" in ch_name_lower or "limit 4" in ch_name_lower:
                     initial_limit = 4
-                    room_name = f"🥂┃・{clean_name}'ꜱ ꜱǫᴜᴀᴅ"
+                    room_name = f"⚡┃・{clean_name}'ꜱ ꜱǫᴜᴀᴅ"
                 elif "5-man" in ch_name_lower or "limit 5" in ch_name_lower:
                     initial_limit = 5
-                    room_name = f"🥂┃・{clean_name}'ꜱ 5-ᴍᴀɴ"
+                    room_name = f"⚡┃・{clean_name}'ꜱ 5-ᴍᴀɴ"
                 elif "6-man" in ch_name_lower or "limit 6" in ch_name_lower:
                     initial_limit = 6
-                    room_name = f"🥂┃・{clean_name}'ꜱ 6-ᴍᴀɴ"
+                    room_name = f"⚡┃・{clean_name}'ꜱ 6-ᴍᴀɴ"
                 elif is_private_hidden:
                     room_name = f"🔒┃・{clean_name}'ꜱ ᴘᴠᴛ"
                 else:
-                    room_name = f"🥂┃・{clean_name}'ꜱ ʟᴏᴜɴɢᴇ"
+                    room_name = f"🎧┃・{clean_name}'ꜱ ʟᴏᴜɴɢᴇ"
+
+                verified_role = discord.utils.get(guild.roles, id=1549504522953695269) or discord.utils.get(guild.roles, name="✨・Verified") or discord.utils.get(guild.roles, name="Verified")
 
                 if is_private_hidden:
                     overwrites = {
                         guild.default_role: discord.PermissionOverwrite(view_channel=False, connect=False),
                         member: discord.PermissionOverwrite(view_channel=True, connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
                     }
-                    verified_role = discord.utils.get(guild.roles, id=1549504522953695269) or discord.utils.get(guild.roles, name="✨・Verified") or discord.utils.get(guild.roles, name="Verified")
                     if verified_role:
                         overwrites[verified_role] = discord.PermissionOverwrite(view_channel=False, connect=False)
                 else:
@@ -973,6 +974,8 @@ class VoiceHub(commands.Cog):
                         guild.default_role: discord.PermissionOverwrite(connect=True, speak=True),
                         member: discord.PermissionOverwrite(connect=True, speak=True, mute_members=True, move_members=True, manage_channels=True)
                     }
+                    if verified_role:
+                        overwrites[verified_role] = discord.PermissionOverwrite(connect=True, speak=True)
 
                 try:
                     temp_vc = await guild.create_voice_channel(
@@ -985,7 +988,13 @@ class VoiceHub(commands.Cog):
                     )
                     self.temp_channels[temp_vc.id] = member.id
                     self._save_temp_channels()
-                    await member.move_to(temp_vc)
+
+                    try:
+                        if member.voice and member.voice.channel:
+                            await member.move_to(temp_vc, reason="Join-to-Create Auto-Move")
+                    except Exception as me:
+                        logger.warning(f"Could not move member into new temp VC: {me}")
+
                     logger.info(f"Created temporary voice room '{room_name}' (limit: {initial_limit}, private: {is_private_hidden}) for {member.name}")
                     asyncio.create_task(self.update_panel_telemetry())
 

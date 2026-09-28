@@ -25,17 +25,10 @@ logger = logging.getLogger("DualRunner")
 async def run_vibes(token: str):
     while True:
         try:
-            bot = create_bot(use_members=True, use_message_content=True)
+            bot = create_bot(use_members=False, use_message_content=False)
             async with bot:
                 await load_cogs(bot)
-                try:
-                    await bot.start(token)
-                except discord.errors.PrivilegedIntentsRequired:
-                    logger.warning("[RAI VIBES] Privileged intents not enabled in portal. Falling back to basic intents.")
-                    bot_fallback = create_bot(use_members=False, use_message_content=False)
-                    async with bot_fallback:
-                        await load_cogs(bot_fallback)
-                        await bot_fallback.start(token)
+                await bot.start(token)
         except asyncio.CancelledError:
             break
         except discord.errors.LoginFailure:
@@ -158,7 +151,7 @@ async def main():
         while True:
             await asyncio.sleep(3600)
     else:
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == "__main__":
     acquire_vibes_lock(59124)
