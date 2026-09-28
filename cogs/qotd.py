@@ -45,16 +45,15 @@ QOTD_POOL = [
 ]
 
 class QOTD(commands.Cog):
-    """Question of the Day Discussion Engine with Automated 8:00 PM Broadcast."""
+    """Question of the Day Discussion Engine (Permanently Disabled)."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.last_posted_date: Optional[str] = None
-        # Automated daily broadcast disabled per server configuration
-        # self.daily_qotd_loop.start()
+        # Permanently disabled
+        pass
 
     def cog_unload(self):
-        if self.daily_qotd_loop.is_running():
-            self.daily_qotd_loop.cancel()
+        pass
 
     @tasks.loop(minutes=15)
     async def daily_qotd_loop(self):
@@ -128,4 +127,6 @@ class QOTD(commands.Cog):
             pass
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(QOTD(bot))
+    # Question of the Day is fully disabled per server configuration
+    logger.info("QOTD cog is disabled.")
+    pass

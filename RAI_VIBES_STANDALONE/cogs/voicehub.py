@@ -25,6 +25,19 @@ def normalize_vc_name(name: str) -> str:
         return ""
     return unicodedata.normalize('NFKD', name).translate(SMALL_CAPS_TRANS).lower()
 
+SMALL_CAPS_MAP = {
+    'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ',
+    'h': 'ʜ', 'i': 'ɪ', 'j': 'ᴊ', 'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ',
+    'o': 'ᴏ', 'p': 'ᴘ', 'q': 'ǫ', 'r': 'ʀ', 's': 'ꜱ', 't': 'ᴛ', 'u': 'ᴜ',
+    'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ'
+}
+
+def to_small_caps(text: str) -> str:
+    """Converts regular latin letters to clean aesthetic Thor Apex small-caps."""
+    if not text:
+        return ""
+    return "".join(SMALL_CAPS_MAP.get(c.lower(), c) for c in text)
+
 async def safe_send(interaction: discord.Interaction, content: str = None, **kwargs):
     """Safely responds to an interaction even if it was already deferred or acknowledged by another process."""
     kwargs.setdefault("ephemeral", True)
@@ -568,8 +581,11 @@ class VoiceControlView(discord.ui.View):
 
 class VoiceHub(commands.Cog):
     """Dynamic Join-to-Create temporary private voice channels with interactive Ghost & Permission controls."""
-    TEMP_PREFIXES = ("🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ", "👻 ", "🔒 ")
-    TEMP_SUFFIXES = ("'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man", "'s Private", "'s Ghost")
+    TEMP_PREFIXES = ("🥂┃・", "🥂┃", "🥂", "🔒┃・", "🎧 ", "👤 ", "👥 ", "🔺 ", "🛡️ ", "⭐ ", "🌟 ", "👻 ", "🔒 ")
+    TEMP_SUFFIXES = (
+        "'s Lounge", "'s Solo", "'s Duo", "'s Trio", "'s Squad", "'s 5-Man", "'s 6-Man", "'s Private", "'s Ghost",
+        "'ꜱ ʟᴏᴜɴɢᴇ", "'ꜱ ꜱᴏʟᴏ", "'ꜱ ᴅᴜᴏ", "'ꜱ ᴛʀɪᴏ", "'ꜱ ꜱǫᴜᴀᴅ", "'ꜱ 5-ᴍᴀɴ", "'ꜱ 6-ᴍᴀɴ", "'ꜱ ᴘᴠᴛ", "ꜱᴏʟᴏ", "ᴅᴜᴏ", "ᴛʀɪᴏ", "ʟᴏᴜɴɢᴇ"
+    )
     INACTIVITY_GRACE_SECONDS = 60  # Auto-delete empty temporary voice rooms after 60 seconds of inactivity
 
     def __init__(self, bot: commands.Bot):
@@ -668,8 +684,9 @@ class VoiceHub(commands.Cog):
         norm = normalize_vc_name(name)
         if any(name.startswith(p) for p in self.TEMP_PREFIXES) and any(name.endswith(s) for s in self.TEMP_SUFFIXES):
             return True
-        if any(s in norm for s in ("'s lounge", "'s solo", "'s duo", "'s trio", "'s squad", "'s private", "'s ghost", "'s 5-man", "'s 6-man")):
-            return True
+        if any(s in norm for s in ("'s lounge", "'s solo", "'s duo", "'s trio", "'s squad", "'s private", "'s ghost", "'s 5-man", "'s 6-man", "lounge", "solo", "duo", "trio", "squad", "pvt")):
+            if any(p in name for p in ("🥂", "🔒", "🎧", "👤", "👥", "🔺", "🛡️")):
+                return True
         return False
 
     def schedule_inactivity_deletion(self, channel: discord.VoiceChannel, delay: int = INACTIVITY_GRACE_SECONDS):
@@ -834,30 +851,31 @@ class VoiceHub(commands.Cog):
                 # Check if this is a Private / Hidden / Ghost VC generator
                 is_private_hidden = any(w in ch_name_lower for w in ("private", "ghost", "secret", "hidden"))
 
-                # Determine initial user limit based on chamber name
+                # Determine initial user limit based on chamber name & apply Thor Apex aesthetic
+                clean_name = to_small_caps(member.display_name[:12].strip())
                 initial_limit = 0
                 if "solo" in ch_name_lower or "limit 1" in ch_name_lower:
                     initial_limit = 1
-                    room_name = f"👤 {member.display_name}'s Solo"
+                    room_name = f"🥂┃・{clean_name}'ꜱ ꜱᴏʟᴏ"
                 elif "duo" in ch_name_lower or "limit 2" in ch_name_lower:
                     initial_limit = 2
-                    room_name = f"👥 {member.display_name}'s Duo"
+                    room_name = f"🥂┃・{clean_name}'ꜱ ᴅᴜᴏ"
                 elif "trio" in ch_name_lower or "limit 3" in ch_name_lower:
                     initial_limit = 3
-                    room_name = f"🔺 {member.display_name}'s Trio"
+                    room_name = f"🥂┃・{clean_name}'ꜱ ᴛʀɪᴏ"
                 elif "squad" in ch_name_lower or "limit 4" in ch_name_lower:
                     initial_limit = 4
-                    room_name = f"🛡️ {member.display_name}'s Squad"
+                    room_name = f"🥂┃・{clean_name}'ꜱ ꜱǫᴜᴀᴅ"
                 elif "5-man" in ch_name_lower or "limit 5" in ch_name_lower:
                     initial_limit = 5
-                    room_name = f"⭐ {member.display_name}'s 5-Man"
+                    room_name = f"🥂┃・{clean_name}'ꜱ 5-ᴍᴀɴ"
                 elif "6-man" in ch_name_lower or "limit 6" in ch_name_lower:
                     initial_limit = 6
-                    room_name = f"🌟 {member.display_name}'s 6-Man"
+                    room_name = f"🥂┃・{clean_name}'ꜱ 6-ᴍᴀɴ"
                 elif is_private_hidden:
-                    room_name = f"👻 {member.display_name}'s Private"
+                    room_name = f"🔒┃・{clean_name}'ꜱ ᴘᴠᴛ"
                 else:
-                    room_name = f"🎧 {member.display_name}'s Lounge"
+                    room_name = f"🥂┃・{clean_name}'ꜱ ʟᴏᴜɴɢᴇ"
 
                 if is_private_hidden:
                     overwrites = {
