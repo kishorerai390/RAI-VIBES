@@ -1815,6 +1815,100 @@ class Music(commands.Cog):
             else:
                 await ctx.send(f"❌ Error while queuing track: `{e}`")
 
+    # =========================================================================
+    # COMMAND: PLAYSKIP (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(
+        name="playskip",
+        aliases=["ps", "pskip", "playnow", "pn"],
+        description="Skips the current song and immediately plays the requested song."
+    )
+    @app_commands.describe(song="The song name, artist, or YouTube/Spotify URL to play immediately")
+    async def playskip(self, ctx: commands.Context, *, song: str):
+        if ctx.interaction:
+            try:
+                await ctx.defer()
+            except Exception:
+                pass
+
+        voice_client = await self.ensure_voice(ctx)
+        if not voice_client:
+            return
+
+        player = self.get_or_create_player(ctx.guild)
+        player.voice_client = voice_client
+        player.text_channel = ctx.channel
+
+        song_obj = await Song.create_source(song, ctx.author, self.bot.loop)
+        if not song_obj:
+            msg = f"❌ No results found for: `{song}`"
+            if ctx.interaction:
+                return await ctx.interaction.followup.send(msg, ephemeral=True)
+            return await ctx.send(msg)
+
+        player.queue.appendleft(song_obj)
+        player.skip()
+
+        embed = discord.Embed(
+            title="⏭️ Playskip Activated",
+            description=f"Now Playing: **[{song_obj.title}]({song_obj.webpage_url})**",
+            color=config.COLOR_SUCCESS
+        )
+        if song_obj.thumbnail:
+            embed.set_thumbnail(url=song_obj.thumbnail)
+        embed.set_footer(text=f"Requested by {ctx.author.display_name} • Rythm Standard", icon_url=ctx.author.display_avatar.url)
+        if ctx.interaction:
+            await ctx.interaction.followup.send(embed=embed)
+        else:
+            await ctx.send(embed=embed)
+
+    # =========================================================================
+    # COMMAND: PLAYTOP (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(
+        name="playtop",
+        aliases=["pt"],
+        description="Adds a song to the top of the queue so it plays next."
+    )
+    @app_commands.describe(song="The song name, artist, or YouTube/Spotify URL to add to top of queue")
+    async def playtop(self, ctx: commands.Context, *, song: str):
+        if ctx.interaction:
+            try:
+                await ctx.defer()
+            except Exception:
+                pass
+
+        voice_client = await self.ensure_voice(ctx)
+        if not voice_client:
+            return
+
+        player = self.get_or_create_player(ctx.guild)
+        player.voice_client = voice_client
+        player.text_channel = ctx.channel
+
+        song_obj = await Song.create_source(song, ctx.author, self.bot.loop)
+        if not song_obj:
+            msg = f"❌ No results found for: `{song}`"
+            if ctx.interaction:
+                return await ctx.interaction.followup.send(msg, ephemeral=True)
+            return await ctx.send(msg)
+
+        if not player.is_playing:
+            player.enqueue_track(song_obj)
+        else:
+            player.queue.appendleft(song_obj)
+            embed = discord.Embed(
+                title="🔝 Added to Top of Queue (Position #1)",
+                description=f"**[{song_obj.title}]({song_obj.webpage_url})** will play next!",
+                color=config.COLOR_PRIMARY
+            )
+            if song_obj.thumbnail:
+                embed.set_thumbnail(url=song_obj.thumbnail)
+            embed.set_footer(text=f"Requested by {ctx.author.display_name} • Rythm Standard", icon_url=ctx.author.display_avatar.url)
+            if ctx.interaction:
+                await ctx.interaction.followup.send(embed=embed)
+            else:
+                await ctx.send(embed=embed)
 
     # =========================================================================
     # COMMAND: PAUSE & RESUME
