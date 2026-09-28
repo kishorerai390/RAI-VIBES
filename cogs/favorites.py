@@ -11,6 +11,7 @@ import config
 
 FAVORITES_FILE = Path(__file__).resolve().parent.parent / "data" / "favorites.json"
 PLAYLISTS_FILE = Path(__file__).resolve().parent.parent / "data" / "playlists.json"
+SHARED_FILE = Path(__file__).resolve().parent.parent / "data" / "shared_playlists.json"
 
 def load_favorites() -> Dict[str, List[dict]]:
     if not FAVORITES_FILE.exists():
@@ -46,304 +47,249 @@ def save_playlists(data: Dict[str, Dict[str, List[dict]]]):
     with open(PLAYLISTS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-class Favorites(commands.Cog):
-    """Save and play your favorite songs directly on RAI VIBES 💗."""
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
 
-    @commands.hybrid_group(name="favorite", aliases=["fav"], description="Manage your personal favorite music tracks.")
-    async def favorite(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            await ctx.send("⚡ Use `/favorite add`, `/favorite list`, or `/favorite play`!", ephemeral=True)
-
-    @favorite.command(name="add", description="Save currently playing song to your personal favorites.")
-    async def add(self, ctx: commands.Context):
-        music_cog = self.bot.get_cog("Music")
-        player = music_cog.get_player(ctx.guild.id) if music_cog else None
-
-        if not player or not player.current:
-            return await ctx.send("❌ Nothing is currently playing to save as favorite.", ephemeral=True)
-
-        user_id = str(ctx.author.id)
-        data = load_favorites()
-        if user_id not in data:
-            data[user_id] = []
-
-        # Check for duplicates
-        if any(item["title"] == player.current.title for item in data[user_id]):
-            return await ctx.send(f"⚠️ `{player.current.title}` is already in your favorites!", ephemeral=True)
-
-        data[user_id].append({
-            "title": player.current.title,
-            "url": player.current.webpage_url,
-            "duration": player.current.duration,
-            "thumbnail": player.current.thumbnail,
-            "uploader": player.current.uploader
-        })
-        save_favorites(data)
-
-        embed = discord.Embed(
-            title="❤️ Added to Favorites",
-            description=f"Saved **[{player.current.title}]({player.current.webpage_url})** to your personal collection!",
-            color=config.COLOR_GOLD
+# =========================================================================
+# INTERACTIVE PLAYLIST UI VIEW
+# =========================================================================
+class PlaylistSelectDropdown(discord.ui.Select):
+    def __init__(self, user_id: int, playlists: Dict[str, List[dict]]):
+        options = []
+        for name, tracks in list(playlists.items())[:25]:
+            options.append(discord.SelectOption(
+                label=name[:25],
+                value=name,
+                description=f"{len(tracks)} track(s) saved",
+                emoji="📁"
+            ))
+        super().__init__(
+            placeholder="📂 Select a custom playlist to manage or play...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id=f"pl_select_{user_id}"
         )
-        embed.set_thumbnail(url=player.current.thumbnail)
-        embed.set_footer(text=f"Total Favorites: {len(data[user_id])}", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
+        self.user_id = user_id
 
-    @favorite.command(name="list", description="View all your saved favorite tracks.")
-    async def list_favs(self, ctx: commands.Context):
-        user_id = str(ctx.author.id)
-        data = load_favorites()
-        favs = data.get(user_id, [])
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ This playlist panel belongs to someone else.", ephemeral=True)
 
-        if not favs:
-            return await ctx.send("❤️ You haven't added any favorite songs yet. Use `/favorite add` while playing a track!", ephemeral=True)
+        chosen = self.values[0]
+        data = load_playlists()
+        user_pls = data.get(str(self.user_id), {})
+        tracks = user_pls.get(chosen, [])
 
         embed = discord.Embed(
-            title=f"❤️ {ctx.author.display_name}'s Favorite Tracks",
+            title=f"📁 Playlist: {chosen}",
+            description=f"Contains **{len(tracks)} tracks**. Use the buttons below to control playback.",
             color=config.COLOR_PRIMARY
         )
-        embed.set_author(name="RAI VIBES 💗 Favorites", icon_url=config.RAI_ICON_URL)
-
         lines = []
-        for i, item in enumerate(favs[:20], 1):
-            lines.append(f"`{i}.` [{item['title'][:40]}]({item['url']}) - `{item['uploader'][:20]}`")
-
-        embed.description = "\n".join(lines)
-        embed.set_footer(text=f"Showing {min(len(favs), 20)} of {len(favs)} songs • Use /favorite play to enqueue all", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
-    @favorite.command(name="play", description="Queue all your saved favorite tracks.")
-    async def play_favs(self, ctx: commands.Context):
-        user_id = str(ctx.author.id)
-        data = load_favorites()
-        favs = data.get(user_id, [])
-
-        if not favs:
-            return await ctx.send("❤️ Your favorites list is empty.", ephemeral=True)
-
-        music_cog = self.bot.get_cog("Music")
-        if not music_cog:
-            return await ctx.send("❌ Music engine not available.", ephemeral=True)
-
-        voice_client = await music_cog.ensure_voice(ctx)
-        if not voice_client:
-            return
-
-        player = music_cog.get_or_create_player(ctx.guild)
-        player.voice_client = voice_client
-        player.text_channel = ctx.channel
-
-        from cogs.music import Song
-        for item in favs:
-            song = Song(
-                data={
-                    "title": item["title"],
-                    "search_query": item["title"],
-                    "url": None,
-                    "webpage_url": item["url"],
-                    "duration": item["duration"],
-                    "thumbnail": item["thumbnail"],
-                    "uploader": item["uploader"]
-                },
-                requester=ctx.author,
-                source_type="favorite"
-            )
-            player.queue.append(song)
-
-        embed = discord.Embed(
-            title="⚡ Enqueued Personal Favorites",
-            description=f"Added **{len(favs)} favorite track(s)** to the RAI VIBES 💗 queue!",
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_thumbnail(url=favs[0]["thumbnail"] if favs else config.RAI_ICON_URL)
-        embed.set_footer(text="RAI VIBES 💗 • Command The Power", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
-    # =========================================================================
-    # PLAYLIST SYSTEM (CUSTOM NAMED PLAYLISTS)
-    # =========================================================================
-    @commands.hybrid_group(name="playlist", aliases=["pl"], description="Manage your custom personal music playlists.")
-    async def playlist(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            await ctx.send(
-                "⚡ **Playlist Commands:**\n"
-                "• `/playlist create <name>` - Create a new empty playlist\n"
-                "• `/playlist add <name> [query]` - Add playing track or song to playlist\n"
-                "• `/playlist save_queue <name>` - Save currently active queue as playlist\n"
-                "• `/playlist play <name>` - Enqueue an entire playlist\n"
-                "• `/playlist list` - View your custom playlists\n"
-                "• `/playlist view <name>` - Inspect songs in a playlist\n"
-                "• `/playlist export <name>` - Export a playlist as a JSON backup file\n"
-                "• `/playlist import_file <name>` - Import a playlist from a JSON backup file\n"
-                "• `/playlist delete <name>` - Delete a playlist",
-                ephemeral=True
-            )
-
-    @playlist.command(name="create", description="Create a new custom playlist.")
-    @app_commands.describe(name="Name for your playlist (e.g. Chill, Workout, Vibes)")
-    async def pl_create(self, ctx: commands.Context, name: str):
-        clean_name = name.strip()
-        if not clean_name or len(clean_name) > 40:
-            return await ctx.send("❌ Playlist name must be between 1 and 40 characters.", ephemeral=True)
-
-        user_id = str(ctx.author.id)
-        data = load_playlists()
-        if user_id not in data:
-            data[user_id] = {}
-
-        if clean_name.lower() in [k.lower() for k in data[user_id].keys()]:
-            return await ctx.send(f"⚠️ You already have a playlist named `{clean_name}`!", ephemeral=True)
-
-        data[user_id][clean_name] = []
-        save_playlists(data)
-
-        embed = discord.Embed(
-            title="📂 Playlist Created",
-            description=f"Successfully created playlist **`{clean_name}`**!\nAdd tracks using `/playlist add {clean_name}` or `/playlist save_queue {clean_name}`.",
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
-    @playlist.command(name="add", description="Add currently playing song or search query to a playlist.")
-    @app_commands.describe(name="Name of the playlist", query="Optional track title or link (defaults to currently playing track)")
-    async def pl_add(self, ctx: commands.Context, name: str, query: Optional[str] = None):
-        user_id = str(ctx.author.id)
-        data = load_playlists()
-        user_pls = data.get(user_id, {})
-
-        matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
-        if not matched_name:
-            return await ctx.send(f"❌ You don't have a playlist named `{name}`. Create one with `/playlist create {name}` first!", ephemeral=True)
-
-        track_to_add = None
-        if query:
-            from cogs.music import Song
-            resolved = await Song.create_source(query, ctx.author, self.bot.loop)
-            if not resolved:
-                return await ctx.send(f"❌ Could not find track for query `{query}`.", ephemeral=True)
-            track_to_add = {
-                "title": resolved.title,
-                "url": resolved.webpage_url,
-                "duration": resolved.duration,
-                "thumbnail": resolved.thumbnail,
-                "uploader": resolved.uploader
-            }
+        for i, t in enumerate(tracks[:10], 1):
+            dur = time.strftime("%M:%S", time.gmtime(t.get("duration", 0))) if t.get("duration") else "Live"
+            lines.append(f"`{i}.` [{t.get('title', 'Unknown')[:35]}]({t.get('url', '#')}) • `{dur}`")
+        if lines:
+            embed.add_field(name="Tracks Preview", value="\n".join(lines), inline=False)
+        if len(tracks) > 10:
+            embed.set_footer(text=f"Showing 10 of {len(tracks)} tracks • RAI VIBES 💗", icon_url=config.RAI_ICON_URL)
         else:
-            music_cog = self.bot.get_cog("Music")
-            player = music_cog.get_player(ctx.guild.id) if music_cog else None
-            if not player or not player.current:
-                return await ctx.send("❌ No track currently playing. Please provide a song query or play a track first.", ephemeral=True)
-            track_to_add = {
+            embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
+
+        self.view.selected_playlist = chosen
+        await interaction.response.edit_message(embed=embed, view=self.view)
+
+
+class PlaylistDashboardView(discord.ui.View):
+    def __init__(self, cog: 'Favorites', user_id: int, playlists: Dict[str, List[dict]]):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.user_id = user_id
+        self.selected_playlist = list(playlists.keys())[0] if playlists else None
+
+        if playlists:
+            self.add_item(PlaylistSelectDropdown(user_id, playlists))
+
+    @discord.ui.button(label="Play Selected", emoji="▶️", style=discord.ButtonStyle.success, row=1)
+    async def play_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ You are not the owner of this menu.", ephemeral=True)
+        if not self.selected_playlist:
+            return await interaction.response.send_message("❌ Please select a playlist from the dropdown first.", ephemeral=True)
+
+        await interaction.response.defer()
+        await self.cog.enqueue_playlist(interaction, self.selected_playlist)
+
+    @discord.ui.button(label="Save Current Queue", emoji="💾", style=discord.ButtonStyle.primary, row=1)
+    async def save_queue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ You are not the owner of this menu.", ephemeral=True)
+
+        modal = SaveQueueModal(self.cog)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Create Playlist", emoji="➕", style=discord.ButtonStyle.secondary, row=1)
+    async def create_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ You are not the owner of this menu.", ephemeral=True)
+
+        modal = CreatePlaylistModal(self.cog)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Delete Selected", emoji="🗑️", style=discord.ButtonStyle.danger, row=1)
+    async def delete_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ You are not the owner of this menu.", ephemeral=True)
+        if not self.selected_playlist:
+            return await interaction.response.send_message("❌ Please select a playlist to delete.", ephemeral=True)
+
+        data = load_playlists()
+        user_pls = data.get(str(self.user_id), {})
+        if self.selected_playlist in user_pls:
+            del user_pls[self.selected_playlist]
+            save_playlists(data)
+            await interaction.response.send_message(f"🗑️ Deleted playlist **`{self.selected_playlist}`**.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Playlist not found.", ephemeral=True)
+
+
+class SaveQueueModal(discord.ui.Modal, title="Save Current Queue"):
+    name_input = discord.ui.TextInput(
+        label="Playlist Name",
+        placeholder="e.g. Chill Beats, Gym Pump, Night Drive",
+        max_length=40,
+        required=True
+    )
+
+    def __init__(self, cog: 'Favorites'):
+        super().__init__()
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        name = self.name_input.value.strip()
+        music_cog = self.cog.bot.get_cog("Music")
+        player = music_cog.get_player(interaction.guild_id) if music_cog else None
+        if not player or (not player.current and not player.queue):
+            return await interaction.response.send_message("❌ No songs currently in queue to save.", ephemeral=True)
+
+        user_id = str(interaction.user.id)
+        data = load_playlists()
+        user_pls = data.setdefault(user_id, {})
+        user_pls[name] = []
+
+        if player.current:
+            user_pls[name].append({
                 "title": player.current.title,
                 "url": player.current.webpage_url,
                 "duration": player.current.duration,
                 "thumbnail": player.current.thumbnail,
                 "uploader": player.current.uploader
-            }
+            })
+        for s in player.queue:
+            user_pls[name].append({
+                "title": s.title,
+                "url": s.webpage_url,
+                "duration": s.duration,
+                "thumbnail": s.thumbnail,
+                "uploader": s.uploader
+            })
 
-        # Prevent duplicate entries
-        if any(item["title"] == track_to_add["title"] for item in user_pls[matched_name]):
-            return await ctx.send(f"⚠️ `{track_to_add['title']}` is already in playlist `{matched_name}`!", ephemeral=True)
-
-        user_pls[matched_name].append(track_to_add)
         save_playlists(data)
-
-        embed = discord.Embed(
-            title="🎵 Track Added to Playlist",
-            description=f"Added **[{track_to_add['title']}]({track_to_add['url']})** to **`{matched_name}`**!",
-            color=config.COLOR_PRIMARY
+        await interaction.response.send_message(
+            f"💾 Successfully saved **{len(user_pls[name])} tracks** into playlist **`{name}`**!",
+            ephemeral=True
         )
-        embed.set_thumbnail(url=track_to_add["thumbnail"])
-        embed.set_footer(text=f"Total tracks in '{matched_name}': {len(user_pls[matched_name])}", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
 
-    @playlist.command(name="save_queue", description="Save all songs currently in queue into a named playlist.")
-    @app_commands.describe(name="Playlist name to save the queue into")
-    async def pl_save_queue(self, ctx: commands.Context, name: str):
-        music_cog = self.bot.get_cog("Music")
-        player = music_cog.get_player(ctx.guild.id) if music_cog else None
-        if not player or (not player.current and not player.queue):
-            return await ctx.send("❌ No active queue or playing songs to save.", ephemeral=True)
 
-        user_id = str(ctx.author.id)
+class CreatePlaylistModal(discord.ui.Modal, title="Create Custom Playlist"):
+    name_input = discord.ui.TextInput(
+        label="Playlist Name",
+        placeholder="e.g. Favorites 2026, Lo-Fi Chill",
+        max_length=40,
+        required=True
+    )
+
+    def __init__(self, cog: 'Favorites'):
+        super().__init__()
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        name = self.name_input.value.strip()
+        user_id = str(interaction.user.id)
         data = load_playlists()
-        if user_id not in data:
-            data[user_id] = {}
+        user_pls = data.setdefault(user_id, {})
 
-        clean_name = name.strip()
-        matched_name = next((k for k in data[user_id].keys() if k.lower() == clean_name.lower()), clean_name)
-        if matched_name not in data[user_id]:
-            data[user_id][matched_name] = []
+        if name.lower() in [k.lower() for k in user_pls.keys()]:
+            return await interaction.response.send_message(f"⚠️ Playlist `{name}` already exists!", ephemeral=True)
 
-        all_songs = []
-        if player.current:
-            all_songs.append(player.current)
-        all_songs.extend(list(player.queue))
-
-        added_count = 0
-        existing_titles = {item["title"] for item in data[user_id][matched_name]}
-        for s in all_songs:
-            if s.title not in existing_titles:
-                data[user_id][matched_name].append({
-                    "title": s.title,
-                    "url": s.webpage_url,
-                    "duration": s.duration,
-                    "thumbnail": s.thumbnail,
-                    "uploader": s.uploader
-                })
-                existing_titles.add(s.title)
-                added_count += 1
-
+        user_pls[name] = []
         save_playlists(data)
-
-        embed = discord.Embed(
-            title="💾 Queue Saved to Playlist",
-            description=f"Saved **{added_count} tracks** into playlist **`{matched_name}`**!\nTotal songs: `{len(data[user_id][matched_name])}`",
-            color=config.COLOR_PRIMARY
+        await interaction.response.send_message(
+            f"✨ Created playlist **`{name}`**! Add tracks using `/playlist action:add name:{name}`.",
+            ephemeral=True
         )
-        embed.set_footer(text=f"Play anytime with /playlist play {matched_name}", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
 
-    @playlist.command(name="play", description="Enqueue all tracks from a named playlist.")
-    @app_commands.describe(name="Name of the playlist to play")
-    async def pl_play(self, ctx: commands.Context, name: str):
-        user_id = str(ctx.author.id)
+
+# =========================================================================
+# FAVORITES & PLAYLISTS COG
+# =========================================================================
+class Favorites(commands.Cog):
+    """Clean, high-performance playlist and favorite music manager for RAI VIBES 💗."""
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    # --- Autocomplete for Playlist Names ---
+    async def playlist_name_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        user_id = str(interaction.user.id)
         data = load_playlists()
         user_pls = data.get(user_id, {})
+        choices = []
+        for name in user_pls.keys():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name[:100], value=name[:100]))
+        return choices[:25]
 
-        matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
-        if not matched_name or not user_pls[matched_name]:
-            return await ctx.send(f"❌ Playlist `{name}` not found or contains no songs.", ephemeral=True)
+    async def enqueue_playlist(self, target, playlist_name: str):
+        """Helper to enqueue a playlist from either a command Context or an Interaction."""
+        guild = target.guild
+        user = target.user if isinstance(target, discord.Interaction) else target.author
+        send_fn = target.followup.send if isinstance(target, discord.Interaction) else target.send
+
+        data = load_playlists()
+        user_pls = data.get(str(user.id), {})
+        matched_name = next((k for k in user_pls.keys() if k.lower() == playlist_name.lower().strip()), None)
+
+        if not matched_name:
+            return await send_fn(f"❌ Playlist `{playlist_name}` not found in your library.", ephemeral=True)
+
+        tracks = user_pls[matched_name]
+        if not tracks:
+            return await send_fn(f"📂 Playlist `{matched_name}` is empty.", ephemeral=True)
 
         music_cog = self.bot.get_cog("Music")
         if not music_cog:
-            return await ctx.send("❌ Music engine not available.", ephemeral=True)
+            return await send_fn("❌ Audio engine is currently unavailable.", ephemeral=True)
 
-        voice_client = await music_cog.ensure_voice(ctx)
+        voice_client = await music_cog.ensure_voice(target)
         if not voice_client:
             return
 
-        player = music_cog.get_or_create_player(ctx.guild)
+        player = music_cog.get_or_create_player(guild)
         player.voice_client = voice_client
-        player.text_channel = ctx.channel
+        player.text_channel = target.channel
 
         from cogs.music import Song
-        tracks = user_pls[matched_name]
         for item in tracks:
             song = Song(
                 data={
-                    "title": item["title"],
-                    "search_query": item["title"],
+                    "title": item.get("title", "Unknown"),
+                    "search_query": item.get("title", ""),
                     "url": None,
-                    "webpage_url": item["url"],
-                    "duration": item["duration"],
-                    "thumbnail": item["thumbnail"],
-                    "uploader": item["uploader"]
+                    "webpage_url": item.get("url", ""),
+                    "duration": item.get("duration", 0),
+                    "thumbnail": item.get("thumbnail"),
+                    "uploader": item.get("uploader", "Unknown Artist")
                 },
-                requester=ctx.author,
+                requester=user,
                 source_type="playlist"
             )
             player.queue.append(song)
@@ -356,264 +302,339 @@ class Favorites(commands.Cog):
         if tracks[0].get("thumbnail"):
             embed.set_thumbnail(url=tracks[0]["thumbnail"])
         embed.set_footer(text="RAI VIBES 💗 • High Fidelity Playlists", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
+        await send_fn(embed=embed)
 
-    @playlist.command(name="list", description="View all your saved custom playlists.")
-    async def pl_list(self, ctx: commands.Context):
+    # =========================================================================
+    # SINGLE UNIFIED /playlist COMMAND
+    # =========================================================================
+    @commands.hybrid_command(name="playlist", aliases=["pl"], description="Manage, browse, and stream your custom personal music playlists.")
+    @app_commands.describe(
+        action="Action: play, list, add, create, save_queue, view, or delete",
+        name="Name of the playlist",
+        query="Song title or link to add (when using add)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="▶️ Play Playlist", value="play"),
+        app_commands.Choice(name="📂 List My Playlists", value="list"),
+        app_commands.Choice(name="➕ Add Track to Playlist", value="add"),
+        app_commands.Choice(name="✨ Create Empty Playlist", value="create"),
+        app_commands.Choice(name="💾 Save Active Queue", value="save_queue"),
+        app_commands.Choice(name="👁️ View Tracks", value="view"),
+        app_commands.Choice(name="🗑️ Delete Playlist", value="delete"),
+    ])
+    @app_commands.autocomplete(name=playlist_name_autocomplete)
+    async def playlist_cmd(
+        self,
+        ctx: commands.Context,
+        action: Optional[app_commands.Choice[str]] = None,
+        name: Optional[str] = None,
+        query: Optional[str] = None
+    ):
+        act = action.value if action else None
         user_id = str(ctx.author.id)
         data = load_playlists()
         user_pls = data.get(user_id, {})
 
-        if not user_pls:
-            return await ctx.send("📂 You don't have any custom playlists yet. Create one with `/playlist create <name>`!", ephemeral=True)
+        # 1. Default to Interactive Dashboard if no action specified
+        if not act:
+            embed = discord.Embed(
+                title=f"📂 {ctx.author.display_name}'s Playlist Hub",
+                description=(
+                    f"You have **{len(user_pls)} custom playlist(s)** saved.\n"
+                    "Select a playlist from the dropdown below or use the quick buttons!"
+                ),
+                color=config.COLOR_PRIMARY
+            )
+            embed.set_thumbnail(url=ctx.author.display_avatar.url)
+            embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
+            view = PlaylistDashboardView(self, ctx.author.id, user_pls)
+            return await ctx.send(embed=embed, view=view, ephemeral=True)
 
-        embed = discord.Embed(
-            title=f"📂 {ctx.author.display_name}'s Custom Playlists",
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_author(name="RAI VIBES 💗 Playlists", icon_url=config.RAI_ICON_URL)
+        # 2. Action: List Playlists
+        if act == "list":
+            if not user_pls:
+                return await ctx.send("📂 You don't have any custom playlists yet. Use `/playlist action:create name:<name>` to start one!", ephemeral=True)
+            embed = discord.Embed(title=f"📂 {ctx.author.display_name}'s Custom Playlists", color=config.COLOR_PRIMARY)
+            lines = [f"• **`{pname}`** — `{len(tracks)} track(s)`" for pname, tracks in user_pls.items()]
+            embed.description = "\n".join(lines)
+            embed.set_footer(text=f"Total: {len(user_pls)} playlists • Play with /playlist action:play name:<name>", icon_url=config.RAI_ICON_URL)
+            return await ctx.send(embed=embed, ephemeral=True)
 
-        lines = []
-        for name, tracks in user_pls.items():
-            lines.append(f"• **`{name}`** — `{len(tracks)} tracks` (Use `/playlist play {name}`)")
+        # 3. Action: Play
+        if act == "play":
+            if not name:
+                return await ctx.send("❌ Please provide the playlist `name` to play, e.g. `/playlist action:play name:Chill`", ephemeral=True)
+            return await self.enqueue_playlist(ctx, name)
 
-        embed.description = "\n".join(lines)
-        embed.set_footer(text=f"Total Playlists: {len(user_pls)}", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
+        # 4. Action: Create
+        if act == "create":
+            if not name:
+                return await ctx.send("❌ Please provide a `name` for your new playlist.", ephemeral=True)
+            clean_name = name.strip()
+            if clean_name.lower() in [k.lower() for k in user_pls.keys()]:
+                return await ctx.send(f"⚠️ Playlist `{clean_name}` already exists!", ephemeral=True)
+            user_pls[clean_name] = []
+            data[user_id] = user_pls
+            save_playlists(data)
+            return await ctx.send(f"✨ Successfully created playlist **`{clean_name}`**! Add tracks with `/playlist action:add name:{clean_name}`.", ephemeral=True)
 
-    @playlist.command(name="view", description="View tracks inside a specific playlist.")
-    @app_commands.describe(name="Name of the playlist to view")
-    async def pl_view(self, ctx: commands.Context, name: str):
+        # 5. Action: Save Queue
+        if act == "save_queue":
+            target_name = (name or "Queue Backup").strip()
+            music_cog = self.bot.get_cog("Music")
+            player = music_cog.get_player(ctx.guild.id) if music_cog else None
+            if not player or (not player.current and not player.queue):
+                return await ctx.send("❌ No active queue or playing songs to save.", ephemeral=True)
+
+            user_pls[target_name] = []
+            if player.current:
+                user_pls[target_name].append({
+                    "title": player.current.title,
+                    "url": player.current.webpage_url,
+                    "duration": player.current.duration,
+                    "thumbnail": player.current.thumbnail,
+                    "uploader": player.current.uploader
+                })
+            for s in player.queue:
+                user_pls[target_name].append({
+                    "title": s.title,
+                    "url": s.webpage_url,
+                    "duration": s.duration,
+                    "thumbnail": s.thumbnail,
+                    "uploader": s.uploader
+                })
+            data[user_id] = user_pls
+            save_playlists(data)
+            return await ctx.send(f"💾 Saved **{len(user_pls[target_name])} songs** from queue into playlist **`{target_name}`**!", ephemeral=True)
+
+        # 6. Action: Add Track
+        if act == "add":
+            if not name:
+                return await ctx.send("❌ Please specify which playlist `name` to add to.", ephemeral=True)
+            matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
+            if not matched_name:
+                return await ctx.send(f"❌ Playlist `{name}` not found. Create it first with `/playlist action:create name:{name}`.", ephemeral=True)
+
+            track_to_add = None
+            if query:
+                from cogs.music import Song
+                resolved = await Song.create_source(query, ctx.author, self.bot.loop)
+                if not resolved:
+                    return await ctx.send(f"❌ Could not resolve track for `{query}`.", ephemeral=True)
+                track_to_add = {
+                    "title": resolved.title,
+                    "url": resolved.webpage_url,
+                    "duration": resolved.duration,
+                    "thumbnail": resolved.thumbnail,
+                    "uploader": resolved.uploader
+                }
+            else:
+                music_cog = self.bot.get_cog("Music")
+                player = music_cog.get_player(ctx.guild.id) if music_cog else None
+                if not player or not player.current:
+                    return await ctx.send("❌ No track currently playing. Specify a `query` or start playing music first.", ephemeral=True)
+                track_to_add = {
+                    "title": player.current.title,
+                    "url": player.current.webpage_url,
+                    "duration": player.current.duration,
+                    "thumbnail": player.current.thumbnail,
+                    "uploader": player.current.uploader
+                }
+
+            user_pls[matched_name].append(track_to_add)
+            save_playlists(data)
+            return await ctx.send(f"🎵 Added **[{track_to_add['title']}]({track_to_add['url']})** to playlist **`{matched_name}`**! Total tracks: `{len(user_pls[matched_name])}`")
+
+        # 7. Action: View Tracks
+        if act == "view":
+            if not name:
+                return await ctx.send("❌ Please specify the playlist `name` to view.", ephemeral=True)
+            matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
+            if not matched_name:
+                return await ctx.send(f"❌ Playlist `{name}` not found.", ephemeral=True)
+            tracks = user_pls[matched_name]
+            embed = discord.Embed(title=f"📂 Playlist: {matched_name} ({len(tracks)} tracks)", color=config.COLOR_PRIMARY)
+            lines = [f"`{i}.` [{t['title'][:40]}]({t['url']})" for i, t in enumerate(tracks[:20], 1)]
+            embed.description = "\n".join(lines) if lines else "*This playlist is currently empty.*"
+            return await ctx.send(embed=embed, ephemeral=True)
+
+        # 8. Action: Delete
+        if act == "delete":
+            if not name:
+                return await ctx.send("❌ Please specify which playlist `name` to delete.", ephemeral=True)
+            matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
+            if not matched_name:
+                return await ctx.send(f"❌ Playlist `{name}` not found.", ephemeral=True)
+            del user_pls[matched_name]
+            save_playlists(data)
+            return await ctx.send(f"🗑️ Successfully deleted playlist **`{matched_name}`**.", ephemeral=True)
+
+    # =========================================================================
+    # SINGLE UNIFIED /favorite COMMAND
+    # =========================================================================
+    @commands.hybrid_command(name="favorite", aliases=["fav"], description="Manage and stream your personal favorite songs.")
+    @app_commands.describe(
+        action="Action: play, list, or add",
+        query="Optional song title or link to add (defaults to currently playing track)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="▶️ Play Favorites", value="play"),
+        app_commands.Choice(name="⭐ View Favorites", value="list"),
+        app_commands.Choice(name="➕ Add Track to Favorites", value="add"),
+    ])
+    async def favorite_cmd(
+        self,
+        ctx: commands.Context,
+        action: Optional[app_commands.Choice[str]] = None,
+        query: Optional[str] = None
+    ):
+        act = action.value if action else "list"
+        user_id = str(ctx.author.id)
+        data = load_favorites()
+        favs = data.get(user_id, [])
+
+        # 1. View Favorites
+        if act == "list":
+            if not favs:
+                return await ctx.send("⭐ You have not added any favorite tracks yet. Use `/favorite action:add` while playing a song!", ephemeral=True)
+            embed = discord.Embed(title=f"⭐ {ctx.author.display_name}'s Favorites", color=config.COLOR_GOLD)
+            lines = [f"`{i}.` [{item['title'][:40]}]({item['url']})" for i, item in enumerate(favs[:20], 1)]
+            embed.description = "\n".join(lines)
+            embed.set_footer(text=f"Total: {len(favs)} track(s) • Play with /favorite action:play", icon_url=config.RAI_ICON_URL)
+            return await ctx.send(embed=embed, ephemeral=True)
+
+        # 2. Add to Favorites
+        if act == "add":
+            track_to_add = None
+            if query:
+                from cogs.music import Song
+                resolved = await Song.create_source(query, ctx.author, self.bot.loop)
+                if not resolved:
+                    return await ctx.send(f"❌ Could not resolve song for `{query}`.", ephemeral=True)
+                track_to_add = {
+                    "title": resolved.title,
+                    "url": resolved.webpage_url,
+                    "duration": resolved.duration,
+                    "thumbnail": resolved.thumbnail,
+                    "uploader": resolved.uploader
+                }
+            else:
+                music_cog = self.bot.get_cog("Music")
+                player = music_cog.get_player(ctx.guild.id) if music_cog else None
+                if not player or not player.current:
+                    return await ctx.send("❌ No track currently playing. Provide a `query` or start playing music first.", ephemeral=True)
+                track_to_add = {
+                    "title": player.current.title,
+                    "url": player.current.webpage_url,
+                    "duration": player.current.duration,
+                    "thumbnail": player.current.thumbnail,
+                    "uploader": player.current.uploader
+                }
+
+            if user_id not in data:
+                data[user_id] = []
+            if any(item["title"] == track_to_add["title"] for item in data[user_id]):
+                return await ctx.send(f"⚠️ `{track_to_add['title']}` is already in your favorites!", ephemeral=True)
+
+            data[user_id].append(track_to_add)
+            save_favorites(data)
+            embed = discord.Embed(
+                title="⭐ Added to Favorites",
+                description=f"Saved **[{track_to_add['title']}]({track_to_add['url']})** to your personal library!",
+                color=config.COLOR_GOLD
+            )
+            if track_to_add.get("thumbnail"):
+                embed.set_thumbnail(url=track_to_add["thumbnail"])
+            embed.set_footer(text=f"Total Favorites: {len(data[user_id])}", icon_url=config.RAI_ICON_URL)
+            return await ctx.send(embed=embed)
+
+        # 3. Play Favorites
+        if act == "play":
+            if not favs:
+                return await ctx.send("⭐ Your favorites list is empty.", ephemeral=True)
+            music_cog = self.bot.get_cog("Music")
+            if not music_cog:
+                return await ctx.send("❌ Audio engine unavailable.", ephemeral=True)
+            voice_client = await music_cog.ensure_voice(ctx)
+            if not voice_client:
+                return
+
+            player = music_cog.get_or_create_player(ctx.guild)
+            player.voice_client = voice_client
+            player.text_channel = ctx.channel
+
+            from cogs.music import Song
+            for item in favs:
+                song = Song(
+                    data={
+                        "title": item["title"],
+                        "search_query": item["title"],
+                        "url": None,
+                        "webpage_url": item["url"],
+                        "duration": item["duration"],
+                        "thumbnail": item["thumbnail"],
+                        "uploader": item["uploader"]
+                    },
+                    requester=ctx.author,
+                    source_type="favorite"
+                )
+                player.queue.append(song)
+
+            embed = discord.Embed(
+                title="⚡ Enqueued Personal Favorites",
+                description=f"Added **{len(favs)} favorite track(s)** to the queue!",
+                color=config.COLOR_PRIMARY
+            )
+            if favs[0].get("thumbnail"):
+                embed.set_thumbnail(url=favs[0]["thumbnail"])
+            embed.set_footer(text="RAI VIBES 💗 • Premium Audio", icon_url=config.RAI_ICON_URL)
+            return await ctx.send(embed=embed)
+
+    # =========================================================================
+    # ADVANCED PREFIX UTILITIES (Non-slash, so they don't pollute the slash picker)
+    # =========================================================================
+    @commands.command(name="plexport", description="Export a playlist as downloadable JSON backup.")
+    async def pl_export_prefix(self, ctx: commands.Context, *, name: str):
         user_id = str(ctx.author.id)
         data = load_playlists()
         user_pls = data.get(user_id, {})
-
-        matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
-        if not matched_name:
-            return await ctx.send(f"❌ Playlist `{name}` not found.", ephemeral=True)
-
-        tracks = user_pls[matched_name]
-        if not tracks:
-            return await ctx.send(f"📂 Playlist `{matched_name}` is empty. Add songs with `/playlist add {matched_name}`!", ephemeral=True)
-
-        embed = discord.Embed(
-            title=f"📂 Playlist: {matched_name} ({len(tracks)} tracks)",
-            color=config.COLOR_PRIMARY
-        )
-        lines = []
-        for i, t in enumerate(tracks[:20], 1):
-            dur = time.strftime("%M:%S", time.gmtime(t.get("duration", 0))) if t.get("duration") else "Live"
-            lines.append(f"`{i}.` [{t['title'][:40]}]({t['url']}) • `{dur}`")
-
-        embed.description = "\n".join(lines)
-        if len(tracks) > 20:
-            embed.set_footer(text=f"Showing top 20 of {len(tracks)} tracks • Play with /playlist play {matched_name}", icon_url=config.RAI_ICON_URL)
-        else:
-            embed.set_footer(text=f"Play with /playlist play {matched_name}", icon_url=config.RAI_ICON_URL)
-
-        await ctx.send(embed=embed)
-
-    @playlist.command(name="delete", description="Delete a custom playlist.")
-    @app_commands.describe(name="Name of the playlist to delete")
-    async def pl_delete(self, ctx: commands.Context, name: str):
-        user_id = str(ctx.author.id)
-        data = load_playlists()
-        user_pls = data.get(user_id, {})
-
-        matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
-        if not matched_name:
-            return await ctx.send(f"❌ Playlist `{name}` not found.", ephemeral=True)
-
-        del user_pls[matched_name]
-        save_playlists(data)
-
-        await ctx.send(f"🗑️ Successfully deleted playlist **`{matched_name}`**.", ephemeral=True)
-
-    @playlist.command(name="export", description="Export a playlist as a downloadable JSON backup file.")
-    @app_commands.describe(name="Name of the playlist to export")
-    async def pl_export(self, ctx: commands.Context, name: str):
-        user_id = str(ctx.author.id)
-        data = load_playlists()
-        user_pls = data.get(user_id, {})
-
         matched_name = next((k for k in user_pls.keys() if k.lower() == name.strip().lower()), None)
         if not matched_name or not user_pls[matched_name]:
-            return await ctx.send(f"❌ Playlist `{name}` not found or contains no songs.", ephemeral=True)
+            return await ctx.send(f"❌ Playlist `{name}` not found or empty.")
 
         tracks = user_pls[matched_name]
-        export_payload = {
-            "version": "1.0",
+        payload = {
+            "version": "2.0",
             "bot": "RAI VIBES 💗",
-            "exported_by": ctx.author.display_name,
             "playlist_name": matched_name,
-            "track_count": len(tracks),
             "tracks": tracks
         }
-        json_bytes = json.dumps(export_payload, indent=2, ensure_ascii=False).encode("utf-8")
-        safe_filename = "".join(c for c in matched_name if c.isalnum() or c in ("-", "_")).strip() or "playlist"
-        discord_file = discord.File(io.BytesIO(json_bytes), filename=f"{safe_filename}_backup.json")
+        json_bytes = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
+        safe_name = "".join(c for c in matched_name if c.isalnum() or c in ("-", "_")).strip() or "playlist"
+        file = discord.File(io.BytesIO(json_bytes), filename=f"{safe_name}_backup.json")
+        await ctx.send(f"📦 Exported **{len(tracks)} tracks** from `{matched_name}`:", file=file)
 
-        embed = discord.Embed(
-            title=f"📦 Exported Playlist • {matched_name}",
-            description=(
-                f"✅ Successfully exported **{len(tracks)} tracks** from **`{matched_name}`**!\n\n"
-                f"📎 Download the `.json` file below. You can restore or share this playlist anytime using `/playlist import_file`."
-            ),
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed, file=discord_file)
-
-    @playlist.command(name="import_file", description="Import a playlist from a JSON backup file.")
-    @app_commands.describe(name="New or existing playlist name", attachment="The .json backup file to import")
-    async def pl_import_file(self, ctx: commands.Context, name: str, attachment: discord.Attachment):
-        if not attachment.filename.lower().endswith(".json"):
-            return await ctx.send("❌ Please attach a valid `.json` playlist backup file.", ephemeral=True)
-
-        if attachment.size > 2 * 1024 * 1024:
-            return await ctx.send("❌ File is too large. Maximum backup file size is 2 MB.", ephemeral=True)
-
+    @commands.command(name="plimport", description="Import a playlist from a JSON backup file.")
+    async def pl_import_prefix(self, ctx: commands.Context, *, name: str):
+        if not ctx.message.attachments:
+            return await ctx.send("❌ Please attach a `.json` playlist backup file.")
+        att = ctx.message.attachments[0]
+        content = await att.read()
         try:
-            content = await attachment.read()
             payload = json.loads(content.decode("utf-8"))
         except Exception as e:
-            return await ctx.send(f"❌ Failed to read backup file: `{e}`", ephemeral=True)
+            return await ctx.send(f"❌ Invalid JSON file: `{e}`")
 
         tracks = payload.get("tracks") if isinstance(payload, dict) else payload
         if not isinstance(tracks, list) or not tracks:
-            return await ctx.send("❌ Backup file does not contain any valid tracks.", ephemeral=True)
+            return await ctx.send("❌ No valid tracks found in file.")
 
         user_id = str(ctx.author.id)
         data = load_playlists()
-        if user_id not in data:
-            data[user_id] = {}
-
-        clean_name = name.strip()
-        matched_name = next((k for k in data[user_id].keys() if k.lower() == clean_name.lower()), clean_name)
-        if matched_name not in data[user_id]:
-            data[user_id][matched_name] = []
-
-        existing_titles = {item.get("title") for item in data[user_id][matched_name]}
-        added_count = 0
-        for t in tracks:
-            if isinstance(t, dict) and t.get("title") and t.get("title") not in existing_titles:
-                data[user_id][matched_name].append({
-                    "title": t.get("title"),
-                    "url": t.get("url") or "",
-                    "duration": t.get("duration", 0),
-                    "thumbnail": t.get("thumbnail"),
-                    "uploader": t.get("uploader", "Unknown Artist")
-                })
-                existing_titles.add(t.get("title"))
-                added_count += 1
-
+        user_pls = data.setdefault(user_id, {})
+        user_pls[name.strip()] = tracks
         save_playlists(data)
-
-        embed = discord.Embed(
-            title=f"📥 Playlist Imported • {matched_name}",
-            description=(
-                f"✅ Successfully imported **{added_count} new tracks** into **`{matched_name}`**!\n"
-                f"Total tracks in playlist: `{len(data[user_id][matched_name])}`\n\n"
-                f"Play anytime with `/playlist play {matched_name}`"
-            ),
-            color=config.COLOR_PRIMARY
-        )
-        embed.set_footer(text="RAI VIBES 💗 • Custom Playlists", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
-    @commands.hybrid_command(name="shareplaylist", description="Share your custom playlist publicly with the server community.")
-    @app_commands.describe(name="Name of your saved playlist to share")
-    async def share_playlist_cmd(self, ctx: commands.Context, *, name: str):
-        user_id = str(ctx.author.id)
-        data = load_playlists()
-        user_lists = data.get(user_id, {})
-
-        matched_name = next((k for k in user_lists if k.lower() == name.lower().strip()), None)
-        if not matched_name:
-            return await ctx.send(f"❌ You don't have a playlist named `{name}`.", ephemeral=True)
-
-        tracks = user_lists[matched_name]
-        if not tracks:
-            return await ctx.send(f"❌ Playlist `{matched_name}` is empty.", ephemeral=True)
-
-        import hashlib
-        share_code = hashlib.md5(f"{user_id}-{matched_name}".encode()).hexdigest()[:8].upper()
-        shared_file = Path(__file__).resolve().parent.parent / "data" / "shared_playlists.json"
-        shared_data = {}
-        if shared_file.exists():
-            try:
-                with open(shared_file, "r", encoding="utf-8") as f:
-                    shared_data = json.load(f)
-            except Exception:
-                pass
-
-        shared_data[share_code] = {
-            "creator": ctx.author.name,
-            "creator_id": ctx.author.id,
-            "name": matched_name,
-            "tracks": tracks,
-            "created_at": int(time.time())
-        }
-        with open(shared_file, "w", encoding="utf-8") as f:
-            json.dump(shared_data, f, indent=2)
-
-        embed = discord.Embed(
-            title="🌐 ┊ 𝐂𝐎𝐌𝐌𝐔𝐍𝐈𝐓𝐘  𝐏𝐋𝐀𝐘𝐋𝐈𝐒𝐓  𝐒𝐇𝐀𝐑𝐄𝐃!",
-            description=(
-                f"🎉 **{ctx.author.mention} published a playlist!**\n\n"
-                f"📁 **Playlist:** `{matched_name}`\n"
-                f"🎵 **Total Tracks:** `{len(tracks)} Songs`\n"
-                f"🔑 **Share Code:** `RAI-{share_code}`\n\n"
-                f"👉 Anyone can import this with:\n"
-                f"`/loadplaylist code: RAI-{share_code}`"
-            ),
-            color=0x00FFCC
-        )
-        embed.set_thumbnail(url=ctx.author.display_avatar.url)
-        embed.set_footer(text="RAI VIBES 💗 • Collaborative Audio", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
-
-    @commands.hybrid_command(name="loadplaylist", description="Load a shared community playlist by share code.")
-    @app_commands.describe(code="The share code (e.g. RAI-ABCD1234)")
-    async def load_playlist_cmd(self, ctx: commands.Context, code: str):
-        clean_code = code.replace("RAI-", "").replace("rai-", "").strip().upper()
-        shared_file = Path(__file__).resolve().parent.parent / "data" / "shared_playlists.json"
-        if not shared_file.exists():
-            return await ctx.send("❌ No shared playlists found.", ephemeral=True)
-
-        try:
-            with open(shared_file, "r", encoding="utf-8") as f:
-                shared_data = json.load(f)
-        except Exception:
-            return await ctx.send("❌ Could not read shared playlist registry.", ephemeral=True)
-
-        if clean_code not in shared_data:
-            return await ctx.send(f"❌ Shared playlist code `{code}` not found or expired.", ephemeral=True)
-
-        entry = shared_data[clean_code]
-        tracks = entry["tracks"]
-        p_name = entry["name"]
-
-        # Save to user's playlists
-        user_id = str(ctx.author.id)
-        data = load_playlists()
-        user_lists = data.setdefault(user_id, {})
-        dest_name = f"{p_name} (by {entry['creator']})"
-        user_lists[dest_name] = tracks
-        save_playlists(data)
-
-        embed = discord.Embed(
-            title="📥 ┊ 𝐏𝐋𝐀𝐘𝐋𝐈𝐒𝐓  𝐈𝐌𝐏𝐎𝐑𝐓𝐄𝐃!",
-            description=(
-                f"✅ Successfully imported **`{dest_name}`**!\n\n"
-                f"👤 **Original Creator:** {entry['creator']}\n"
-                f"🎵 **Tracks Loaded:** `{len(tracks)}`\n\n"
-                f"Play anytime with `/playlist play {dest_name}`!"
-            ),
-            color=0x2ED573
-        )
-        embed.set_footer(text="RAI VIBES 💗 • Collaborative Playlists", icon_url=config.RAI_ICON_URL)
-        await ctx.send(embed=embed)
+        await ctx.send(f"📥 Successfully imported **{len(tracks)} tracks** into playlist **`{name.strip()}`**!")
 
 
 async def setup(bot: commands.Bot):
