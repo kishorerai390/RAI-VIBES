@@ -29,10 +29,10 @@ async def init_db():
                 antispam_enabled INTEGER DEFAULT 1,
                 antilink_enabled INTEGER DEFAULT 1,
                 antimention_enabled INTEGER DEFAULT 1,
-                channel_delete_limit INTEGER DEFAULT 3,
-                role_delete_limit INTEGER DEFAULT 3,
-                ban_limit INTEGER DEFAULT 4,
-                kick_limit INTEGER DEFAULT 4,
+                channel_delete_limit INTEGER DEFAULT 2,
+                role_delete_limit INTEGER DEFAULT 2,
+                ban_limit INTEGER DEFAULT 3,
+                kick_limit INTEGER DEFAULT 3,
                 time_window INTEGER DEFAULT 10
             )
         """)
