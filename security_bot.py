@@ -203,6 +203,9 @@ async def start_sentinel(token: str, use_members: bool = True, use_message_conte
         "cogs.whitelist",
         "cogs.security_dashboard",
         "cogs.tournaments",
+        "cogs.server_backup",
+        "cogs.sticky",
+        "cogs.stream_alerts",
     ]
     import database
     await database.init_db()

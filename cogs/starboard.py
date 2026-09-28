@@ -1,102 +1,134 @@
+import os
+import json
+import logging
+from pathlib import Path
+from typing import Optional
 import discord
 from discord.ext import commands
 
-import config
+logger = logging.getLogger("Starboard")
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+STAR_FILE = DATA_DIR / "starboard.json"
+DEFAULT_STAR_CHANNEL_ID = 1554174876749791342  # 🏆｜ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ
+REQUIRED_STARS = 3
+
+def load_star_data() -> dict:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if STAR_FILE.exists():
+        try:
+            with open(STAR_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_star_data(data: dict):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(STAR_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save starboard data: {e}")
 
 class Starboard(commands.Cog):
-    """Community Starboard / Hall of Fame."""
+    """Automatic Community Clip Showcase & Hall of Fame."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.starred_messages = set()
+        self.starred_posts = load_star_data()
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        if str(payload.emoji) != "⭐":
+        if str(payload.emoji) not in ("⭐", "🌟", "✨"):
             return
 
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
             return
 
-        channel = guild.get_channel(payload.channel_id)
-        if not channel:
+        star_channel = guild.get_channel(DEFAULT_STAR_CHANNEL_ID)
+        if not star_channel or payload.channel_id == star_channel.id:
             return
 
-        starboard_chan = (
-            discord.utils.get(guild.text_channels, name="hall-of-fame") or
-            discord.utils.get(guild.text_channels, name="starboard") or
-            next((c for c in guild.text_channels if "hall" in c.name.lower() or "ʜᴀʟʟ" in c.name or "star" in c.name.lower() or "⭐" in c.name), None)
-        )
-        if not starboard_chan or channel.id == starboard_chan.id:
+        source_channel = guild.get_channel(payload.channel_id)
+        if not source_channel:
             return
 
         try:
-            message = await channel.fetch_message(payload.message_id)
+            message = await source_channel.fetch_message(payload.message_id)
         except Exception:
             return
 
-        reaction = discord.utils.get(message.reactions, emoji="⭐")
-        if reaction and reaction.count >= 3 and message.id not in self.starred_messages:
-            self.starred_messages.add(message.id)
-
-            embed = discord.Embed(
-                description=message.content or "",
-                color=config.COLOR_GOLD,
-                timestamp=message.created_at
-            )
-            embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
-            embed.add_field(name="Source", value=f"[Jump to Message]({message.jump_url}) in {channel.mention}", inline=False)
-
-            if message.attachments:
-                embed.set_image(url=message.attachments[0].url)
-
-            embed.set_footer(text=f"⭐ {reaction.count} | Hall of Fame", icon_url=config.RAI_ICON_URL)
-            await starboard_chan.send(content=f"⭐ **{reaction.count}** {channel.mention}", embed=embed)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        """Auto-creates discussion threads on media uploads to keep the gallery channel tidy and engaging."""
-        if message.author.bot or not message.guild:
+        if message.author.bot:
             return
 
-        # Check if channel is media gallery (ID 1546097792915873842 or name matches)
-        ch_name = message.channel.name.lower()
-        is_media_channel = (
-            message.channel.id == 1546097792915873842 or
-            "media" in ch_name or "clip" in ch_name or "gallery" in ch_name or "art" in ch_name
-        )
-        if not is_media_channel:
+        # Count star reactions
+        star_count = 0
+        for reaction in message.reactions:
+            if str(reaction.emoji) in ("⭐", "🌟", "✨"):
+                star_count += reaction.count
+
+        if star_count < REQUIRED_STARS:
             return
 
-        has_media = bool(
-            message.attachments or
-            any(k in message.content.lower() for k in ["http://", "https://", "youtube.com", "youtu.be", "tiktok.com", "imgur.com", "x.com", "twitter.com"])
+        str_msg_id = str(message.id)
+        existing_star_id = self.starred_posts.get(str_msg_id)
+
+        # Build Hall of Fame Embed
+        embed = discord.Embed(
+            description=message.content or "",
+            color=0xFFA500,
+            timestamp=message.created_at
+        )
+        embed.set_author(
+            name=f"{message.author.display_name} in #{source_channel.name}",
+            icon_url=message.author.display_avatar.url
+        )
+        embed.add_field(
+            name="🔗 Original Clip / Message",
+            value=f"[Jump to Message]({message.jump_url})",
+            inline=False
         )
 
-        if has_media:
-            # 1. Add quick engagement reactions
-            for emoji in ["❤️", "🔥"]:
-                try:
-                    await message.add_reaction(emoji)
-                except Exception:
-                    pass
+        # Handle images / media attachments
+        image_set = False
+        for att in message.attachments:
+            if any(att.filename.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp")):
+                embed.set_image(url=att.url)
+                image_set = True
+                break
 
-            # 2. Automatically spawn a public discussion thread
+        embed.set_footer(text=f"⭐ {star_count} | RAI FAM Hall of Fame")
+
+        content = f"⭐ **{star_count}** | {source_channel.mention}"
+
+        if existing_star_id:
             try:
-                thread_title = f"💬 {message.author.display_name} • Media Thread"[:95]
-                thread = await message.create_thread(
-                    name=thread_title,
-                    auto_archive_duration=1440
-                )
-                intro_embed = discord.Embed(
-                    description=f"👋 **Leave your thoughts and feedback on {message.author.mention}'s upload here!**\nKeeping comments inside threads keeps the media feed organized.",
-                    color=config.COLOR_PRIMARY
-                )
-                intro_embed.set_footer(text="RAI VIBES 💗 Community Automation", icon_url=config.RAI_ICON_URL)
-                await thread.send(embed=intro_embed)
+                star_msg = await star_channel.fetch_message(existing_star_id)
+                await star_msg.edit(content=content, embed=embed)
+                return
             except Exception:
                 pass
 
+        # Post new Hall of Fame entry
+        try:
+            star_msg = await star_channel.send(content=content, embed=embed)
+            self.starred_posts[str_msg_id] = star_msg.id
+            save_star_data(self.starred_posts)
+
+            # Award bonus coins to clip author
+            try:
+                from cogs.economy import update_user_coins
+                update_user_coins(message.author.id, 250)
+                await source_channel.send(
+                    f"🌟 **Hall of Fame Feature!** {message.author.mention}'s clip just hit **{star_count} stars** and was featured in {star_channel.mention}! (`+250 Coins` awarded)",
+                    delete_after=15
+                )
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.error(f"Failed to post to starboard: {e}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Starboard(bot))

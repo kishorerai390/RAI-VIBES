@@ -1,0 +1,873 @@
+{
+  "timestamp": 1790614564,
+  "guild_id": 1457382179981099090,
+  "guild_name": "RAI FAM💗",
+  "roles": [
+    {
+      "id": 1457382179981099090,
+      "name": "@everyone",
+      "color": "#000000",
+      "position": 0,
+      "permissions": 2222085186637377
+    },
+    {
+      "id": 1554174873511657542,
+      "name": "🔴・Live Now",
+      "color": "#ff244b",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1553097634187710525,
+      "name": "🎙️・Stage Events",
+      "color": "#f1c40f",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1553097632228839609,
+      "name": "🎬・Watch Party",
+      "color": "#e74c3c",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1553097629611729028,
+      "name": "🎲・Party Games",
+      "color": "#9b59b6",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1553097627531346103,
+      "name": "🎯・Valorant",
+      "color": "#ff4655",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1553097624872030230,
+      "name": "⚡・BGMI",
+      "color": "#00ffcc",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1553097622745522218,
+      "name": "⚡・Free Fire",
+      "color": "#ff9900",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552378057866608768,
+      "name": "Royal Gold",
+      "color": "#ffd700",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552378054150717520,
+      "name": "Cyber Cyan",
+      "color": "#80d8ff",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552378050023399454,
+      "name": "Neon Purple",
+      "color": "#b388ff",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552378045615177788,
+      "name": "Sakura Pink",
+      "color": "#ff9aa2",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552378041441849408,
+      "name": "─── PALETTE COLORS ───",
+      "color": "#2f3136",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552378037276901547,
+      "name": "✨・Starlight Initiate",
+      "color": "#70a1ff",
+      "position": 1,
+      "permissions": 137439215616
+    },
+    {
+      "id": 1552378030855290931,
+      "name": "🌸・Aurora Voyager",
+      "color": "#ff758c",
+      "position": 1,
+      "permissions": 137506324480
+    },
+    {
+      "id": 1552378026367647887,
+      "name": "💫・Nebula Elite",
+      "color": "#a55eea",
+      "position": 1,
+      "permissions": 137506373632
+    },
+    {
+      "id": 1552378020352884756,
+      "name": "👑・Celestial Sovereign",
+      "color": "#ffa502",
+      "position": 1,
+      "permissions": 137506373632
+    },
+    {
+      "id": 1552378015248289816,
+      "name": "─── ACTIVITY TIERS ───",
+      "color": "#2f3136",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1552358758972137506,
+      "name": "🎧 ┊ In Voice",
+      "color": "#00f0ff",
+      "position": 1,
+      "permissions": 0
+    },
+    {
+      "id": 1551184129347817483,
+      "name": "📻・Live DJ & Radio",
+      "color": "#9b59b6",
+      "position": 2,
+      "permissions": 0
+    },
+    {
+      "id": 1550199924614758480,
+      "name": "🍿・Movie Nights",
+      "color": "#ff4757",
+      "position": 3,
+      "permissions": 0
+    },
+    {
+      "id": 1550199921007792188,
+      "name": "🏆・Tournaments",
+      "color": "#e74c3c",
+      "position": 4,
+      "permissions": 0
+    },
+    {
+      "id": 1550199917262143560,
+      "name": "🎁・Giveaways",
+      "color": "#2ecc71",
+      "position": 5,
+      "permissions": 0
+    },
+    {
+      "id": 1551184124998455316,
+      "name": "─── NOTIFICATIONS ───",
+      "color": "#2f3136",
+      "position": 6,
+      "permissions": 0
+    },
+    {
+      "id": 1550199913093144649,
+      "name": "📢・Announcements",
+      "color": "#a55eea",
+      "position": 7,
+      "permissions": 0
+    },
+    {
+      "id": 1551184114978132019,
+      "name": "🚀・Rocket League",
+      "color": "#00cec9",
+      "position": 8,
+      "permissions": 0
+    },
+    {
+      "id": 1551184108053467176,
+      "name": "🏎️・GTA RP",
+      "color": "#3498db",
+      "position": 9,
+      "permissions": 0
+    },
+    {
+      "id": 1551184102957523048,
+      "name": "🔥・Free Fire",
+      "color": "#e74c3c",
+      "position": 10,
+      "permissions": 0
+    },
+    {
+      "id": 1551184098834251786,
+      "name": "⚡・BGMI / PUBG",
+      "color": "#e67e22",
+      "position": 11,
+      "permissions": 0
+    },
+    {
+      "id": 1551184094313062470,
+      "name": "🎯・Valorant / CS2",
+      "color": "#fa4454",
+      "position": 12,
+      "permissions": 0
+    },
+    {
+      "id": 1551184089703260182,
+      "name": "─── GAME SELECTOR ───",
+      "color": "#2f3136",
+      "position": 13,
+      "permissions": 0
+    },
+    {
+      "id": 1551184085630718044,
+      "name": "🏆・Tournament Champion",
+      "color": "#f1c40f",
+      "position": 14,
+      "permissions": 0
+    },
+    {
+      "id": 1550588116077645914,
+      "name": "🎙️・Cinema Host",
+      "color": "#f1c40f",
+      "position": 15,
+      "permissions": 0
+    },
+    {
+      "id": 1551184081067450451,
+      "name": "💎・VIP / Elite",
+      "color": "#00d2d3",
+      "position": 16,
+      "permissions": 0
+    },
+    {
+      "id": 1551184075103010918,
+      "name": "─── SPECIAL & ELITE ───",
+      "color": "#2f3136",
+      "position": 17,
+      "permissions": 0
+    },
+    {
+      "id": 1551184071101649038,
+      "name": "🛠️ ┆ 𝐓𝐑𝐈𝐀𝐋 𝐌𝐎𝐃",
+      "color": "#34495e",
+      "position": 18,
+      "permissions": 0
+    },
+    {
+      "id": 1551184066609422358,
+      "name": "─── MANAGEMENT ───",
+      "color": "#2f3136",
+      "position": 19,
+      "permissions": 0
+    },
+    {
+      "id": 1550547059009130588,
+      "name": "Blue Seal!",
+      "color": "#000000",
+      "position": 20,
+      "permissions": 8
+    },
+    {
+      "id": 1550542999891742852,
+      "name": "RAI ARCADE",
+      "color": "#000000",
+      "position": 21,
+      "permissions": 8
+    },
+    {
+      "id": 1549504522953695269,
+      "name": "✨・Verified",
+      "color": "#00ff88",
+      "position": 22,
+      "permissions": 512
+    },
+    {
+      "id": 1547283179172528210,
+      "name": "Top.gg",
+      "color": "#000000",
+      "position": 23,
+      "permissions": 1
+    },
+    {
+      "id": 1547276530718216203,
+      "name": "Zabrina",
+      "color": "#000000",
+      "position": 24,
+      "permissions": 142878297153
+    },
+    {
+      "id": 1547276294398545984,
+      "name": "Green-Bot",
+      "color": "#000000",
+      "position": 25,
+      "permissions": 4331695368
+    },
+    {
+      "id": 1546245722456723480,
+      "name": "RAI SENTINAL",
+      "color": "#000000",
+      "position": 26,
+      "permissions": 8
+    },
+    {
+      "id": 1546243699082793033,
+      "name": "RAI VIBES",
+      "color": "#000000",
+      "position": 27,
+      "permissions": 8
+    },
+    {
+      "id": 1546072104397443175,
+      "name": "DISBOARD.org",
+      "color": "#000000",
+      "position": 28,
+      "permissions": 19473
+    },
+    {
+      "id": 1546049335148544095,
+      "name": "Sapphire",
+      "color": "#000000",
+      "position": 29,
+      "permissions": 1101596716286
+    },
+    {
+      "id": 1546048477291741248,
+      "name": "Koya",
+      "color": "#000000",
+      "position": 30,
+      "permissions": 7627857622199543
+    },
+    {
+      "id": 1546048371565793383,
+      "name": "Invite Tracker",
+      "color": "#000000",
+      "position": 31,
+      "permissions": 2252899594128510
+    },
+    {
+      "id": 1545616944827342940,
+      "name": "BeatSync",
+      "color": "#000000",
+      "position": 32,
+      "permissions": 143935237465
+    },
+    {
+      "id": 1545519948007473222,
+      "name": "Wick",
+      "color": "#000000",
+      "position": 33,
+      "permissions": 8
+    },
+    {
+      "id": 1545494584203673740,
+      "name": "💖・RAI FAM",
+      "color": "#ffb8c6",
+      "position": 34,
+      "permissions": 3148288
+    },
+    {
+      "id": 1545834928221069522,
+      "name": "🎧・DJ",
+      "color": "#a55eea",
+      "position": 35,
+      "permissions": 2222085186637377
+    },
+    {
+      "id": 1550049493012189184,
+      "name": "Zynrax Unbypassable Security™",
+      "color": "#ffffff",
+      "position": 36,
+      "permissions": 8
+    },
+    {
+      "id": 1545494578512134176,
+      "name": "🤖・Bots",
+      "color": "#747d8c",
+      "position": 37,
+      "permissions": 51200
+    },
+    {
+      "id": 1545494591883579434,
+      "name": "🚀・Booster",
+      "color": "#ff1493",
+      "position": 38,
+      "permissions": 67142144
+    },
+    {
+      "id": 1545494600347680918,
+      "name": "🛡️ ┆ 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐎𝐑 🛡️",
+      "color": "#3498db",
+      "position": 39,
+      "permissions": 163586054
+    },
+    {
+      "id": 1545506927788687470,
+      "name": "⚡ ┆ 𝐇𝐄𝐀𝐃 𝐀𝐃𝐌𝐈𝐍 ⚡",
+      "color": "#e74c3c",
+      "position": 40,
+      "permissions": 0
+    },
+    {
+      "id": 1545494610489643038,
+      "name": "👑 ┆ 𝐅𝐎𝐔𝐍𝐃𝐄𝐑 🍷",
+      "color": "#f1c40f",
+      "position": 41,
+      "permissions": 8
+    },
+    {
+      "id": 1534903565535940648,
+      "name": "Rythm",
+      "color": "#000000",
+      "position": 42,
+      "permissions": 8
+    }
+  ],
+  "categories": [
+    {
+      "id": 1546059369085534229,
+      "name": "📊 SERVER STATS",
+      "position": 0
+    },
+    {
+      "id": 1545803464712650844,
+      "name": "✦ INFORMATION",
+      "position": 1
+    },
+    {
+      "id": 1545803478490812578,
+      "name": "💬 COMMUNITY",
+      "position": 3
+    },
+    {
+      "id": 1553069011045060759,
+      "name": "📡 LIVE STAGE",
+      "position": 8
+    },
+    {
+      "id": 1550186724137640006,
+      "name": "🔊 VOICE LOUNGE",
+      "position": 9
+    },
+    {
+      "id": 1553071866040688841,
+      "name": "⚡ SQUAD ARENA",
+      "position": 10
+    },
+    {
+      "id": 1553071868234170428,
+      "name": "🎵 VIBE STUDIO",
+      "position": 11
+    },
+    {
+      "id": 1552374826423943188,
+      "name": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "position": 12
+    },
+    {
+      "id": 1545803487093456906,
+      "name": "👑 VIP & STAFF HQ",
+      "position": 13
+    },
+    {
+      "id": 1554170417634086922,
+      "name": "🔎  | 𝙀𝙎𝙋𝙊𝙍𝙏𝙎 𝘾𝙃𝙀𝘾𝙆𝙄𝙉𝙂",
+      "position": 14
+    }
+  ],
+  "channels": [
+    {
+      "id": 1553071868234170428,
+      "name": "🎵 VIBE STUDIO",
+      "type": "category",
+      "category": null,
+      "position": 11
+    },
+    {
+      "id": 1550196955660029964,
+      "name": "🍿  |  ᴄɪɴᴇᴍᴀ & ꜱᴛʀᴇᴀᴍꜱ",
+      "type": "voice",
+      "category": "🎵 VIBE STUDIO",
+      "position": 0
+    },
+    {
+      "id": 1550187298115551272,
+      "name": "💤  |  ᴀꜰᴋ / ꜱʟᴇᴇᴘ",
+      "type": "voice",
+      "category": "🔊 VOICE LOUNGE",
+      "position": 12
+    },
+    {
+      "id": 1554170417634086922,
+      "name": "🔎  | 𝙀𝙎𝙋𝙊𝙍𝙏𝙎 𝘾𝙃𝙀𝘾𝙆𝙄𝙉𝙂",
+      "type": "category",
+      "category": null,
+      "position": 14
+    },
+    {
+      "id": 1545514505520545886,
+      "name": "🎫｜ᴛɪᴄᴋᴇᴛ-ꜱᴜᴘᴘᴏʀᴛ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 10
+    },
+    {
+      "id": 1553056622962679838,
+      "name": "🎲  |  ᴘᴀʀᴛʏ ɢᴀᴍᴇꜱ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 6
+    },
+    {
+      "id": 1554167256697675888,
+      "name": "🌑┃・ᴅʀᴀɢ ᴍᴇ",
+      "type": "voice",
+      "category": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "position": 5
+    },
+    {
+      "id": 1554170431383146639,
+      "name": "💎┃・ʙᴏᴏꜱᴛᴇʀ-ᴄʜᴀᴛ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 25
+    },
+    {
+      "id": 1550187295821402114,
+      "name": "➕  | ᴊᴏɪɴ ᴛᴏ ᴄʀᴇᴀᴛᴇ",
+      "type": "voice",
+      "category": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "position": 0
+    },
+    {
+      "id": 1546099701496029194,
+      "name": "👥・All Members: 40",
+      "type": "voice",
+      "category": "📊 SERVER STATS",
+      "position": 13
+    },
+    {
+      "id": 1545502710101704714,
+      "name": "📜｜ʀᴜʟᴇꜱ-ᴀɴᴅ-ɪɴꜰᴏ",
+      "type": "text",
+      "category": "✦ INFORMATION",
+      "position": 21
+    },
+    {
+      "id": 1553069011045060759,
+      "name": "📡 LIVE STAGE",
+      "type": "category",
+      "category": null,
+      "position": 8
+    },
+    {
+      "id": 1545803464712650844,
+      "name": "✦ INFORMATION",
+      "type": "category",
+      "category": null,
+      "position": 1
+    },
+    {
+      "id": 1545502845208629328,
+      "name": "🛡️｜ꜱᴛᴀꜰꜰ-ᴏᴘᴇʀᴀᴛɪᴏɴꜱ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 9
+    },
+    {
+      "id": 1550580964122566770,
+      "name": "🎯  |  ᴠᴀʟᴏʀᴀɴᴛ ʀᴀɴᴋᴇᴅ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 5
+    },
+    {
+      "id": 1545803478490812578,
+      "name": "💬 COMMUNITY",
+      "type": "category",
+      "category": null,
+      "position": 3
+    },
+    {
+      "id": 1549416359723532480,
+      "name": "🤖｜ʙᴏᴛ-ᴄᴏᴍᴍᴀɴᴅꜱ",
+      "type": "text",
+      "category": "💬 COMMUNITY",
+      "position": 2
+    },
+    {
+      "id": 1550159859607928882,
+      "name": "🤝｜ᴘᴀʀᴛɴᴇʀꜱʜɪᴘꜱ",
+      "type": "text",
+      "category": "✦ INFORMATION",
+      "position": 24
+    },
+    {
+      "id": 1550187323084374079,
+      "name": "👑  |  ᴇxᴇᴄᴜᴛɪᴠᴇ ꜱᴜɪᴛᴇ",
+      "type": "voice",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 9
+    },
+    {
+      "id": 1550186724137640006,
+      "name": "🔊 VOICE LOUNGE",
+      "type": "category",
+      "category": null,
+      "position": 9
+    },
+    {
+      "id": 1552354617415962785,
+      "name": "🎙️  |  ʀᴇᴄᴏʀᴅɪɴɢ ꜱᴛᴜᴅɪᴏ",
+      "type": "voice",
+      "category": "🎵 VIBE STUDIO",
+      "position": 2
+    },
+    {
+      "id": 1546593526073135107,
+      "name": "🚨｜ꜱᴇɴᴛɪɴᴇʟ-ʟᴏɢꜱ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 12
+    },
+    {
+      "id": 1552359010513195099,
+      "name": "🎛️｜ᴠᴏɪᴄᴇ-ᴄᴏɴᴛʀᴏʟꜱ",
+      "type": "text",
+      "category": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "position": 1
+    },
+    {
+      "id": 1552374826423943188,
+      "name": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "type": "category",
+      "category": null,
+      "position": 12
+    },
+    {
+      "id": 1550187321285148782,
+      "name": "👑｜ᴇxᴇᴄᴜᴛɪᴠᴇ-ʟᴏᴜɴɢᴇ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 8
+    },
+    {
+      "id": 1546059369085534229,
+      "name": "📊 SERVER STATS",
+      "type": "category",
+      "category": null,
+      "position": 0
+    },
+    {
+      "id": 1545502705643167876,
+      "name": "🌸｜ᴡᴇʟᴄᴏᴍᴇ",
+      "type": "text",
+      "category": "✦ INFORMATION",
+      "position": 20
+    },
+    {
+      "id": 1553055109632753835,
+      "name": "🌧️  |  ᴍɪᴅɴɪɢʜᴛ ʟᴏ-ꜰɪ",
+      "type": "voice",
+      "category": "🔊 VOICE LOUNGE",
+      "position": 16
+    },
+    {
+      "id": 1545502730699808768,
+      "name": "💬｜ɢᴇɴᴇʀᴀʟ-ᴄʜᴀᴛ",
+      "type": "text",
+      "category": "💬 COMMUNITY",
+      "position": 0
+    },
+    {
+      "id": 1554170409967026308,
+      "name": "⚡┃・ᴛᴇᴀᴍ ᴀʟᴘʜᴀ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 17
+    },
+    {
+      "id": 1554170412504449184,
+      "name": "⚡┃・ᴛᴇᴀᴍ ʙʀᴀᴠᴏ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 18
+    },
+    {
+      "id": 1550186752163975250,
+      "name": "⚡  |  ʙɢᴍɪ ꜱǫᴜᴀᴅ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 4
+    },
+    {
+      "id": 1545502718792175646,
+      "name": "📢｜ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛꜱ",
+      "type": "news",
+      "category": "✦ INFORMATION",
+      "position": 22
+    },
+    {
+      "id": 1553071866040688841,
+      "name": "⚡ SQUAD ARENA",
+      "type": "category",
+      "category": null,
+      "position": 10
+    },
+    {
+      "id": 1546540192343523399,
+      "name": "📝｜ᴍᴏᴅᴇʀᴀᴛɪᴏɴ-ʟᴏɢꜱ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 11
+    },
+    {
+      "id": 1545502850057244762,
+      "name": "📋｜ᴀᴜᴅɪᴛ-ʟᴏɢꜱ",
+      "type": "text",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 13
+    },
+    {
+      "id": 1550186760779211003,
+      "name": "🎧  |  24/7 ᴍᴜꜱɪᴄ ꜱᴛᴜᴅɪᴏ",
+      "type": "voice",
+      "category": "🎵 VIBE STUDIO",
+      "position": 1
+    },
+    {
+      "id": 1554170414878433283,
+      "name": "🎙️┃・ᴄᴀꜱᴛᴇʀ & ʜᴏꜱᴛ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 19
+    },
+    {
+      "id": 1546099703630798848,
+      "name": "👤・Members: 37",
+      "type": "voice",
+      "category": "📊 SERVER STATS",
+      "position": 14
+    },
+    {
+      "id": 1553067640367349854,
+      "name": "🎙️  |  ᴄᴏᴍᴍᴜɴɪᴛʏ ꜱᴛᴀɢᴇ",
+      "type": "stage_voice",
+      "category": "📡 LIVE STAGE",
+      "position": 8
+    },
+    {
+      "id": 1545502722739150898,
+      "name": "🏷️｜ʀᴏʟᴇꜱ",
+      "type": "text",
+      "category": "✦ INFORMATION",
+      "position": 23
+    },
+    {
+      "id": 1554170422214398016,
+      "name": "🔎┃・ᴘᴄ-ᴄʜᴇᴄᴋɪɴɢ",
+      "type": "voice",
+      "category": "🔎  | 𝙀𝙎𝙋𝙊𝙍𝙏𝙎 𝘾𝙃𝙀𝘾𝙆𝙄𝙉𝙂",
+      "position": 21
+    },
+    {
+      "id": 1554170427041914970,
+      "name": "🔎┃・ᴘᴠᴛ-ᴄʜᴇᴄᴋɪɴɢ",
+      "type": "voice",
+      "category": "🔎  | 𝙀𝙎𝙋𝙊𝙍𝙏𝙎 𝘾𝙃𝙀𝘾𝙆𝙄𝙉𝙂",
+      "position": 23
+    },
+    {
+      "id": 1551184138932068373,
+      "name": "📸｜ᴍᴇᴅɪᴀ-ᴀɴᴅ-ᴄʟɪᴘꜱ",
+      "type": "text",
+      "category": "💬 COMMUNITY",
+      "position": 1
+    },
+    {
+      "id": 1550186750289379328,
+      "name": "⚡  |  ꜰʀᴇᴇ ꜰɪʀᴇ ꜱǫᴜᴀᴅ",
+      "type": "voice",
+      "category": "⚡ SQUAD ARENA",
+      "position": 3
+    },
+    {
+      "id": 1554170429193588826,
+      "name": "💎┃・ᴠɪᴘ ʟᴏᴜɴɢᴇ",
+      "type": "voice",
+      "category": "👑 VIP & STAFF HQ",
+      "position": 24
+    },
+    {
+      "id": 1545502700840427702,
+      "name": "✨｜ᴠᴇʀɪꜰʏ-ʜᴇʀᴇ",
+      "type": "text",
+      "category": "✦ INFORMATION",
+      "position": 19
+    },
+    {
+      "id": 1554166103171801108,
+      "name": "🔒┃・ ɢʜᴏꜱᴛ ᴠᴄ",
+      "type": "voice",
+      "category": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "position": 7
+    },
+    {
+      "id": 1550186738410987591,
+      "name": "💬  |  ᴄʜɪʟʟ ʟᴏᴜɴɢᴇ",
+      "type": "voice",
+      "category": "🔊 VOICE LOUNGE",
+      "position": 10
+    },
+    {
+      "id": 1546059375574130769,
+      "name": "🤖・Bots: 3",
+      "type": "voice",
+      "category": "📊 SERVER STATS",
+      "position": 15
+    },
+    {
+      "id": 1545803487093456906,
+      "name": "👑 VIP & STAFF HQ",
+      "type": "category",
+      "category": null,
+      "position": 13
+    },
+    {
+      "id": 1554170424802279525,
+      "name": "🔎┃・ᴍᴏʙɪʟᴇ-ᴄʜᴇᴄᴋɪɴɢ",
+      "type": "voice",
+      "category": "🔎  | 𝙀𝙎𝙋𝙊𝙍𝙏𝙎 𝘾𝙃𝙀𝘾𝙆𝙄𝙉𝙂",
+      "position": 22
+    },
+    {
+      "id": 1550184399742697512,
+      "name": "💸｜ᴏᴡᴏ-ᴀʀᴄᴀᴅᴇ",
+      "type": "text",
+      "category": "💬 COMMUNITY",
+      "position": 3
+    },
+    {
+      "id": 1554170420482023495,
+      "name": "🔎┃・ᴡᴀɪᴛɪɴɢ ᴀʀᴇᴀ",
+      "type": "voice",
+      "category": "🔎  | 𝙀𝙎𝙋𝙊𝙍𝙏𝙎 𝘾𝙃𝙀𝘾𝙆𝙄𝙉𝙂",
+      "position": 20
+    },
+    {
+      "id": 1554166098411257866,
+      "name": "🔒┃・ ᴘʀɪᴠᴀᴛᴇ ꜱᴜɪᴛᴇ",
+      "type": "voice",
+      "category": "🎭  | 𝙋𝙀𝙍𝙎𝙊𝙉𝘼𝙇 𝘼𝙍𝙀𝘼",
+      "position": 6
+    },
+    {
+      "id": 1554174876749791342,
+      "name": "🏆｜ʜᴀʟʟ-ᴏꜰ-ꜰᴀᴍᴇ",
+      "type": "text",
+      "category": "💬 COMMUNITY",
+      "position": 26
+    }
+  ]
+}
