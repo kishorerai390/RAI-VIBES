@@ -8,43 +8,76 @@ import config
 
 COMMAND_CATEGORIES: Dict[str, Dict[str, Any]] = {
     "music": {
-        "label": "Music & Audio Suite",
+        "label": "Music Playback",
         "emoji": "🎵",
         "bot": "RAI VIBES 💗",
-        "description": "High-fidelity streaming, interactive player, queue & lyrics",
+        "description": "Rythm Standard • High-fidelity streaming, search & playback",
         "color": 0xFF69B4,
         "commands": [
-            ("`/play <song or url>`", "Stream any track or playlist from YouTube, Spotify, or SoundCloud."),
-            ("`/controller`", "Open the interactive button controller remote."),
-            ("`/pause` & `/resume`", "Instantly pause or unpause current audio stream."),
-            ("`/skip`", "Vote or skip immediately to the next queued track."),
-            ("`/queue`", "Browse upcoming track playlist with pagination."),
-            ("`/nowplaying`", "View real-time progress bar, track details, and requester."),
-            ("`/volume <0-200>`", "Adjust volume with studio audio boost capabilities."),
-            ("`/loop <track|queue|off>`", "Set repeat mode for single track or entire playlist."),
-            ("`/shuffle`", "Randomize upcoming song order in queue."),
-            ("`/lyrics [song]`", "Fetch synchronized live Genius lyrics with album artwork."),
-            ("`/import <url>`", "Batch import public Spotify or YouTube playlists into queue."),
-            ("`/favorite <add|list|play>`", "Save and stream your personal favorite song library.")
+            ("`/play <song or url>`", "Stream any track or playlist from YouTube, Spotify, or SoundCloud. (Aliases: `/p`, `/stream`)"),
+            ("`/playskip <song or url>`", "Play a track immediately, skipping the currently playing song. (Aliases: `/ps`, `/playnow`)"),
+            ("`/playtop <song or url>`", "Add a track directly to the top (position #1) of the upcoming queue. (Aliases: `/pt`)"),
+            ("`/pause` & `/resume`", "Instantly pause or resume current audio playback. (Aliases: `/unpause`)"),
+            ("`/join` & `/disconnect`", "Summon the bot to your voice channel or disconnect cleanly. (Aliases: `/summon`, `/j`, `/dc`, `/leave`)"),
+            ("`/search <query>`", "Search YouTube for top 5 results and interactively pick which track to play."),
+            ("`/like` & `/liked`", "Save current playing track to your personal library or browse liked songs."),
+            ("`/playlist [action] [name]`", "Interactive playlist dashboard to create, save, play, and manage playlists."),
+            ("`/lyrics [song]`", "Fetch synchronized live Genius lyrics with album artwork.")
         ]
     },
-    "voice_audio": {
-        "label": "Studio FX, Radio & Voice Hub",
-        "emoji": "🎧",
+    "queue": {
+        "label": "Queue Management",
+        "emoji": "📋",
         "bot": "RAI VIBES 💗",
-        "description": "8D Spatial, Equalizer, 24/7 Live Radio & Dynamic Lounges",
+        "description": "Rythm Standard • Real-time queue ordering & manipulation",
+        "color": 0x3498DB,
+        "commands": [
+            ("`/queue`", "View upcoming songs with interactive pagination buttons. (Aliases: `/q`)"),
+            ("`/move <from> <to>`", "Move a track to a different position in the upcoming queue. (Aliases: `/m`)"),
+            ("`/remove <position>`", "Remove a specific track or range of songs (e.g. `2-5`) from the queue. (Aliases: `/rm`)"),
+            ("`/clear`", "Instantly empty the entire upcoming queue while keeping current track. (Aliases: `/cq`)"),
+            ("`/skipto <position>`", "Skip directly to a specific track number in the queue. (Aliases: `/st`)"),
+            ("`/shuffle`", "Randomize the playback order of all upcoming songs in queue."),
+            ("`/removedupes`", "Automatically purge duplicate songs from the queue. (Aliases: `/rmd`, `/dedupe`)"),
+            ("`/leavecleanup`", "Remove all songs queued by users who have left the voice channel. (Aliases: `/lc`)")
+        ]
+    },
+    "controls": {
+        "label": "Controls & Playback",
+        "emoji": "🎛️",
+        "bot": "RAI VIBES 💗",
+        "description": "Rythm Standard • Interactive controller, skipping & timeline scrubbing",
         "color": 0x9B59B6,
         "commands": [
-            ("`/filter <effect>`", "Apply audio filters: `8d`, `bassboost`, `nightcore`, `vaporwave`, `slowed`."),
-            ("`/equalizer`", "Open the live 10-band interactive studio audio equalizer switchboard."),
-            ("`/loudnorm`", "Automatic loudness normalization (EBU R128) for balanced volume."),
+            ("`/control`", "Open the interactive button controller remote. (Aliases: `/c`, `/controller`, `/remote`)"),
+            ("`/nowplaying`", "View real-time progress bar, track details, bitrates & requester. (Aliases: `/np`)"),
+            ("`/skip`", "Vote or immediately skip to the next track in queue. (Aliases: `/s`)"),
+            ("`/forceskip`", "Instantly skip current track bypassing any vote requirement. (Aliases: `/fs`)"),
+            ("`/seek <mm:ss>`", "Jump directly to a specific timestamp in the current playing track."),
+            ("`/rewind [seconds]`", "Rewind playback backwards by specified seconds (default 10s). (Aliases: `/rwd`)"),
+            ("`/forward [seconds]`", "Fast forward playback ahead by specified seconds (default 10s). (Aliases: `/fwd`)"),
+            ("`/replay`", "Restart the currently playing track from 00:00."),
+            ("`/loop <track|queue|off>`", "Set repeat mode for single track or entire playlist."),
+            ("`/queueloop`", "Quickly toggle repeat mode for the entire queue. (Aliases: `/qloop`)"),
+            ("`/volume <0-200>`", "Adjust volume with studio audio boost capabilities. (Aliases: `/vol`, `/v`)")
+        ]
+    },
+    "utility": {
+        "label": "Utility & Studio FX",
+        "emoji": "🛠️",
+        "bot": "RAI VIBES 💗",
+        "description": "Rythm Standard • Audio DSP Effects, Equalizer, 24/7 Radio & Settings",
+        "color": 0x00FFCC,
+        "commands": [
+            ("`/effects [effect]`", "Apply studio audio FX: `8d`, `bassboost`, `nightcore`, `vaporwave`, `slowed`. (Aliases: `/filter`)"),
+            ("`/equalizer`", "Open the live 10-band interactive studio audio equalizer switchboard. (Aliases: `/eq`)"),
+            ("`/loudnorm`", "Automatic loudness normalization (EBU R128) for consistent volume."),
             ("`/karaoke`", "Real-time vocal frequency cancellation for singing along."),
             ("`/radio [station]`", "Stream 24/7 curated live radio (Tamil Nadu FM, AIR Kodai, Lofi, Synthwave)."),
-            ("`/stay247 <on|off>`", "Keep the bot streaming in your voice channel 24/7 even when empty."),
-            ("`/voicepanel`", "Open the 4x4 interactive temporary voice room control panel."),
+            ("`/stay247 <on|off>`", "Keep the bot streaming in your voice channel 24/7 even when empty. (Aliases: `/247`)"),
             ("`/vctune`", "Auto-optimize all server voice bitrates up to maximum 384kbps."),
-            ("`/quiethours`", "Configure automated late-night quiet hours to suppress join pings."),
-            ("`➕┃・ᴊᴏɪɴ ᴛᴏ ᴄʀᴇᴀᴛᴇ`", "Auto-spawns dynamic Thor Apex personal voice lounges.")
+            ("`/ping`", "Check bot latency and API heartbeat response times."),
+            ("`/help [category]`", "Display the master interactive categorized command guide.")
         ]
     },
     "economy": {
@@ -266,7 +299,7 @@ class MasterCommandHubView(View):
     @discord.ui.button(label="Music Remote", emoji="🎵", style=discord.ButtonStyle.secondary, custom_id="mch_music", row=1)
     async def music_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_message(
-            "🎵 **Music Remote:** Join any voice channel and type `/controller` to launch the 1-click interactive audio remote!",
+            "🎵 **Music Remote:** Join any voice channel and type `/control` (or `/c`) to launch the 1-click interactive audio remote!",
             ephemeral=True
         )
 

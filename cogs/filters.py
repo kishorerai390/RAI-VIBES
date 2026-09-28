@@ -79,6 +79,39 @@ class Filters(commands.Cog):
             await player.restart_current_with_filters()
             return await interaction.response.send_message(f"⚡ **Audio filter activated:** `{display}`")
 
+    @app_commands.command(name="effects", description="Apply studio audio FX filters (Rythm standard).")
+    @app_commands.describe(effect="Select an audio filter effect to toggle or activate")
+    @app_commands.choices(effect=[
+        app_commands.Choice(name="⚡ Bass Boost (Medium)", value="bassboost_medium"),
+        app_commands.Choice(name="💥 Bass Boost (Extreme)", value="bassboost_extreme"),
+        app_commands.Choice(name="🌙 Nightcore (Speed + Pitch)", value="nightcore"),
+        app_commands.Choice(name="☕ Slowed + Reverb (Lo-fi)", value="slowed"),
+        app_commands.Choice(name="🎧 8D Spatial Audio", value="8d"),
+        app_commands.Choice(name="🌆 Retro Vaporwave", value="vaporwave"),
+        app_commands.Choice(name="🎤 Karaoke (Vocal Cut)", value="karaoke"),
+        app_commands.Choice(name="🔊 Loudness Normalization (ReplayGain)", value="loudnorm"),
+        app_commands.Choice(name="🧹 Clear All Filters (Normal)", value="off"),
+    ])
+    async def effects_slash(self, interaction: discord.Interaction, effect: Optional[app_commands.Choice[str]] = None):
+        if effect:
+            return await self.filter_slash(interaction, effect)
+        # If no effect specified, open interactive Equalizer
+        player = self.bot.get_cog("Music").get_player(interaction.guild) if self.bot.get_cog("Music") else None
+        if not player or not player.is_connected or not player.current:
+            return await interaction.response.send_message("❌ RAI VIBES must be streaming music in a voice channel to open effects.", ephemeral=True)
+        active_list = ", ".join([f"`{f}`" for f in player.active_filters]) if player.active_filters else "`Flat / Clean`"
+        embed = discord.Embed(
+            title="🎛️ STUDIO AUDIO EFFECTS & EQUALIZER",
+            description=(
+                f"Now Playing: **[{player.current.title}]({player.current.webpage_url})**\n\n"
+                f"🎚️ **Active DSP Filters:** {active_list}\n\n"
+                f"Click buttons below to toggle real-time audiophile DSP enhancements:"
+            ),
+            color=0x00FFCC
+        )
+        embed.set_footer(text="RAI VIBES Studio Sound Engine • Rythm-Style Effects Engine", icon_url=config.RAI_ICON_URL)
+        await interaction.response.send_message(embed=embed, view=StudioEqualizerView(self, interaction.guild.id))
+
     @commands.command(name="bassboost", aliases=["bb", "bass"])
     async def bassboost(self, ctx: commands.Context, level: Optional[str] = "medium"):
         target_map = {

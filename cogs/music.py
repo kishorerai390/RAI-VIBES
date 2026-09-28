@@ -1378,8 +1378,8 @@ class Music(commands.Cog):
     # COMMAND: CONTROLLER / REMOTE / PANEL
     # =========================================================================
     @commands.hybrid_command(
-        name="controller",
-        aliases=["remote", "panel", "player", "controls"],
+        name="control",
+        aliases=["c", "controller", "remote", "panel", "player", "controls"],
         description="Open the Rythm-style interactive music controller remote."
     )
     async def controller_cmd(self, ctx: commands.Context):
@@ -1943,22 +1943,35 @@ class Music(commands.Cog):
         await ctx.send(f"⏭️ **Skipped:** `{current_title}`")
 
     # =========================================================================
-    # COMMAND: SKIPTO / JUMP
+    # COMMAND: FORCESKIP (RYTHM STANDARD)
     # =========================================================================
-    @commands.command(name="skipto", aliases=["jump"])
-    async def skipto(self, ctx: commands.Context, index: int):
+    @commands.hybrid_command(name="forceskip", aliases=["fs", "fskip"], description="Immediately force-skips the current track without voting.")
+    async def forceskip(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.is_connected or not (player.voice_client.is_playing() or player.voice_client.is_paused()):
+            return await ctx.send("❌ Nothing is playing to skip.", ephemeral=True)
+        current_title = player.current.title if player.current else "Track"
+        player.skip()
+        await ctx.send(f"⏭️ **Force Skipped:** `{current_title}`")
+
+    # =========================================================================
+    # COMMAND: SKIPTO / JUMP (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(name="skipto", aliases=["st", "jump"], description="Skip to a certain position in the queue.")
+    @app_commands.describe(position="Queue position number to jump to")
+    async def skipto(self, ctx: commands.Context, position: int):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
             return await ctx.send("❌ Queue is empty.", ephemeral=True)
-        if not 1 <= index <= len(player.queue):
+        if not 1 <= position <= len(player.queue):
             return await ctx.send(f"❌ Invalid track position. Choose between 1 and {len(player.queue)}.", ephemeral=True)
 
-        for _ in range(index - 1):
+        for _ in range(position - 1):
             player.queue.popleft()
 
         target_song = player.queue[0].title if player.queue else "Track"
         player.skip()
-        await ctx.send(f"⏭️ **Skipped directly to track #{index}:** `{target_song}`")
+        await ctx.send(f"⏭️ **Skipped directly to track #{position}:** `{target_song}`")
 
     # =========================================================================
     # COMMAND: JOIN / SUMMON
@@ -1984,6 +1997,20 @@ class Music(commands.Cog):
             await ctx.send(f"🎧 **Joined:** {target_vc.mention}! Ready to play music{' in 24/7 AFK Lounge mode' if is_afk else ''}.")
         else:
             await ctx.send("❌ Could not connect to the voice channel.", ephemeral=True)
+
+    # =========================================================================
+    # COMMAND: DISCONNECT (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(name="disconnect", aliases=["dc", "leave"], description="Disconnect from voice channel and clear queue.")
+    async def disconnect_cmd(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if player:
+            player.stop()
+        if ctx.guild.voice_client:
+            await ctx.guild.voice_client.disconnect(force=True)
+            await ctx.send("👋 **Disconnected from voice channel.**")
+        else:
+            await ctx.send("❌ Bot is not currently connected to voice.", ephemeral=True)
 
     # =========================================================================
     # COMMAND: 247 / TIMEOUT
@@ -2177,6 +2204,18 @@ class Music(commands.Cog):
         await ctx.send(f"🔁 **Loop mode set to:** `{player.loop_mode.upper()}`")
 
     # =========================================================================
+    # COMMAND: QUEUELOOP (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(name="queueloop", aliases=["qloop"], description="Toggle looping the entire music queue.")
+    async def queueloop(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player:
+            return await ctx.send("❌ Player not active.", ephemeral=True)
+        player.loop_mode = "off" if player.loop_mode == "queue" else "queue"
+        status = "ENABLED 🔁" if player.loop_mode == "queue" else "DISABLED ⏹️"
+        await ctx.send(f"🔁 **Queue Loop:** `{status}`")
+
+    # =========================================================================
     # COMMAND: SHUFFLE
     # =========================================================================
     @commands.hybrid_command(name="shuffle", aliases=["sh"], description="Shuffle songs in the current queue.")
@@ -2189,9 +2228,34 @@ class Music(commands.Cog):
         await ctx.send(f"🔀 **Shuffled {len(player.queue)} songs in the queue!**")
 
     # =========================================================================
+    # COMMAND: MOVE (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(
+        name="move",
+        aliases=["m"],
+        description="Move a song from one position in the queue to another."
+    )
+    @app_commands.describe(from_pos="Current song position in queue", to_pos="New position (defaults to 1 - top of queue)")
+    async def move(self, ctx: commands.Context, from_pos: int, to_pos: Optional[int] = 1):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.queue:
+            return await ctx.send("❌ Queue is empty.", ephemeral=True)
+        q_len = len(player.queue)
+        if not 1 <= from_pos <= q_len or not 1 <= to_pos <= q_len:
+            return await ctx.send(f"❌ Positions must be between 1 and {q_len}.", ephemeral=True)
+
+        q_list = list(player.queue)
+        song = q_list.pop(from_pos - 1)
+        q_list.insert(to_pos - 1, song)
+        player.queue = deque(q_list)
+
+        await ctx.send(f"🔀 Moved **`{song.title}`** from `#{from_pos}` to `#{to_pos}`!")
+
+    # =========================================================================
     # COMMAND: REMOVE
     # =========================================================================
-    @commands.command(name="remove", aliases=["rm"])
+    @commands.hybrid_command(name="remove", aliases=["rm"], description="Remove a song from the queue by position number.")
+    @app_commands.describe(index="Position number in queue to remove")
     async def remove(self, ctx: commands.Context, index: int):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
@@ -2200,14 +2264,15 @@ class Music(commands.Cog):
         if not 1 <= index <= len(player.queue):
             return await ctx.send(f"❌ Invalid position. Choose between 1 and {len(player.queue)}.", ephemeral=True)
 
-        removed_song = player.queue[index - 1]
-        del player.queue[index - 1]
+        q_list = list(player.queue)
+        removed_song = q_list.pop(index - 1)
+        player.queue = deque(q_list)
         await ctx.send(f"🗑️ **Removed track #{index}:** `{removed_song.title}`")
 
     # =========================================================================
     # COMMAND: CLEAR QUEUE
     # =========================================================================
-    @commands.command(name="clearqueue", aliases=["cq", "emptyqueue", "qclear"])
+    @commands.hybrid_command(name="clear", aliases=["clearqueue", "cq", "emptyqueue", "qclear"], description="Clear all songs from the music queue.")
     async def clearqueue(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.queue:
@@ -2218,9 +2283,61 @@ class Music(commands.Cog):
         await ctx.send(f"🗑️ **Cleared {count} tracks from the queue.**")
 
     # =========================================================================
+    # COMMAND: REMOVEDUPES (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(
+        name="removedupes",
+        aliases=["rmd", "rd", "drm"],
+        description="Automatically remove duplicate songs from the queue."
+    )
+    async def removedupes(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or len(player.queue) < 2:
+            return await ctx.send("❌ Not enough songs in queue to check for duplicates.", ephemeral=True)
+
+        seen = set()
+        new_q = deque()
+        removed = 0
+        for song in player.queue:
+            identifier = song.webpage_url or song.title.lower().strip()
+            if identifier in seen:
+                removed += 1
+            else:
+                seen.add(identifier)
+                new_q.append(song)
+        player.queue = new_q
+        await ctx.send(f"🧹 Removed **{removed} duplicate track(s)**! `{len(player.queue)} tracks remaining in queue.`")
+
+    # =========================================================================
+    # COMMAND: LEAVECLEANUP (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(
+        name="leavecleanup",
+        aliases=["lc"],
+        description="Remove songs from queue added by users who left the voice channel."
+    )
+    async def leavecleanup(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.queue:
+            return await ctx.send("❌ Queue is empty.", ephemeral=True)
+        if not player.voice_client or not player.voice_client.channel:
+            return await ctx.send("❌ Bot is not currently in a voice channel.", ephemeral=True)
+
+        active_member_ids = {m.id for m in player.voice_client.channel.members if not m.bot}
+        new_q = deque()
+        removed = 0
+        for song in player.queue:
+            if song.requester and song.requester.id not in active_member_ids:
+                removed += 1
+            else:
+                new_q.append(song)
+        player.queue = new_q
+        await ctx.send(f"🧹 Cleaned **{removed} track(s)** from listeners who left the voice room!")
+
+    # =========================================================================
     # COMMAND: REPLAY / RESTART
     # =========================================================================
-    @commands.command(name="replay", aliases=["restart"])
+    @commands.hybrid_command(name="replay", aliases=["restart"], description="Restart the current song from the beginning.")
     async def replay(self, ctx: commands.Context):
         player = self.get_player(ctx.guild.id)
         if not player or not player.current or not player.voice_client:
@@ -2228,29 +2345,21 @@ class Music(commands.Cog):
 
         player.start_time = time.time()
         await player.restart_current_with_filters()
-        await ctx.send(f"🔄 **Replaying:** `{player.current.title}`")
+        await ctx.send(f"🔄 **Replaying from start:** `{player.current.title}`")
 
     # =========================================================================
     # COMMAND: SEEK
     # =========================================================================
-    @commands.command(name="seek")
+    @commands.hybrid_command(name="seek", description="Seek to a position in the current track (e.g. 1:30 or 90).")
+    @app_commands.describe(timestamp="Timestamp to jump to (e.g. 1:30, 2m45s, or 90)")
     async def seek(self, ctx: commands.Context, timestamp: str):
         player = self.get_player(ctx.guild.id)
         if not player or not player.current or not player.voice_client:
             return await ctx.send("❌ No track is currently playing.", ephemeral=True)
 
-        seconds = 0
-        try:
-            if ":" in timestamp:
-                parts = [int(p) for p in timestamp.split(":")]
-                if len(parts) == 2:
-                    seconds = parts[0] * 60 + parts[1]
-                elif len(parts) == 3:
-                    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-            else:
-                seconds = int(timestamp)
-        except Exception:
-            return await ctx.send("❌ Invalid format! Use `mm:ss` (e.g. `1:30`) or total seconds.", ephemeral=True)
+        seconds = self._parse_time_str(timestamp)
+        if seconds is None:
+            return await ctx.send("❌ Invalid format! Use `mm:ss` (e.g. `1:30`), `2m45s`, or seconds.", ephemeral=True)
 
         if player.current.duration > 0 and seconds > player.current.duration:
             return await ctx.send(f"❌ Timestamp exceeds song duration ({time.strftime('%M:%S', time.gmtime(player.current.duration))}).", ephemeral=True)
@@ -2259,6 +2368,102 @@ class Music(commands.Cog):
         await player.restart_current_with_filters()
         seek_str = time.strftime('%M:%S', time.gmtime(seconds))
         await ctx.send(f"⏩ **Seeked to:** `{seek_str}`")
+
+    # =========================================================================
+    # COMMAND: FORWARD & REWIND (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(name="forward", aliases=["fwd"], description="Fast-forward playback by a duration (e.g. 30s or 1m).")
+    @app_commands.describe(duration="Time duration to jump forward (e.g. 15s, 30s, 1m)")
+    async def forward(self, ctx: commands.Context, duration: str = "30s"):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current or not player.voice_client:
+            return await ctx.send("❌ No track is currently playing.", ephemeral=True)
+        sec = self._parse_time_str(duration) or 30
+        current_elapsed = int(time.time() - player.start_time) if player.start_time else 0
+        new_time = min(player.current.duration or 99999, current_elapsed + sec)
+        player.start_time = time.time() - new_time
+        await player.restart_current_with_filters()
+        seek_str = time.strftime('%M:%S', time.gmtime(new_time))
+        await ctx.send(f"⏩ Fast-forwarded `{sec}s` ➔ `{seek_str}`")
+
+    @commands.hybrid_command(name="rewind", aliases=["rwd"], description="Rewind playback by a duration (e.g. 30s or 1m).")
+    @app_commands.describe(duration="Time duration to rewind (e.g. 15s, 30s, 1m)")
+    async def rewind(self, ctx: commands.Context, duration: str = "30s"):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current or not player.voice_client:
+            return await ctx.send("❌ No track is currently playing.", ephemeral=True)
+        sec = self._parse_time_str(duration) or 30
+        current_elapsed = int(time.time() - player.start_time) if player.start_time else 0
+        new_time = max(0, current_elapsed - sec)
+        player.start_time = time.time() - new_time
+        await player.restart_current_with_filters()
+        seek_str = time.strftime('%M:%S', time.gmtime(new_time))
+        await ctx.send(f"⏪ Rewound `{sec}s` ➔ `{seek_str}`")
+
+    # =========================================================================
+    # COMMAND: LIKE & LIKED (RYTHM STANDARD)
+    # =========================================================================
+    @commands.hybrid_command(name="like", aliases=["heart", "love", "grab"], description="Like and save the currently playing song.")
+    async def like_cmd(self, ctx: commands.Context):
+        player = self.get_player(ctx.guild.id)
+        if not player or not player.current:
+            return await ctx.send("❌ Nothing is currently playing to like.", ephemeral=True)
+        from cogs.favorites import load_favorites, save_favorites
+        user_id = str(ctx.author.id)
+        data = load_favorites()
+        favs = data.setdefault(user_id, [])
+        if any(item.get("title") == player.current.title for item in favs):
+            data[user_id] = [item for item in favs if item.get("title") != player.current.title]
+            save_favorites(data)
+            return await ctx.send(f"💔 Removed **`{player.current.title}`** from your liked tracks.")
+        else:
+            favs.append({
+                "title": player.current.title,
+                "url": player.current.webpage_url,
+                "duration": player.current.duration,
+                "thumbnail": player.current.thumbnail,
+                "uploader": player.current.uploader
+            })
+            save_favorites(data)
+            return await ctx.send(f"❤️ Added **[{player.current.title}]({player.current.webpage_url})** to your liked songs! (Total: `{len(favs)}`)")
+
+    @commands.hybrid_command(name="liked", aliases=["likes"], description="View your saved liked songs.")
+    async def liked_cmd(self, ctx: commands.Context):
+        from cogs.favorites import load_favorites
+        data = load_favorites()
+        favs = data.get(str(ctx.author.id), [])
+        if not favs:
+            return await ctx.send("❤️ You have not liked any songs yet. Use `/like` while listening to save tracks!", ephemeral=True)
+        embed = discord.Embed(title=f"❤️ {ctx.author.display_name}'s Liked Tracks", color=0xFF69B4)
+        lines = [f"`{i}.` [{item['title'][:40]}]({item['url']})" for i, item in enumerate(favs[:15], 1)]
+        embed.description = "\n".join(lines)
+        embed.set_footer(text=f"Total: {len(favs)} liked songs • Play with /favorite action:play", icon_url=config.RAI_ICON_URL)
+        await ctx.send(embed=embed, ephemeral=True)
+
+    def _parse_time_str(self, time_str: str) -> Optional[int]:
+        if not time_str:
+            return None
+        time_str = time_str.strip().lower()
+        if ":" in time_str:
+            try:
+                parts = [int(p) for p in time_str.split(":")]
+                if len(parts) == 2:
+                    return parts[0] * 60 + parts[1]
+                elif len(parts) == 3:
+                    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+            except Exception:
+                return None
+        match = re.match(r"^(\d+)\s*(s|sec|seconds|m|min|minutes)?$", time_str)
+        if match:
+            val = int(match.group(1))
+            unit = match.group(2) or "s"
+            if unit.startswith("m"):
+                return val * 60
+            return val
+        try:
+            return int(time_str)
+        except Exception:
+            return None
 
     # =========================================================================
     # COMMAND: AUTOPLAY / SMART RADIO
