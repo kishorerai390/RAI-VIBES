@@ -66,11 +66,31 @@ class BumpReminder(commands.Cog):
                 self.state["reminder_sent"] = False
                 save_state(self.state)
                 logger.info(f"Disboard bump registered at {now}. 2h timer active.")
-                
+
+                bumper = None
+                if message.interaction and message.interaction.user:
+                    bumper = message.interaction.user
+
+                reward_text = ""
+                if bumper:
+                    try:
+                        from cogs.economy import update_user_coins
+                        new_bal = update_user_coins(bumper.id, 500)
+                        reward_text = f"\n\n🎁 **Bumper Reward:** {bumper.mention} earned **🪙 500 Coins**! (New Balance: `{new_bal:,}`)"
+                    except Exception as e:
+                        logger.debug(f"Could not award bump reward: {e}")
+
                 try:
-                    await message.channel.send(
-                        "✨ **Bump Registered!** I will remind you in **2 hours** when the next bump is ready! ⏰"
+                    embed = discord.Embed(
+                        title="🚀 SERVER BUMP SUCCESSFUL!",
+                        description=(
+                            f"✨ Thank you for boosting **RAI FAM 💗** on Disboard!{reward_text}\n\n"
+                            "⏰ The bump cooldown timer is active. I will ping `#🤖｜ʙᴏᴛ-ᴄᴏᴍᴍᴀɴᴅꜱ` in **2 hours** when ready for the next boost!"
+                        ),
+                        color=discord.Color.gold()
                     )
+                    embed.set_footer(text="RAI PLAY 🎮 • Server Growth Engine")
+                    await message.channel.send(embed=embed)
                 except Exception:
                     pass
 
