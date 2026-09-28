@@ -240,10 +240,10 @@ class DropCodeModal(Modal, title="Drop In-Game Team Code 🔑"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         hub = (
-            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
-            or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
+            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ᴄʜᴀᴛ")
+            or discord.utils.get(interaction.guild.text_channels, name="⚔️｜ʟꜰɢ-ᴍᴀᴛᴄʜᴍᴀᴋɪɴɢ")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="gaming-hub")
-            or discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
             or interaction.channel
         )
         game_str = self.game_name.value.strip()
@@ -330,10 +330,10 @@ class LFGHubLauncherView(View):
                 return await interaction.followup.send("⚠️ You already have an active recruiting squad! Please wait for it or finish before opening another.", ephemeral=True)
 
         hub = (
-            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
-            or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
+            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ᴄʜᴀᴛ")
+            or discord.utils.get(interaction.guild.text_channels, name="⚔️｜ʟꜰɢ-ᴍᴀᴛᴄʜᴍᴀᴋɪɴɢ")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
             or discord.utils.get(interaction.guild.text_channels, name="gaming-hub")
-            or discord.utils.get(interaction.guild.text_channels, name="🎮・lfg-matchmaking")
             or interaction.channel
         )
 

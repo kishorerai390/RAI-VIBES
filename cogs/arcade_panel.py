@@ -154,8 +154,9 @@ class ArcadeStationView(View):
     @button(label="Match Squad (LFG)", emoji="🎮", style=discord.ButtonStyle.secondary, custom_id="arcade_station_lfg")
     async def match_squad(self, interaction: discord.Interaction, btn: Button):
         lfg_chan = (
-            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
-            or discord.utils.get(interaction.guild.text_channels, name="🎮・ɢᴀᴍɪɴɢ-ʜᴜʙ")
+            discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ᴄʜᴀᴛ")
+            or discord.utils.get(interaction.guild.text_channels, name="⚔️｜ʟꜰɢ-ᴍᴀᴛᴄʜᴍᴀᴋɪɴɢ")
+            or discord.utils.get(interaction.guild.text_channels, name="🎮｜ɢᴀᴍɪɴɢ-ʜᴜʙ")
         )
         dest = lfg_chan.mention if lfg_chan else "the gaming hub"
         await interaction.response.send_message(
