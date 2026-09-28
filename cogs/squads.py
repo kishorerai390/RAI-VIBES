@@ -323,52 +323,6 @@ class Squads(commands.Cog):
         embed.set_footer(text="RAI VIBES 💗 • Matchmaking Engine", icon_url=config.RAI_ICON_URL)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="bracket", description="Generate a single-elimination tournament match bracket for custom games.")
-    @app_commands.describe(teams="Comma-separated squad names (4, 8, or 16 teams)")
-    async def bracket(self, ctx: commands.Context, teams: Optional[str] = None):
-        if teams:
-            team_list = [t.strip() for t in teams.split(",") if t.strip()]
-        else:
-            team_list = [f"Squad #{i+1}" for i in range(8)]
-
-        count = len(team_list)
-        if count < 4:
-            return await ctx.send("❌ Tournament brackets require at least 4 teams! Provide comma-separated names, e.g. `/bracket teams: Alpha, Bravo, Charlie, Delta`.", ephemeral=True)
-
-        random.shuffle(team_list)
-
-        embed = discord.Embed(
-            title="🏆 TOURNAMENT SINGLE-ELIMINATION BRACKET",
-            description=f"Generated balanced match schedule for **{count} participating squads**:",
-            color=0xFFD700
-        )
-
-        matches = []
-        for i in range(0, len(team_list) - 1, 2):
-            matches.append(f"**Match #{len(matches)+1}:** `{team_list[i]}` ⚔️ `{team_list[i+1]}`")
-
-        if len(team_list) % 2 != 0:
-            matches.append(f"**Match #{len(matches)+1}:** `{team_list[-1]}` *(Bye to next round)*")
-
-        embed.add_field(name="⚔️ ROUND 1 / QUARTERFINALS", value="\n".join(matches), inline=False)
-        embed.add_field(
-            name="🏁 ADVANCEMENT PATH",
-            value="```fix\n[Round 1 / Quarterfinals] ➔ [Semifinals] ➔ [Grand Championship Final]\n```",
-            inline=False
-        )
-        embed.set_footer(text="RAI VIBES 💗 • Community Tournament System", icon_url=config.RAI_ICON_URL)
-
-        match_tuples = []
-        for i in range(0, len(team_list) - 1, 2):
-            match_tuples.append((team_list[i], team_list[i+1]))
-        if len(team_list) % 2 != 0:
-            match_tuples.append((team_list[-1], "BYE (Advance)"))
-
-        card_buf = generate_bracket_card(match_tuples, round_name="Quarterfinals" if count >= 8 else "Semifinals")
-        file = discord.File(fp=card_buf, filename="bracket.png")
-        embed.set_image(url="attachment://bracket.png")
-
-        await ctx.send(embed=embed, file=file)
 
 
 async def setup(bot: commands.Bot):

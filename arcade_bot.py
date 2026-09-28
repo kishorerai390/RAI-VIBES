@@ -90,11 +90,8 @@ ARCADE_EXTENSIONS = [
     "cogs.social",
     "cogs.starboard",
     "cogs.profile",
-    "cogs.telemetry",
     "cogs.general",
     "cogs.lfg",
-    "cogs.tournaments",
-    "cogs.music_quiz",
     "cogs.stream_alerts",
 ]
 

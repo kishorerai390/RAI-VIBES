@@ -170,10 +170,12 @@ def create_bot(use_members: bool = True, use_message_content: bool = True) -> co
         b.add_view(MovieVoteView())
         from cogs.lfg import LFGView, LFGHubLauncherView, CopyCodeView
         from cogs.security_dashboard import SentinelPanicView
+        from cogs.help import MasterCommandHubView
         b.add_view(LFGView())
         b.add_view(LFGHubLauncherView())
         b.add_view(CopyCodeView())
         b.add_view(SentinelPanicView())
+        b.add_view(MasterCommandHubView())
 
         # Update bot profile banner to 3D animated GIF
         banner_path = os.path.join("assets", "rai_vibes_3d_banner.gif")
