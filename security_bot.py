@@ -98,10 +98,12 @@ def create_security_bot(use_members: bool = True, use_message_content: bool = Tr
             GamingRolesView, NotificationRolesView, IdentityRolesView, ColorRolesView
         )
         from cogs.tickets import PersistentTicketLauncherView, TicketChannelControlView
+        from cogs.security_dashboard import SentinelPanicView
         for view_cls in [
             VerifyButtonView, TicketCreateView, TicketCloseView,
             PersistentTicketLauncherView, TicketChannelControlView,
-            GamingRolesView, NotificationRolesView, IdentityRolesView, ColorRolesView
+            GamingRolesView, NotificationRolesView, IdentityRolesView, ColorRolesView,
+            SentinelPanicView
         ]:
             try:
                 bot.add_view(view_cls())

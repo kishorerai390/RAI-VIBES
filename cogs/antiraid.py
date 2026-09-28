@@ -103,7 +103,8 @@ class AntiRaid(commands.Cog):
         recent_joins = [t for t in tracker if now - t <= 10]
         join_threshold = 10
 
-        is_raid_active = bool(settings.get("raid_mode", 0))
+        is_lockdown = bool(settings.get("lockdown", 0))
+        is_raid_active = bool(settings.get("raid_mode", 0)) or is_lockdown
 
         # 1. Trigger automated Raid Mode if threshold crossed
         if len(recent_joins) >= join_threshold and not is_raid_active:
@@ -141,21 +142,27 @@ class AntiRaid(commands.Cog):
                 severity="CRITICAL"
             )
 
-        # 2. If Raid Mode is active, apply quarantine or restrict member
+        # 2. If Raid Mode or Panic Lockdown is active, apply quarantine or restrict member
         if is_raid_active:
+            try:
+                import datetime
+                await member.timeout(datetime.timedelta(days=1), reason="[Panic/Raid Mode] Auto-quarantine on join")
+            except Exception as e:
+                logger.debug(f"Could not timeout member on join: {e}")
+
             quarantine_id = settings.get("quarantine_role_id") or settings.get("unverified_role_id")
             if quarantine_id:
                 quarantine_role = guild.get_role(quarantine_id)
                 if quarantine_role and quarantine_role < guild.me.top_role:
                     try:
-                        await member.add_roles(quarantine_role, reason="[Anti-Raid] Auto-quarantine during active raid mode")
+                        await member.add_roles(quarantine_role, reason="[Anti-Raid] Auto-quarantine during active raid/panic mode")
                     except Exception as e:
                         logger.error(f"Failed to apply quarantine role to {member}: {e}")
 
             # Notify member in DM
             try:
                 await member.send(
-                    f"🛡️ **Notice from {guild.name}**: The server is currently under **Raid Protection Mode**. "
+                    f"🛡️ **Notice from {guild.name}**: The server is currently under **Emergency Defense / Raid Protection**. "
                     f"Your access has been temporarily restricted until staff review the security status."
                 )
             except Exception:
