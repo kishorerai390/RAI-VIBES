@@ -129,6 +129,82 @@ class AntiSpam(commands.Cog):
             except Exception:
                 pass
 
+    async def handle_automod_spam_kick(self, message: discord.Message, count: int = 4):
+        """Thor Apex AutoMod Rapid Spam Kick: Auto-kicks users flooding > 3 messages."""
+        guild = message.guild
+        member = message.author
+        if not isinstance(member, discord.Member):
+            return
+
+        # 1. Delete triggering message and purge recent messages from this spammer in this channel
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        try:
+            def is_spammer(m: discord.Message):
+                return m.author.id == member.id
+            await message.channel.purge(limit=10, check=is_spammer)
+        except Exception:
+            pass
+
+        # 2. Kick member with AutoMod reason
+        kick_reason = "AutoMod (Spamming (> 3 msgs))"
+        kicked = False
+        try:
+            await member.kick(reason=kick_reason)
+            kicked = True
+        except discord.Forbidden:
+            # Fallback to timeout if hierarchy prevents kicking
+            try:
+                await member.timeout(timedelta(hours=1), reason=kick_reason)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error(f"AutoMod kick error on {member}: {e}")
+
+        # 3. Post public AutoMod notification in the channel (Exact Thor Apex format)
+        try:
+            if kicked:
+                await message.channel.send(f"🚫 **{member.name}** was KICKED by AutoMod (Spamming (> 3 msgs)).")
+            else:
+                await message.channel.send(f"🚫 **{member.name}** was TIMED OUT by AutoMod (Spamming (> 3 msgs)).")
+        except Exception:
+            pass
+
+        # 4. Record infraction in database
+        try:
+            await database.record_infraction(
+                guild.id,
+                member.id,
+                "AUTOMOD_KICK" if kicked else "AUTOMOD_TIMEOUT",
+                kick_reason,
+                moderator_id=self.bot.user.id
+            )
+        except Exception:
+            pass
+
+        # 5. Security Sentinel Log Embed
+        log_channel = await self.get_log_channel(guild)
+        if log_channel:
+            embed = discord.Embed(
+                title="🚨 AutoMod Spam Enforcement",
+                description=(
+                    f"**User:** {member.mention} (`{member.name}` • ID: `{member.id}`)\n"
+                    f"**Action:** `{'KICKED' if kicked else 'TIMED OUT'}`\n"
+                    f"**Reason:** `Spamming (> 3 msgs in rapid succession)`\n"
+                    f"**Channel:** {message.channel.mention}"
+                ),
+                color=0xFF0033
+            )
+            embed.set_footer(text="Thor Apex AutoMod Defense Protocol")
+            embed.timestamp = discord.utils.utcnow()
+            try:
+                await log_channel.send(embed=embed)
+            except Exception:
+                pass
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
@@ -179,35 +255,43 @@ class AntiSpam(commands.Cog):
         now = time.time()
         content = message.content
 
-        # 1. Message Flooding Check: >6 messages in 5 seconds
+        # 1. Thor Apex AutoMod Rapid Spam Rule: Kick on > 3 msgs in rapid burst (3.5s)
         timestamps = self.msg_timestamps[member.id]
         timestamps.append(now)
-        recent_msgs = [t for t in timestamps if now - t <= 5]
-        if len(recent_msgs) >= 6:
-            await self.handle_violation(message, "Message Flooding (>6 msgs / 5s)")
+        rapid_burst = [t for t in timestamps if now - t <= 3.5]
+        if len(rapid_burst) > 3:
+            self.msg_timestamps[member.id].clear()
+            await self.handle_automod_spam_kick(message, count=len(rapid_burst))
             return
 
-        # 2. Repeated Character Spam: e.g. "aaaaaaaaaaaaaaaaaaaaa"
+        # 2. General Message Flooding Check: >6 messages in 6 seconds
+        recent_msgs = [t for t in timestamps if now - t <= 6]
+        if len(recent_msgs) >= 6:
+            await self.handle_violation(message, "Message Flooding (>6 msgs / 6s)")
+            return
+
+        # 3. Repeated Character Spam: e.g. "aaaaaaaaaaaaaaaaaaaaa"
         if REPEATED_CHAR_REGEX.search(content):
             await self.handle_violation(message, "Excessive Repeated Characters")
             return
 
-        # 3. Excessive Emoji Spam: >10 emojis
+        # 4. Excessive Emoji Spam: >10 emojis
         emojis = EMOJI_REGEX.findall(content)
         if len(emojis) > 10:
             await self.handle_violation(message, f"Emoji Spam ({len(emojis)} emojis)")
             return
 
-        # 4. Duplicate Message Spam
+        # 5. Duplicate Message Spam
         history = self.msg_history[member.id]
         history.append((content.strip().lower(), now))
-        if len(content.strip()) > 6:
+        if len(content.strip()) > 3:
             recent_identical = [
                 text for text, t in history
-                if text == content.strip().lower() and now - t <= 15
+                if text == content.strip().lower() and now - t <= 12
             ]
-            if len(recent_identical) >= 3:
-                await self.handle_violation(message, "Repeated Duplicate Messages")
+            if len(recent_identical) > 3:
+                self.msg_history[member.id].clear()
+                await self.handle_automod_spam_kick(message, count=len(recent_identical))
                 return
 
     @commands.Cog.listener()
