@@ -457,6 +457,7 @@ async def load_cogs(bot_instance: commands.Bot):
         "cogs.telemetry",
         "cogs.vc_enhancer",
         "cogs.help",
+        "cogs.mention_notifier",
     ]
 
     for extension in initial_extensions:
